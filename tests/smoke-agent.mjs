@@ -1,0 +1,5 @@
+import {readFile} from "node:fs/promises";import {io} from "socket.io-client";
+const tokens=JSON.parse(await readFile("deploy/server/secrets/player-tokens.json","utf8"));const playerId=process.argv[2]??"joueur-01";const token=tokens[playerId];if(!token)throw new Error(`Unknown test player ${playerId}`);
+const socket=io(process.env.SMOKE_SERVER??"http://localhost:8080/agent",{auth:{playerId,token},transports:["websocket"]});
+await new Promise((resolve,reject)=>{socket.on("connect",resolve);socket.on("connect_error",reject)});
+const observedAt=new Date().toISOString();const result=await socket.emitWithAck("telemetry",{type:"state",data:{protocolVersion:1,playerId,game:{name:"pokemon-emerald",language:null,profileId:null,romStatus:"unknown",revision:null,header:{title:"POKEMON EMER","gameCode":"BPEF","version":0},romSha256:"a".repeat(64)},trainer:null,location:null,party:[],observedAt,diagnostic:"ROM non reconnue : test du garde-fou sans lecture mémoire."}});if(!result.ok)throw new Error(result.error);console.log("État de diagnostic accepté",result.receivedAt);await new Promise(r=>setTimeout(r,2000));socket.close();

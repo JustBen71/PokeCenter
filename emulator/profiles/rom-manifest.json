@@ -1,0 +1,5 @@
+{
+  "$schema": "./rom-manifest.schema.json",
+  "version": 1,
+  "roms": []
+}

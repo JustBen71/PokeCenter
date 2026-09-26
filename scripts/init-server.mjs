@@ -1,0 +1,4 @@
+import {randomBytes} from "node:crypto";import {access,copyFile,writeFile,mkdir} from "node:fs/promises";import {resolve} from "node:path";
+const envFile=resolve("deploy/server/.env"),tokensFile=resolve("deploy/server/secrets/player-tokens.json");
+for(const file of [envFile,tokensFile]){try{await access(file);throw new Error(`${file} existe déjà; aucun fichier n’a été écrasé.`)}catch(e){if(e.message?.includes("existe déjà"))throw e}}
+await mkdir(resolve("deploy/server/secrets"),{recursive:true});await writeFile(envFile,`PUBLIC_DOMAIN=:80\nHTTP_PORT=8080\nHTTPS_PORT=443\nDATABASE_PATH=/data/pokerace.sqlite\nCORS_ORIGIN=http://localhost:8080\nOFFLINE_AFTER_MS=15000\nADMIN_TOKEN=${randomBytes(32).toString("hex")}\n`,{flag:"wx",mode:0o600});await writeFile(tokensFile,"{}\n",{flag:"wx",mode:0o600});console.log("Configuration serveur locale créée. Ajoutez ensuite chaque joueur avec scripts/manage-client.mjs.");

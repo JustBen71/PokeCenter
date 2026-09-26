@@ -1,0 +1,3 @@
+import {randomBytes} from "node:crypto";import {readFile,writeFile,mkdir} from "node:fs/promises";import {resolve} from "node:path";
+const id=process.argv[2];if(!id||!/^[a-z0-9][a-z0-9_-]{1,39}$/.test(id)){console.error("Usage: node scripts/manage-client.mjs <player-id>");process.exit(1)}
+const file=resolve("deploy/server/secrets/player-tokens.json");await mkdir(resolve("deploy/server/secrets"),{recursive:true});let tokens={};try{tokens=JSON.parse(await readFile(file,"utf8"))}catch(e){if(e.code!=="ENOENT")throw e}const token=randomBytes(32).toString("hex");tokens[id]=token;await writeFile(file,JSON.stringify(tokens,null,2)+"\n",{mode:0o600});console.log(`Client ${id} enregistré. Copiez ce jeton maintenant :\n${token}\nRedémarrez l’API pour appliquer la modification.`);

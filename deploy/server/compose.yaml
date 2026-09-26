@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DATABASE_PATH: ${DATABASE_PATH:-/data/pokerace.sqlite}
+      PLAYER_TOKENS_FILE: /run/secrets/player-tokens.json
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      OFFLINE_AFTER_MS: ${OFFLINE_AFTER_MS:-15000}
+    volumes:
+      - pokerace_data:/data
+      - ./secrets/player-tokens.json:/run/secrets/player-tokens.json:ro
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+volumes:
+  pokerace_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,4 @@
+import {mkdir,writeFile,access} from "node:fs/promises";import {resolve} from "node:path";
+const base="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";const root=resolve("apps/web/public/sprites");await mkdir(resolve(root,"shiny"),{recursive:true});
+let cursor=1;async function worker(){while(cursor<=386){const id=cursor++;for(const variant of ["", "shiny/"]){const file=resolve(root,variant,String(id)+".png");try{await access(file);continue}catch{}const response=await fetch(`${base}/${variant}${id}.png`);if(!response.ok)throw new Error(`${response.status} sprite ${variant}${id}`);await writeFile(file,Buffer.from(await response.arrayBuffer()));}if(id%50===0)console.log(`${id}/386`);}}
+await Promise.all(Array.from({length:6},worker));console.log("772 sprites génération 3 enregistrés.");

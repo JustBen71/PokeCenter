@@ -1,0 +1,8 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {playerStateSchema,pokemonInjectionSchema,toPublicPlayer} from "../src/index.js";
+const sample={protocolVersion:1,playerId:"joueur-01",game:{name:"pokemon-emerald",language:"fr",profileId:"emerald-fr-test",romStatus:"recognized",revision:"0",header:{title:"POKEMON EMER",gameCode:"BPEF",version:0},romSha256:"a".repeat(64)},trainer:{name:"ÉLISE"},location:{mapGroup:0,mapNumber:1,label:"BOURG-EN-VOL"},party:[{slot:1,speciesId:252,speciesName:"Arcko",nickname:null,level:12,currentHp:28,maxHp:34,shiny:false}],observedAt:"2026-09-25T12:00:00.000Z",diagnostic:null} as const;
+test("validates a bilingual-safe state",()=>assert.equal(playerStateSchema.parse(sample).trainer?.name,"ÉLISE"));
+test("rejects impossible party data",()=>assert.throws(()=>playerStateSchema.parse({...sample,party:[{...sample.party[0],currentHp:99}]})));
+test("never exposes the ROM fingerprint publicly",()=>assert.equal("romSha256" in toPublicPlayer({playerId:"joueur-01",connected:true,receivedAt:sample.observedAt,lastSeenAt:sample.observedAt,state:playerStateSchema.parse(sample)}).state.game,false));
+test("rejects a Pokemon whose EV total exceeds 510",()=>assert.throws(()=>pokemonInjectionSchema.parse({playerId:"joueur-01",slot:1,speciesId:129,nickname:"NULCARPE",level:1,experience:0,currentHp:11,stats:{maxHp:11,attack:5,defense:6,speed:9,spAttack:5,spDefense:6},moves:[{id:150,pp:40},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:0,friendship:70,otName:"POKER",trainerId:1,secretId:2,ivs:{hp:0,attack:0,defense:0,speed:0,spAttack:0,spDefense:0},evs:{hp:255,attack:255,defense:1,speed:0,spAttack:0,spDefense:0},shiny:false})));

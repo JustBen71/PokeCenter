@@ -1,0 +1,14 @@
+{
+  "name": "pokerace-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/api", "apps/web", "packages/shared"],
+  "scripts": {
+    "build": "npm run build -w @pokerace/shared && npm run build -w @pokerace/api && npm run build -w @pokerace/web",
+    "test": "npm run test -w @pokerace/shared && npm run test -w @pokerace/api",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "dev:api": "npm run dev -w @pokerace/api",
+    "dev:web": "npm run dev -w @pokerace/web"
+  },
+  "devDependencies": {"typescript": "5.9.3"}
+}
