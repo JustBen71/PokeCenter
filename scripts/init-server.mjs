@@ -1,4 +1,21 @@
-import {randomBytes} from "node:crypto";import {access,copyFile,writeFile,mkdir} from "node:fs/promises";import {resolve} from "node:path";
-const envFile=resolve("deploy/server/.env"),tokensFile=resolve("deploy/server/secrets/player-tokens.json");
-for(const file of [envFile,tokensFile]){try{await access(file);throw new Error(`${file} existe déjà; aucun fichier n’a été écrasé.`)}catch(e){if(e.message?.includes("existe déjà"))throw e}}
-await mkdir(resolve("deploy/server/secrets"),{recursive:true});await writeFile(envFile,`PUBLIC_DOMAIN=:80\nHTTP_PORT=8080\nHTTPS_PORT=443\nDATABASE_PATH=/data/pokerace.sqlite\nCORS_ORIGIN=http://localhost:8080\nOFFLINE_AFTER_MS=15000\nADMIN_TOKEN=${randomBytes(32).toString("hex")}\n`,{flag:"wx",mode:0o600});await writeFile(tokensFile,"{}\n",{flag:"wx",mode:0o600});console.log("Configuration serveur locale créée. Ajoutez ensuite chaque joueur avec scripts/manage-client.mjs.");
+import {randomBytes} from "node:crypto";
+import {writeFile,mkdir} from "node:fs/promises";
+import {resolve} from "node:path";
+const roomCode=process.argv[2]??"123";
+if(!roomCode.trim()||roomCode.length>128||/[\r\n]/.test(roomCode))throw Error("Code de salon invalide");
+await mkdir(resolve("deploy/server"),{recursive:true});
+try {
+ await writeFile(resolve("deploy/server/.env"),`PUBLIC_DOMAIN=:80
+HTTP_PORT=8080
+HTTPS_PORT=443
+DATABASE_PATH=/data/pokerace.sqlite
+CORS_ORIGIN=http://localhost:8080
+OFFLINE_AFTER_MS=15000
+ROOM_CODE=${roomCode}
+ADMIN_TOKEN=${randomBytes(32).toString("hex")}
+`,{flag:"wx",mode:0o600});
+ console.log("Serveur configuré. Partagez le code de salon choisi avec vos amis. Aucun jeton joueur à créer.");
+} catch(error) {
+ if(error.code==="EEXIST")throw Error("deploy/server/.env existe déjà. Modifiez ROOM_CODE dans ce fichier.");
+ throw error;
+}

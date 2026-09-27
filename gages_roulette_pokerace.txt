@@ -1,0 +1,80 @@
+ROULETTE DU CHAOS — POKÉRACE NUZLOCK RANDOM
+============================================
+
+Principe : Timéo lance la roue et subit personnellement le résultat. Certaines cases lui permettent de choisir un autre joueur à voler, d'échanger des Pokémon ou d'infliger un effet à quelqu'un.
+Règles : aucun soin pendant les combats ; tous les Pokémon concernés par un échange ou un vol doivent être vivants, sauf mention contraire. Les Pokémon ajoutés sont au niveau adapté à la progression.
+
+LES 20 GAGES
+============
+
+1. LE CASSE DU SIÈCLE
+Timéo choisit un joueur et lui vole 50 % de son argent. Le joueur volé ne reçoit rien en échange.
+
+2. LE MAGICARPE DE LA HONTE
+Un Magicarpe niveau 5 rejoint l'équipe de Timéo. Il doit le garder et commencer son prochain combat de dresseur avec lui.
+
+3. LE VOL PARFAIT
+Timéo choisit un Pokémon vivant dans l'équipe d'un autre joueur et le récupère définitivement. Sa victime reçoit un Pokémon complètement aléatoire en échange.
+
+4. LE CONSEIL DES TRAÎTRES
+Les autres joueurs votent pour choisir un Pokémon dans l'équipe de Timéo. Ce Pokémon est échangé contre un Pokémon aléatoire de la box d'un des votants.
+
+5. LE DILEMME DU CON
+Timéo choisit entre deux enveloppes :
+A — Reçois un Pokémon légendaire aléatoire, mais perds immédiatement un Pokémon de ton équipe tiré au sort.
+B — Vole le meilleur Pokémon d'un joueur de ton choix, mais ce joueur choisit un Pokémon de ton équipe à récupérer en échange.
+
+6. LE SYNDICAT DES POKÉMON
+Le Pokémon de Timéo au niveau le plus élevé se met en grève : il reste dans la box jusqu'à ce que Timéo batte son prochain champion.
+
+7. LA RÉSURRECTION INTERDITE
+Timéo peut ressusciter un Pokémon mort, mais les autres joueurs choisissent lequel parmi ses morts. Il peut refuser et garder cette récompense pour plus tard.
+
+8. LE CONTRÔLE FISCAL
+L'argent de Timéo est remis à zéro et redistribué équitablement entre les autres joueurs.
+
+9. LE PACTE AVEC LE DIABLE
+Timéo reçoit un Pokémon légendaire aléatoire à un niveau adapté. En échange, il ne peut capturer aucun Pokémon sur les deux prochaines routes.
+
+10. LE DERNIER DE LA CLASSE
+Timéo doit garder son Pokémon le plus faible dans son équipe jusqu'au prochain badge. S'il meurt, les autres joueurs choisissent son surnom Discord pendant 24 heures.
+
+11. LE BRAQUAGE RATÉ
+Timéo tente de voler le Pokémon de son choix à un autre joueur. Une deuxième roulette décide : 50 % de réussite ; 50 % de chance que la victime vole à la place un Pokémon aléatoire à Timéo.
+
+12. LE POKÉMON TEMU
+Timéo choisit une espèce et reçoit ce Pokémon, mais ses IV, sa nature, son talent et ses quatre attaques sont complètement randomisés.
+
+13. L'ARNAQUEUR ARNAQUÉ
+Timéo désigne un autre joueur. Chacun place dans une Poké Ball virtuelle un Pokémon aléatoire de sa box. Les deux Pokémon sont échangés sans révéler leur identité au préalable.
+
+14. LE DIEU DES PAUVRES
+Timéo récupère gratuitement un Pokémon de son choix appartenant au joueur actuellement dernier, mais doit lui donner son Pokémon au niveau le plus élevé.
+
+15. LA BANANE MARIO KART
+Timéo reçoit une carte lui permettant de forcer un autre joueur à relancer sa prochaine roulette et à subir le deuxième résultat. La carte expire au prochain badge.
+
+16. LA ROUE DANS LA ROUE
+Timéo relance deux fois la roulette et subit les deux résultats. Si l'un accorde une immunité, elle ne protège pas contre l'autre.
+
+17. LE POKÉMON DU PEUPLE
+Les autres joueurs proposent trois Pokémon absurdes. Timéo en reçoit un au hasard, à un niveau adapté à sa progression, et doit le garder jusqu'au prochain champion.
+
+18. L'HÉRITAGE
+Timéo désigne un autre joueur comme héritier. Si l'un de ses Pokémon meurt avant son prochain badge, l'héritier reçoit 50 % de son argent. Si aucun ne meurt, Timéo vole 25 % de l'argent de son héritier.
+
+19. LE DOUBLE OU RIEN
+Timéo choisit l'un de ses Pokémon vivants. Pile : il obtient un deuxième Pokémon de la même espèce et au même niveau. Face : son Pokémon choisi est envoyé dans la box jusqu'au prochain badge.
+
+20. LE JOKER ABSOLU
+Timéo gagne un joker utilisable avant son prochain badge : il peut soit refuser une future roulette, soit forcer un joueur de son choix à lui donner un Pokémon aléatoire de sa box.
+
+RÉPARTITION SUGGÉRÉE
+===================
+Chaos et échanges : 35 %
+Malus personnels : 30 %
+Gros jackpots : 20 %
+Catastrophes : 10 %
+Événements légendaires : 5 %
+
+Note : les enchères sont prévues comme fonctionnalité à part et ne figurent pas dans cette roulette.

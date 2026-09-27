@@ -1,0 +1,17 @@
+{
+  "profileId": "emerald-fr-bpef-v0",
+  "language": "fr",
+  "gameCode": "BPEF",
+  "version": 0,
+  "revision": "BPEF v0",
+  "saveBlock1Pointer": 50355596,
+  "saveBlock2Pointer": 50355600,
+  "partyAddress": 33703148,
+  "partyCountAddress": 33703145,
+  "status": "read-validated",
+  "allowWrites": true,
+  "sources": [
+    "https://github.com/mgba-emu/mgba/blob/master/res/scripts/demos/pokemon.lua",
+    "https://github.com/pret/pokeemerald"
+  ]
+}

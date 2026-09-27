@@ -1,5 +1,11 @@
 {
   "$schema": "./rom-manifest.schema.json",
   "version": 1,
-  "roms": []
+  "roms": [{
+    "sha256": "e79b40e6189550b4870b06918a5c59e04d3a2e1d7c92718aeda92181201f51e4",
+    "profileId": "emerald-fr-bpef-v0",
+    "language": "fr",
+    "revision": "BPEF v0",
+    "validated": true
+  }]
 }

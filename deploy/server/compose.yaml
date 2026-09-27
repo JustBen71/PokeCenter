@@ -7,13 +7,12 @@ services:
     environment:
       PORT: 3000
       DATABASE_PATH: ${DATABASE_PATH:-/data/pokerace.sqlite}
-      PLAYER_TOKENS_FILE: /run/secrets/player-tokens.json
+      ROOM_CODE: ${ROOM_CODE:?ROOM_CODE is required}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is required}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       OFFLINE_AFTER_MS: ${OFFLINE_AFTER_MS:-15000}
     volumes:
       - pokerace_data:/data
-      - ./secrets/player-tokens.json:/run/secrets/player-tokens.json:ro
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s

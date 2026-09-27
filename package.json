@@ -5,8 +5,8 @@
   "workspaces": ["apps/api", "apps/web", "packages/shared"],
   "scripts": {
     "build": "npm run build -w @pokerace/shared && npm run build -w @pokerace/api && npm run build -w @pokerace/web",
-    "test": "npm run test -w @pokerace/shared && npm run test -w @pokerace/api",
-    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm run test -w @pokerace/shared && npm run test -w @pokerace/api && npm run test -w @pokerace/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:api": "npm run dev -w @pokerace/api",
     "dev:web": "npm run dev -w @pokerace/web"
   },

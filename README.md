@@ -6,7 +6,9 @@ Le cahier des charges source est conservé dans [README_Pokerace.md](README_Poke
 
 ## État réel du projet
 
-Le serveur, le dashboard, les contrats JSON, l'authentification par joueur, la persistance, les diagnostics de ROM, le rendu des sprites hors ligne et le créateur de Pokémon sont implémentés. Le serveur fonctionne sous Docker ; le poste joueur utilise mGBA et l'agent Python directement sous Windows. La ROM française locale BPEF v0 actuellement configurée dispose d'un extracteur mémoire testé avec l'instance mGBA du joueur.
+Le serveur, le dashboard, les contrats JSON, l'authentification par joueur, la persistance, les diagnostics de ROM, le rendu des sprites hors ligne et le créateur de Pokémon sont implémentés. Le serveur fonctionne sous Docker ; le poste joueur utilise mGBA et l'agent Python directement sous Windows. Deux profils mémoire candidats FR/EN sont testés sur mémoire simulée, mais restent à valider avec de vraies sauvegardes. Le registre des ROM validées est vide : aucune ROM inconnue ne déclenche de lecture ou d'écriture RAM.
+
+Le nouveau [client CMD Windows](docs/player-client.md) recherche les ROM dans les dossiers Users, affiche leurs chemins et lance la sélection dans mGBA avec chargement de Lua. Le chargement passe directement par `--script`, sans automatisation des menus. Si mGBA ne propose pas cette option, `scripts/setup-mgba-windows.ps1` installe une copie portable officielle de développement adaptée.
 
 mGBA s'ouvre comme une application Windows normale, ce qui conserve le son, les manettes et la fenêtre native. Le script Lua lit l'état en direct et accepte les commandes d'insertion provenant de l'agent local, uniquement sur `127.0.0.1`.
 
@@ -22,17 +24,12 @@ Prérequis : Node.js 22 uniquement pour générer les secrets/clients, puis Dock
 
 ```bash
 node scripts/init-server.mjs
-node scripts/manage-client.mjs joueur-01
 cd deploy/server
 docker compose up -d --build
 docker compose ps
 ```
 
-Copier le jeton affiché par `manage-client.mjs` dans la configuration du joueur. Après chaque ajout ou révocation, redémarrer l’API :
-
-```bash
-docker compose restart api
-```
+Le code de salon initial est `123`. Partagez-le avec les joueurs : aucun jeton individuel ni inscription côté serveur n'est nécessaire. Pour le changer, modifiez `ROOM_CODE` dans `deploy/server/.env`, puis relancez `docker compose up -d` depuis `deploy/server` pour appliquer la nouvelle configuration.
 
 En local, ouvrir `http://localhost:8080`. Pour Internet, modifier `deploy/server/.env` :
 
@@ -45,17 +42,17 @@ Caddy obtient alors automatiquement le certificat si le DNS et les ports 80/443 
 
 ## Démarrage d’un joueur sous Windows
 
-Prérequis : mGBA installé sous Windows et Python 3.12 avec le lanceur `py`. Créer d’abord le jeton du joueur côté serveur, puis ouvrir PowerShell dans le projet :
+Prérequis : mGBA installé sous Windows et Python 3.12 avec le lanceur `py`. Double-cliquer sur `player.cmd` ou ouvrir PowerShell dans le projet :
 
 ```powershell
-.\scripts\setup-player-windows.ps1
-# renseigner deploy\player\player.env
-.\scripts\start-player-windows.ps1
+.\player.cmd
 ```
 
-`MGBA_PATH` permet au script de lancer mGBA et d’ouvrir automatiquement `ROM_PATH`. Si ce chemin n’est pas renseigné ou invalide, le script laisse mGBA ouvert manuellement. L’agent et le diagnostic communiquent uniquement sur `127.0.0.1:8765`. La ROM et les sauvegardes restent gérées localement par mGBA sous Windows.
+Au premier lancement, le client demande l’adresse du serveur, ton pseudo et le code du salon. Il enregistre ces informations et gère automatiquement l’identifiant du joueur. `player.cmd --configure` permet de les modifier.
 
-Avec le manifeste actuel, le dashboard affiche « ROM non reconnue » et les métadonnées d’en-tête. C’est le comportement attendu jusqu’à validation d’un profil. La ROM et la sauvegarde ne quittent jamais le PC joueur ; seul l’état JSON validé et, pour le diagnostic agent→serveur, l’empreinte sont transmis. Le dashboard public ne reçoit jamais l’empreinte complète.
+`MGBA_PATH` indique l'exécutable mGBA. La ROM est choisie dans le client, ou passée avec `player.cmd --rom "chemin.gba"`. Lua et l'agent communiquent sur un port dynamique de `127.0.0.1`, avec vérification de l'identifiant de session. La ROM et les sauvegardes restent gérées localement par mGBA sous Windows.
+
+Le manifeste reconnaît la ROM française BPEF v0 testée en lecture sur un état mGBA réel (voir `docs/rom-compatibility.md`). L’insertion est activée pour ce profil ; le test sur copie mémoire et ses limites sont documentés dans `docs/rom-compatibility.md`. Les autres empreintes affichent « ROM non reconnue » et les métadonnées d’en-tête. La ROM et la sauvegarde ne quittent jamais le PC joueur ; seul l’état JSON validé et, pour le diagnostic agent→serveur, l’empreinte sont transmis. Le dashboard public ne reçoit jamais l’empreinte complète.
 
 ## Développement
 
@@ -73,7 +70,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-L’API demande `PLAYER_TOKENS_FILE`, `ADMIN_TOKEN`, `DATABASE_PATH` et `CORS_ORIGIN`. Le frontend Vite proxifie `/api` et Socket.IO vers `localhost:3000` en développement.
+L’API demande `ROOM_CODE`, `ADMIN_TOKEN`, `DATABASE_PATH` et `CORS_ORIGIN`. Le frontend Vite proxifie `/api` et Socket.IO vers `localhost:3000` en développement.
 
 Les 386 sprites normaux et chromatiques sont copiés localement avec :
 
@@ -124,5 +121,13 @@ Copier ensuite le fichier hors du volume avec `docker compose cp`. Pour restaure
 
 - Aucun profil FR/EN validé : l’extraction du dresseur, des cartes et des Pokémon n’est donc pas annoncée fonctionnelle.
 - Le lanceur joueur fourni cible Windows et Python 3.12. Il ne configure pas automatiquement les contrôles, le son ou l’emplacement des sauvegardes de mGBA.
-- Le script d’administration modifie un fichier local puis exige un redémarrage API ; aucune interface web d’administration n’expose les secrets.
+- Le code de salon est commun aux participants ; la clé administrateur reste séparée et ne doit pas être partagée avec les joueurs.
 - Le dashboard est public derrière Caddy. Ajouter une authentification au proxy si la course doit rester privée.
+
+### Enchères
+
+La page `/#/encheres` propose un Pokémon aléatoire, calculé à partir des niveaux des équipes connectées, puis permet de miser les Pokédollars du jeu. Le bouton Accepter débite le gagnant et ajoute le lot uniquement si son équipe a une place libre. Relancer les clients après mise à jour. Voir [le fonctionnement et les validations](docs/auctions.md).
+
+### Comptes et avatars
+
+Sélectionner ou créer un compte sur le portail, puis renseigner `ACCOUNT_NAME=Ben` dans le client. La case Administrateur organise la gestion des enchères et des gages. Les enchères affichent des fourchettes réglables pour les IV/EV/statistiques. Voir [comptes, rôles et incertitude](docs/accounts.md).

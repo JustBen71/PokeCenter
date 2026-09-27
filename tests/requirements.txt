@@ -1,0 +1,2 @@
+-r ../apps/agent/requirements.txt
+lupa==2.8

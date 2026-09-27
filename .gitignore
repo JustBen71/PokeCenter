@@ -18,3 +18,5 @@ __pycache__/
 deploy/player/player.env
 deploy/server/secrets/player-tokens.json
 *.tsbuildinfo
+.work/
+.player-runtime/
