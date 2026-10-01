@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <BizHawkDir Condition="'$(BizHawkDir)' == ''">$(MSBuildThisFileDirectory)../../.runtime</BizHawkDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Pokerace.BizHawkBridge.Core/Pokerace.BizHawkBridge.Core.csproj" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="BizHawk.Client.Common"><HintPath>$(BizHawkDir)/dll/BizHawk.Client.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BizHawk.Emulation.Common"><HintPath>$(BizHawkDir)/dll/BizHawk.Emulation.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BizHawk.Common"><HintPath>$(BizHawkDir)/dll/BizHawk.Common.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="RequireBizHawk" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(BizHawkDir)/dll/BizHawk.Client.Common.dll')" Text="Run e2e/prepare-bizhawk.ps1 or set -p:BizHawkDir to the official BizHawk 2.11.1 directory." />
+  </Target>
+</Project>

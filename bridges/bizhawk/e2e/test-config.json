@@ -1,0 +1,7 @@
+{
+  "expectedSystemId": "NES",
+  "preferredDomain": "RAM",
+  "testAddress": "0x0300",
+  "initialBytes": "11223344",
+  "writeBytes": "deadbeef"
+}

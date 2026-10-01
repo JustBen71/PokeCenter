@@ -1,0 +1,54 @@
+name: BizHawk bridge
+on:
+  pull_request:
+    paths: ['bridges/bizhawk/**', '.github/workflows/bizhawk-bridge.yml']
+  push:
+    branches: [master, main, 'bizhawk-bridge']
+    paths: ['bridges/bizhawk/**', '.github/workflows/bizhawk-bridge.yml']
+    tags: ['bizhawk-bridge-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-integration:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Download and verify pinned BizHawk assemblies
+        shell: pwsh
+        run: ./bridges/bizhawk/e2e/prepare-bizhawk.ps1
+      - run: dotnet restore bridges/bizhawk/Pokerace.BizHawkBridge.sln
+      - run: dotnet build bridges/bizhawk/Pokerace.BizHawkBridge.sln --configuration Release --no-restore
+      - run: dotnet test bridges/bizhawk/Pokerace.BizHawkBridge.sln --configuration Release --no-build --logger "trx;LogFileName=bridge-tests.trx" --results-directory bridges/bizhawk/artifacts/tests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-unit-results
+          path: bridges/bizhawk/artifacts/tests
+
+  e2e-bizhawk:
+    needs: unit-and-integration
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Real BizHawk, real bridge, original homebrew ROM
+        shell: pwsh
+        run: ./bridges/bizhawk/e2e/run-e2e.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-e2e-results
+          path: bridges/bizhawk/artifacts/e2e

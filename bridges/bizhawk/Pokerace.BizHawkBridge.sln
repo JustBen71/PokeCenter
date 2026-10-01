@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{34303374-B45D-4DBD-8044-0C9E0D599B9C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pokerace.BizHawkBridge.Core", "src\Pokerace.BizHawkBridge.Core\Pokerace.BizHawkBridge.Core.csproj", "{A15A7CF7-70B0-4168-AAB6-A4E1767C36AB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pokerace.BizHawkBridge", "src\Pokerace.BizHawkBridge\Pokerace.BizHawkBridge.csproj", "{9FBCFE39-0DCB-4C0E-9C90-BCDAC6F756D8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{B3A21B94-8E30-42EB-9F23-18340918175C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pokerace.BizHawkBridge.Cli", "tools\Pokerace.BizHawkBridge.Cli\Pokerace.BizHawkBridge.Cli.csproj", "{2A1C96A0-800E-47C7-BFF6-C0F6F88C4D16}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{B0BF6D00-0E2E-4C11-ADB8-D5A1843B7E89}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pokerace.BizHawkBridge.Tests", "tests\Pokerace.BizHawkBridge.Tests\Pokerace.BizHawkBridge.Tests.csproj", "{0D597E36-BFBE-40CB-BBBD-619878CA4E87}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A15A7CF7-70B0-4168-AAB6-A4E1767C36AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A15A7CF7-70B0-4168-AAB6-A4E1767C36AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A15A7CF7-70B0-4168-AAB6-A4E1767C36AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A15A7CF7-70B0-4168-AAB6-A4E1767C36AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FBCFE39-0DCB-4C0E-9C90-BCDAC6F756D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FBCFE39-0DCB-4C0E-9C90-BCDAC6F756D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FBCFE39-0DCB-4C0E-9C90-BCDAC6F756D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FBCFE39-0DCB-4C0E-9C90-BCDAC6F756D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A1C96A0-800E-47C7-BFF6-C0F6F88C4D16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A1C96A0-800E-47C7-BFF6-C0F6F88C4D16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A1C96A0-800E-47C7-BFF6-C0F6F88C4D16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A1C96A0-800E-47C7-BFF6-C0F6F88C4D16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D597E36-BFBE-40CB-BBBD-619878CA4E87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D597E36-BFBE-40CB-BBBD-619878CA4E87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D597E36-BFBE-40CB-BBBD-619878CA4E87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D597E36-BFBE-40CB-BBBD-619878CA4E87}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A15A7CF7-70B0-4168-AAB6-A4E1767C36AB} = {34303374-B45D-4DBD-8044-0C9E0D599B9C}
+		{9FBCFE39-0DCB-4C0E-9C90-BCDAC6F756D8} = {34303374-B45D-4DBD-8044-0C9E0D599B9C}
+		{2A1C96A0-800E-47C7-BFF6-C0F6F88C4D16} = {B3A21B94-8E30-42EB-9F23-18340918175C}
+		{0D597E36-BFBE-40CB-BBBD-619878CA4E87} = {B0BF6D00-0E2E-4C11-ADB8-D5A1843B7E89}
+	EndGlobalSection
+EndGlobal
