@@ -37,7 +37,7 @@ try {
     # GitHub's disposable Windows runner is elevated. BizHawk otherwise opens
     # a modal privilege notice before constructing MainForm or loading our DLL.
     # Apply this only to the generated CI configuration, never a user's config.
-    @{ LastWrittenFrom = '2.11.1'; FirstBoot = $false; SkipSuperuserPrivsCheck = $true; DispMethod = 1; SoundEnabled = $false; TrustedExtTools = $trusted } |
+    @{ LastWrittenFrom = '2.11.1'; FirstBoot = $false; SkipSuperuserPrivsCheck = $true; DispMethod = 1; SoundEnabled = $false; SoundOutputMethod = 'Dummy'; TrustedExtTools = $trusted } |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $config -Encoding utf8
     $fixture = Get-Content (Join-Path $PSScriptRoot 'test-config.json') -Raw | ConvertFrom-Json
     $env:POKERACE_BRIDGE_TOKEN = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
