@@ -25,9 +25,11 @@ public sealed class BridgeForm : Form, IExternalToolForm
         Text = "Pokérace — BizHawk Bridge"; Width = 440; Height = 130;
         Controls.Add(status);
     }
-    protected override void OnShown(EventArgs e)
+    protected override void OnHandleCreated(EventArgs e)
     {
-        base.OnShown(e);
+        // The hidden CI launch can defer Shown until shutdown. Start once the
+        // dispatcher has a window handle, independently of window visibility.
+        base.OnHandleCreated(e);
         if (server != null) return;
         try
         {
