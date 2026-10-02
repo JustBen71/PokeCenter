@@ -11,6 +11,40 @@ $process = $null
 $oldToken = $env:POKERACE_BRIDGE_TOKEN
 $oldPort = $env:POKERACE_BRIDGE_PORT
 $oldLog = $env:POKERACE_BRIDGE_LOG
+Add-Type @'
+using System;
+using System.Text;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class E2EWindows {
+    public delegate bool Callback(IntPtr handle, IntPtr state);
+    [DllImport("user32.dll")] static extern bool EnumWindows(Callback callback, IntPtr state);
+    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, Callback callback, IntPtr state);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr handle, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr handle, StringBuilder text, int length);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
+    public static bool Close(uint pid) {
+        // Process.CloseMainWindow excludes invisible windows. Address only the
+        // verified EmuHawk main window of the process this harness launched.
+        bool posted = false;
+        EnumWindows((h, s) => {
+            uint owner; GetWindowThreadProcessId(h, out owner);
+            if (owner != pid) return true;
+            var title = new StringBuilder(2048); GetWindowText(h, title, title.Capacity);
+            if (!title.ToString().EndsWith(" - BizHawk", StringComparison.Ordinal)) return true;
+            posted = PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero); // WM_CLOSE, normal application shutdown
+            return !posted;
+        }, IntPtr.Zero);
+        return posted;
+    }
+    public static string[] Read(uint pid) {
+        var lines = new List<string>();
+        Callback read = (h, s) => { var text = new StringBuilder(2048); GetWindowText(h, text, text.Capacity); if(text.Length > 0) lines.Add(text.ToString()); return true; };
+        EnumWindows((h, s) => { uint owner; GetWindowThreadProcessId(h, out owner); if(owner == pid) { read(h, s); EnumChildWindows(h, read, s); } return true; }, IntPtr.Zero);
+        return lines.ToArray();
+    }
+}
+'@
 $stage = 'prepare'
 try {
     & (Join-Path $PSScriptRoot 'prepare-bizhawk.ps1') -Destination $runtime
@@ -113,7 +147,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Client E2E failed.' }
     }
     $stage = 'close'
-    if (!$process.CloseMainWindow() -or !$process.WaitForExit(10000)) { throw 'BizHawk did not shut down cleanly.' }
+    if (![E2EWindows]::Close($process.Id) -or !$process.WaitForExit(10000)) { throw 'BizHawk did not shut down cleanly.' }
     if ($process.ExitCode -ne 0) { throw "BizHawk exit code $($process.ExitCode)." }
     'E2E_BIZHAWK_VERIFIED: real DLL + homebrew + read/write/read-back/restore + clean exit' | Set-Content (Join-Path $artifacts 'result.txt')
     Write-Host 'E2E_BIZHAWK_VERIFIED'
@@ -122,25 +156,7 @@ catch {
     "FAILED stage=$stage : $($_.Exception.Message)" | Set-Content (Join-Path $artifacts 'result.txt')
     # Diagnostics from this disposable runner only, before closing any dialog.
     if ($null -ne $process -and !$process.HasExited) {
-        Add-Type @'
-using System;
-using System.Text;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-public static class E2EWindows {
-    public delegate bool Callback(IntPtr handle, IntPtr state);
-    [DllImport("user32.dll")] static extern bool EnumWindows(Callback callback, IntPtr state);
-    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, Callback callback, IntPtr state);
-    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr handle, out uint pid);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr handle, StringBuilder text, int length);
-    public static string[] Read(uint pid) {
-        var lines = new List<string>();
-        Callback read = (h, s) => { var text = new StringBuilder(2048); GetWindowText(h, text, text.Capacity); if(text.Length > 0) lines.Add(text.ToString()); return true; };
-        EnumWindows((h, s) => { uint owner; GetWindowThreadProcessId(h, out owner); if(owner == pid) { read(h, s); EnumChildWindows(h, read, s); } return true; }, IntPtr.Zero);
-        return lines.ToArray();
-    }
-}
-'@
+
         [E2EWindows]::Read($process.Id) | Set-Content (Join-Path $artifacts 'windows.txt')
         Get-Content (Join-Path $artifacts 'windows.txt') | Write-Host
     }
@@ -148,7 +164,7 @@ public static class E2EWindows {
 }
 finally {
     if ($null -ne $process) {
-        if (!$process.HasExited) { $null = $process.CloseMainWindow(); if (!$process.WaitForExit(5000)) { $process.Kill() } }
+        if (!$process.HasExited) { $null = [E2EWindows]::Close($process.Id); if (!$process.WaitForExit(5000)) { $process.Kill() } }
         $process.Dispose()
     }
     $env:POKERACE_BRIDGE_TOKEN = $oldToken

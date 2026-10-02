@@ -27,8 +27,8 @@ public sealed class BridgeForm : Form, IExternalToolForm
     }
     protected override void OnHandleCreated(EventArgs e)
     {
-        // The hidden CI launch can defer Shown until shutdown. Start once the
-        // dispatcher has a window handle, independently of window visibility.
+        // Start once the dispatcher has a window handle, independently of
+        // whether the external tool window is visible.
         base.OnHandleCreated(e);
         if (server != null) return;
         try
