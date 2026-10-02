@@ -24,15 +24,15 @@ public sealed class FakeServer : IAsyncDisposable
     public int Pongs => Volatile.Read(ref pongs);
     public int ProtocolVersion { get; set; } = 1;
     public int Port { get; private set; }
-    private FakeServer()
+    private FakeServer(int port)
     {
-        var builder = WebApplication.CreateBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:0");
+        var builder = WebApplication.CreateBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:" + port);
         app = builder.Build(); app.UseWebSockets();
         app.Map("/socket.io/", HandleAsync);
     }
-    public static async Task<FakeServer> StartAsync()
+    public static async Task<FakeServer> StartAsync(int port = 0)
     {
-        var server = new FakeServer(); await server.app.StartAsync();
+        var server = new FakeServer(port); await server.app.StartAsync();
         server.Port = new Uri(server.app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()).Port;
         return server;
     }
@@ -68,6 +68,7 @@ public sealed class FakeServer : IAsyncDisposable
     }
     public static string Event(string type, JsonObject payload) => "42/client," + new JsonArray(JsonValue.Create(type), payload.DeepClone()).ToJsonString();
     public Task SendAsync(JsonObject command) => peers.OrderBy(p => p.Key).Last().Value.SendAsync(Event("COMMAND", command));
+    public Task SendRawAsync(string frame) => peers.OrderBy(p => p.Key).Last().Value.SendAsync(frame);
     public Task PingAsync() => peers.OrderBy(p => p.Key).Last().Value.SendAsync("2");
     public void DropConnections()
     {

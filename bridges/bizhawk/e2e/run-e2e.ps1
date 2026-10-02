@@ -50,7 +50,8 @@ try {
         -RedirectStandardOutput (Join-Path $artifacts 'bizhawk.stdout.log') -RedirectStandardError (Join-Path $artifacts 'bizhawk.stderr.log')
     $stage = 'wait-for-bridge-and-sentinel'
     $ready = $false
-    $deadline = [DateTime]::UtcNow.AddSeconds(60)
+    $deadline = [DateTime]::UtcNow.AddSeconds(180)
+    $lastReadinessError = ''
     while ([DateTime]::UtcNow -lt $deadline) {
         if ($process.HasExited) { throw "BizHawk exited before readiness (exit $($process.ExitCode))." }
         $client = [Net.Sockets.TcpClient]::new()
@@ -85,10 +86,13 @@ try {
             $ready = $true
             break
         }
-        catch { Start-Sleep -Milliseconds 200 }
+        catch {
+            $lastReadinessError = $_.Exception.Message
+            Start-Sleep -Milliseconds 200
+        }
         finally { $client.Dispose() }
     }
-    if (!$ready) { throw 'Bridge/sentinel readiness timeout; inspect BizHawk and bridge logs.' }
+    if (!$ready) { throw "Bridge/sentinel readiness timeout: $lastReadinessError" }
     Start-Sleep -Milliseconds 250
     $stage = 'doctor-write-read-restore'
     $cli = Join-Path $root 'tools/Pokerace.BizHawkBridge.Cli/bin/Release/net8.0/Pokerace.BizHawkBridge.Cli.dll'

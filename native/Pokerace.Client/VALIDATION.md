@@ -7,7 +7,7 @@ Branche locale : `pokerace-client`, construite sur la branche contenant le bridg
 | Vérification | Résultat |
 |---|---|
 | Build Release, SDK .NET 8.0.425 | Succès, 0 erreur, 0 avertissement |
-| Tests xUnit du client | **29 réussis, 0 échoué, 0 ignoré** |
+| Tests xUnit du client | **50 réussis, 0 échoué, 0 ignoré** |
 | Tests API, y compris ancien client et nouveau namespace | **31 réussis, 0 échoué, 0 ignoré** |
 | Vérification TypeScript de l'API | Succès après compilation du package partagé |
 | Faux bridge : vrai TCP sur `127.0.0.1` | Succès |
@@ -49,9 +49,9 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 
 - **UNIT_VERIFIED** : validé localement sous Windows.
 - **INTEGRATION_VERIFIED** : validé sur TCP/WebSocket réels avec mémoire factice et Socket.IO réel ; ce statut ne désigne pas un vrai émulateur.
-- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes ont réussi depuis Windows. L'exécution des tests sur Linux/macOS reste à confirmer par la CI.
+- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes ont réussi depuis Windows. Les tests et les binaires ont aussi été exécutés avec succès sur les quatre systèmes en CI (run 37018756039, commit 7b924fd ; 29 tests client à ce commit).
 - **E2E_BIZHAWK_CLIENT_VERIFIED** : **NOT_YET_VERIFIED**. Aucun vrai processus BizHawk n'a exécuté ce client durant cette validation.
-- CI Windows/Linux/macOS : workflow ajouté, **aucun run GitHub Actions de cette branche encore confirmé**. La publication de la branche nécessite l'accord explicite du propriétaire.
+- CI Windows/Linux/macOS : **quatre jobs réussis** au commit 7b924fd : https://github.com/JustBen71/PokeCenter/actions/runs/37018756039. Les 21 tests supplémentaires sont validés localement. Le test bridge réel du run 37018756281 a atteint son délai de démarrage ; il ne valide pas encore BizHawk.
 
 ## Limites connues
 
@@ -62,3 +62,4 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 - Aucune équipe Pokémon, enchère ou roulette n'est implémentée ici. Le dashboard existant n'est pas alimenté en données de jeu par ce client générique.
 - La compatibilité de l'émulateur/bridge sur Linux ou macOS est distincte de la portabilité du client.
 - Aucune ROM, sauvegarde, donnée mémoire privée ou installation personnelle de BizHawk n'a été utilisée.
+

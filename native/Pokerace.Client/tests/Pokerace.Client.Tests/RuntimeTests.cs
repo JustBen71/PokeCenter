@@ -34,6 +34,9 @@ public sealed class RuntimeTests
             await server.SendAsync(command);
             var ack = await server.WaitForAsync(m => (string?)m["commandId"] == id);
             Assert.True((bool)ack["ok"]!); Assert.Equal(4, fake.Memory.Writes);
+            var readId = Guid.NewGuid().ToString("D");
+            await server.SendAsync(ClientTests.Command("bridge.readMemory", readId, new() { ["domain"] = "RAM", ["address"] = 123, ["length"] = 4 }));
+            Assert.Equal("deadbeef", (string?)(await server.WaitForAsync(m => (string?)m["commandId"] == readId))["result"]?["data"]);
             await server.PingAsync(); await UntilAsync(() => server.Pongs > 0);
             server.DropConnections();
             await UntilAsync(() => server.Connections >= 2);
@@ -92,5 +95,43 @@ public sealed class RuntimeTests
             await server.WaitForAsync(m => (string?)m["type"] == "BRIDGE_STATUS" && (string?)m["system"] == "NDS");
         }
         finally { cancellation.Cancel(); await running.WaitAsync(TimeSpan.FromSeconds(5)); }
+    }
+    [Fact] public async Task WriteDisabledProducesServerAckWithoutBridgeWrite()
+    {
+        await using var fake = new FakeBridgeServer(); await using var server = await FakeServer.StartAsync();
+        var config = fake.Configuration(serverPort: server.Port);
+        await using var bridge = new BridgeClient(config, () => FakeBridgeServer.Token);
+        await using var connection = new ServerConnection(config);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var running = new ClientRuntime(config, bridge, connection, new ClientLog(TextWriter.Null)).RunAsync(cancellation.Token);
+        try
+        {
+            await server.WaitForAsync(m => (string?)m["type"] == "HELLO");
+            var command = ClientTests.Command("bridge.writeMemory", payload: new() { ["domain"] = "RAM", ["address"] = 0, ["data"] = "deadbeef" });
+            await server.SendAsync(command);
+            var ack = await server.WaitForAsync(m => (string?)m["commandId"] == (string?)command["commandId"]);
+            Assert.False((bool)ack["ok"]!); Assert.Equal("writes_disabled", (string?)ack["error"]?["code"]); Assert.Equal(0, fake.Memory.Writes);
+        }
+        finally { cancellation.Cancel(); await running.WaitAsync(TimeSpan.FromSeconds(5)); }
+    }
+    [Fact] public async Task ServerStopsAndRestartsOnSamePort()
+    {
+        await using var fake = new FakeBridgeServer(); var server = await FakeServer.StartAsync(); var port = server.Port;
+        var config = fake.Configuration(serverPort: port);
+        await using var bridge = new BridgeClient(config, () => FakeBridgeServer.Token);
+        await using var connection = new ServerConnection(config);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var running = new ClientRuntime(config, bridge, connection, new ClientLog(TextWriter.Null), TimeSpan.FromMilliseconds(40), TimeSpan.FromMilliseconds(40)).RunAsync(cancellation.Token);
+        var disposed = false;
+        try
+        {
+            await server.WaitForAsync(m => (string?)m["type"] == "HELLO");
+            await server.DisposeAsync(); disposed = true;
+            await UntilAsync(() => !connection.IsConnected); Assert.False(running.IsCompleted);
+            server = await FakeServer.StartAsync(port); disposed = false;
+            await server.WaitForAsync(m => (string?)m["type"] == "HELLO");
+            await server.WaitForAsync(m => (string?)m["type"] == "HEARTBEAT");
+        }
+        finally { cancellation.Cancel(); await running.WaitAsync(TimeSpan.FromSeconds(5)); if (!disposed) await server.DisposeAsync(); }
     }
 }
