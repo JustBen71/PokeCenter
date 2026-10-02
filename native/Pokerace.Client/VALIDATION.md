@@ -49,9 +49,9 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 
 - **UNIT_VERIFIED** : validé localement sous Windows.
 - **INTEGRATION_VERIFIED** : validé sur TCP/WebSocket réels avec mémoire factice et Socket.IO réel ; ce statut ne désigne pas un vrai émulateur.
-- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes ont réussi depuis Windows. Les tests et les binaires ont aussi été exécutés avec succès sur les quatre systèmes en CI (run 37018756039, commit 7b924fd ; 29 tests client à ce commit).
+- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes ont réussi depuis Windows. Les tests et les binaires ont aussi été exécutés avec succès sur les quatre systèmes en CI (run 37020651074, commit 17c9841 ; 50 tests client).
 - **E2E_BIZHAWK_CLIENT_VERIFIED** : **NOT_YET_VERIFIED**. Aucun vrai processus BizHawk n'a exécuté ce client durant cette validation.
-- CI Windows/Linux/macOS : **quatre jobs réussis** au commit 7b924fd : https://github.com/JustBen71/PokeCenter/actions/runs/37018756039. Les 21 tests supplémentaires sont validés localement. Le test bridge réel du run 37018756281 a atteint son délai de démarrage ; il ne valide pas encore BizHawk.
+- CI Windows/Linux/macOS : **quatre jobs réussis** au commit 17c9841 : https://github.com/JustBen71/PokeCenter/actions/runs/37020651074, avec les 50 tests client. Le test bridge réel du run 37018756281 a atteint son délai de démarrage ; il ne valide pas encore BizHawk.
 
 ## Limites connues
 

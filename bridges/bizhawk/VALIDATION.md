@@ -16,8 +16,8 @@
 
 ## Validation réelle
 
-- GitHub Actions unit/integration : en attente d'exécution du nouveau workflow.
-- GitHub Actions E2E : en attente d'exécution du nouveau workflow.
+- GitHub Actions unit/integration : 45 tests réussis, run https://github.com/JustBen71/PokeCenter/actions/runs/37020650764 (commit 17c9841).
+- GitHub Actions E2E : premiers essais en échec au démarrage du bridge dans la fenêtre cachée. Le démarrage au moment de la création du handle ne suffit pas : run https://github.com/JustBen71/PokeCenter/actions/runs/37021421922 (commit 9259d56) encore en échec, Connection timeout. Cause non résolue ; E2E non validé.
 - ROM : fixture NES original, sources `e2e/test-rom/src/main.asm`, assembleur Python sans dépendance externe, licence MIT.
 - Construction du fixture exécutée : 24 592 octets, SHA-256 `9eb9b1df31eb3c3f7d37e83a616eef022743292240051006adff8180274902d7`.
 - Lecture/écriture/relecture/restauration dans un vrai BizHawk : pas encore vérifiée.
