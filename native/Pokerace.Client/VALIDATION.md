@@ -62,4 +62,3 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 - Aucune équipe Pokémon, enchère ou roulette n'est implémentée ici. Le dashboard existant n'est pas alimenté en données de jeu par ce client générique.
 - La compatibilité de l'émulateur/bridge sur Linux ou macOS est distincte de la portabilité du client.
 - Aucune ROM, sauvegarde, donnée mémoire privée ou installation personnelle de BizHawk n'a été utilisée.
-

@@ -1,10 +1,10 @@
 name: BizHawk bridge
 on:
   pull_request:
-    paths: ['bridges/bizhawk/**', '.github/workflows/bizhawk-bridge.yml']
+    paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'apps/api/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
   push:
     branches: [master, main, 'bizhawk-bridge']
-    paths: ['bridges/bizhawk/**', '.github/workflows/bizhawk-bridge.yml']
+    paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'apps/api/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
     tags: ['bizhawk-bridge-*']
   workflow_dispatch:
 
@@ -44,9 +44,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
       - name: Real BizHawk, real bridge, original homebrew ROM
         shell: pwsh
-        run: ./bridges/bizhawk/e2e/run-e2e.ps1
+        run: ./bridges/bizhawk/e2e/run-e2e.ps1 -ClientE2E
       - uses: actions/upload-artifact@v4
         if: always()
         with:

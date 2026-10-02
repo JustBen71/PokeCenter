@@ -1,4 +1,4 @@
-param([switch]$DisposableCi, [string]$Dotnet = 'dotnet', [string]$Python = 'python')
+param([switch]$DisposableCi, [switch]$ClientE2E, [string]$Dotnet = 'dotnet', [string]$Python = 'python')
 $ErrorActionPreference = 'Stop'
 if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted' -and !$DisposableCi) {
     throw 'Run in a disposable CI/VM. This harness must not depend on the maintainer PC. For an isolated VM, explicitly pass -DisposableCi.'
@@ -99,6 +99,16 @@ try {
     & $Dotnet $cli doctor --port $env:POKERACE_BRIDGE_PORT --domain $fixture.preferredDomain --address $fixture.testAddress `
         --expect $fixture.initialBytes --data $fixture.writeBytes --write-test 2>&1 | Tee-Object -FilePath (Join-Path $artifacts 'doctor.log')
     if ($LASTEXITCODE -ne 0) { throw 'Doctor failed to verify write/read-back/restore.' }
+    if ($ClientE2E) {
+        $stage = 'server-client-bridge-read-write-restore'
+        $repo = [IO.Path]::GetFullPath((Join-Path $root '../..'))
+        $project = Join-Path $repo 'native/Pokerace.Client/src/Pokerace.Client/Pokerace.Client.csproj'
+        & $Dotnet build $project --configuration Release
+        if ($LASTEXITCODE -ne 0) { throw 'Client build failed.' }
+        & node --import tsx (Join-Path $repo 'native/Pokerace.Client/tools/e2e-client.mjs') $Dotnet 2>&1 |
+            Tee-Object -FilePath (Join-Path $artifacts 'client-e2e.log')
+        if ($LASTEXITCODE -ne 0) { throw 'Client E2E failed.' }
+    }
     $stage = 'close'
     if (!$process.CloseMainWindow() -or !$process.WaitForExit(10000)) { throw 'BizHawk did not shut down cleanly.' }
     if ($process.ExitCode -ne 0) { throw "BizHawk exit code $($process.ExitCode)." }
