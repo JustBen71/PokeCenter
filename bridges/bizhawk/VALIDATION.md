@@ -16,12 +16,13 @@
 
 ## Validation réelle
 
-- GitHub Actions unit/integration : 45 tests réussis, run https://github.com/JustBen71/PokeCenter/actions/runs/37020650764 (commit 17c9841).
-- GitHub Actions E2E : premiers essais en échec au démarrage du bridge dans la fenêtre cachée. Le démarrage au moment de la création du handle ne suffit pas : run https://github.com/JustBen71/PokeCenter/actions/runs/37021421922 (commit 9259d56) encore en échec, Connection timeout. Cause non résolue ; E2E non validé.
+- GitHub Actions unit/integration : **45 tests réussis** au commit `3933f86f2f7d2ebeaf85468f2930db250cd95e29`.
+- GitHub Actions E2E : **succès**, [run 37072042070](https://github.com/JustBen71/PokeCenter/actions/runs/37072042070), même commit. Vérifié le 3 octobre 2026 (Europe/Paris).
+- Configuration CI corrigée : sortie audio `Dummy` pour les machines sans périphérique, avertissements interactifs désactivés uniquement dans la configuration jetable, fermeture normale par `WM_CLOSE` de la fenêtre BizHawk du processus lancé (même cachée), code de sortie 0 exigé.
 - ROM : fixture NES original, sources `e2e/test-rom/src/main.asm`, assembleur Python sans dépendance externe, licence MIT.
 - Construction du fixture exécutée : 24 592 octets, SHA-256 `9eb9b1df31eb3c3f7d37e83a616eef022743292240051006adff8180274902d7`.
-- Lecture/écriture/relecture/restauration dans un vrai BizHawk : pas encore vérifiée.
-- Chargement réel : **NOT_YET_VERIFIED** tant qu'un run E2E complet n'a pas réussi.
+- Lecture `11223344`, écriture `deadbeef`, relecture et restauration `11223344` dans un vrai BizHawk : **vérifiées**, avec le CLI puis le vrai client piloté par le serveur Socket.IO.
+- Chargement réel et fermeture propre : **E2E_BIZHAWK_VERIFIED**. Chaîne serveur → client → bridge → BizHawk → ROM : **E2E_BIZHAWK_CLIENT_VERIFIED**.
 - Smoke-test humain initial : non effectué ; **MANUAL_VERIFIED non revendiqué**.
 
 Ne pas transformer un workflow ajouté, un build réussi ou une présence de DLL en preuve E2E. Mettre à jour cette section avec l'URL et le commit du run réellement réussi.

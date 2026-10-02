@@ -182,4 +182,4 @@ Voir [VALIDATION.md](VALIDATION.md) pour les commandes réellement exécutées e
 
 Le [workflow multiplateforme](../../.github/workflows/pokerace-client.yml) teste Windows x64, Linux x64, macOS x64 et macOS arm64. Les statuts `UNIT_VERIFIED`, `INTEGRATION_VERIFIED` et `CROSS_PLATFORM_BUILD_VERIFIED` doivent rester distincts d'une CI réellement verte sur tous les OS et de `E2E_BIZHAWK_CLIENT_VERIFIED`.
 
-L'E2E avec vrai BizHawk n'est pas revendiqué tant que le harness du bridge n'a pas effectivement réussi en environnement CI jetable. Aucun test n'utilise de ROM privée, sauvegarde, BIOS ou installation BizHawk personnelle. Le client ne contient aucun `GameAdapter` ni aucune logique Pokémon.
+L'E2E avec vrai BizHawk est validé en environnement CI jetable : serveur → client → bridge → émulateur → ROM homebrew, avec lecture, écriture, relecture, restauration et fermeture propre. Le commit et les runs de preuve figurent dans [VALIDATION.md](VALIDATION.md). Aucun test n'utilise de ROM privée, sauvegarde, BIOS ou installation BizHawk personnelle. Le client ne contient aucun `GameAdapter` ni aucune logique Pokémon.

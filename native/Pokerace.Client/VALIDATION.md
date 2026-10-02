@@ -49,9 +49,9 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 
 - **UNIT_VERIFIED** : validé localement sous Windows.
 - **INTEGRATION_VERIFIED** : validé sur TCP/WebSocket réels avec mémoire factice et Socket.IO réel ; ce statut ne désigne pas un vrai émulateur.
-- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes ont réussi depuis Windows. Les tests et les binaires ont aussi été exécutés avec succès sur les quatre systèmes en CI (run 37020651074, commit 17c9841 ; 50 tests client).
-- **E2E_BIZHAWK_CLIENT_VERIFIED** : **NOT_YET_VERIFIED**. Aucun vrai processus BizHawk n'a exécuté ce client durant cette validation.
-- CI Windows/Linux/macOS : **quatre jobs réussis** au commit 17c9841 : https://github.com/JustBen71/PokeCenter/actions/runs/37020651074, avec les 50 tests client. Le test bridge réel du run 37018756281 a atteint son délai de démarrage ; il ne valide pas encore BizHawk.
+- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes, tests et lancements des binaires ont réussi sur Windows, Linux, macOS Intel et macOS ARM ([run 37072042136](https://github.com/JustBen71/PokeCenter/actions/runs/37072042136), commit `3933f86f2f7d2ebeaf85468f2930db250cd95e29`, 50 tests client et 31 tests API par job).
+- **E2E_BIZHAWK_CLIENT_VERIFIED** : **succès**, [run 37072042070](https://github.com/JustBen71/PokeCenter/actions/runs/37072042070), même commit. Le serveur Socket.IO avec le namespace de production pilote le vrai client .NET, le vrai bridge et BizHawk 2.11.1 avec la ROM homebrew : lecture `11223344`, écriture `deadbeef`, relecture, restauration puis relecture `11223344`. Fermeture propre de BizHawk confirmée. Vérifié le 3 octobre 2026 (Europe/Paris).
+- CI Windows/Linux/macOS : **quatre jobs réussis**. Les diagnostics et les binaires sont disponibles dans les artefacts des runs ci-dessus.
 
 ## Limites connues
 
