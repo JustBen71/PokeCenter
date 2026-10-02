@@ -1,0 +1,11 @@
+{
+  "serverUrl": "https://race.example.com",
+  "roomCode": "123",
+  "playerName": "Ben",
+  "playerId": "p-example-replace-with-your-own-id",
+  "bridgeHost": "127.0.0.1",
+  "bridgePort": 43821,
+  "allowMemoryWrites": false,
+  "allowInsecureLocalServer": false,
+  "heartbeatSeconds": 5
+}

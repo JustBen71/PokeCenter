@@ -1,4 +1,5 @@
 import {assertKeptPokemon} from './roulette-effects.js';
+import {registerNativeClients} from './native-clients.js';
 import {registerAccounts} from './accounts.js';
 import {accountKey} from '@pokerace/shared';
 import {registerRoulette} from "./roulette-routes.js";
@@ -21,6 +22,7 @@ export function createApp(store:Store,config:Config){
  const agent=io.of("/agent"), dashboard=io.of("/dashboard");const connected=new Map<string,number>();const agentSockets=new Map<string,Set<string>>();
  const actionLocks=new Set<string>();
  const accountsRequired=config.accountsRequired!==false;registerAccounts(app,store,accountsRequired);
+ const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)));
  const publicPlayers=()=>store.all().map(row=>{const account=store.accounts().find(a=>a.id===row.playerId);return {...toPublicPlayer({...row,state:{...row.state,...(account?{playerName:account.name}:{})},connected:(connected.get(row.playerId)??0)>0 && Date.now()-Date.parse(row.lastSeenAt)<config.offlineAfterMs}),account};});
  const broadcast=()=>dashboard.emit("players",publicPlayers());
  registerAuctions(app,store,publicPlayers,async(data,commandId)=>{
@@ -91,5 +93,5 @@ export function createApp(store:Store,config:Config){
    return res.json({ok:true,commandId,confirmed:true});
   } catch {return res.status(504).json({commandId,error:"Confirmation timeout; check game before retrying"});} finally {actionLocks.delete(parsed.data.playerId);}
  });
- const timer=setInterval(broadcast,5000);timer.unref();return {app,server,io};
+ const timer=setInterval(broadcast,5000);timer.unref();return {app,server,io,nativeClients};
 }

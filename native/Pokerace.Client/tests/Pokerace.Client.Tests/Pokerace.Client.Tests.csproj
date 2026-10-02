@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable><IsTestProject>true</IsTestProject></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../src/Pokerace.Client/Pokerace.Client.csproj" />
+    <!-- Test fixture only; the shipped client has no bridge or BizHawk assembly reference. -->
+    <ProjectReference Include="../../../../bridges/bizhawk/src/Pokerace.BizHawkBridge.Core/Pokerace.BizHawkBridge.Core.csproj" />
+    <Compile Include="../../../../bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Fakes.cs" Link="Fixtures/MemoryFakes.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,73 @@
+name: Pokerace native client
+on:
+  pull_request:
+    paths:
+      - 'native/Pokerace.Client/**'
+      - 'bridges/bizhawk/src/Pokerace.BizHawkBridge.Core/**'
+      - 'bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Fakes.cs'
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'package*.json'
+      - '.github/workflows/pokerace-client.yml'
+  push:
+    branches: [master, main, pokerace-client]
+    paths:
+      - 'native/Pokerace.Client/**'
+      - 'bridges/bizhawk/src/Pokerace.BizHawkBridge.Core/**'
+      - 'bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Fakes.cs'
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'package*.json'
+      - '.github/workflows/pokerace-client.yml'
+    tags: ['pokerace-client-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  client:
+    name: Client ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            rid: win-x64
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-15
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @pokerace/shared
+      - run: npm run typecheck -w @pokerace/api
+      - run: npm run test -w @pokerace/api
+      - run: dotnet restore native/Pokerace.Client/Pokerace.Client.sln
+      - run: dotnet build native/Pokerace.Client/Pokerace.Client.sln --configuration Release --no-restore
+      - run: dotnet test native/Pokerace.Client/Pokerace.Client.sln --configuration Release --no-build --logger "trx;LogFileName=client-tests.trx" --results-directory native/Pokerace.Client/artifacts/tests
+      - name: Publish standalone client
+        run: dotnet publish native/Pokerace.Client/src/Pokerace.Client/Pokerace.Client.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained true -o native/Pokerace.Client/artifacts/${{ matrix.rid }}
+      - name: Smoke-test published client
+        shell: pwsh
+        run: |
+          $name = if ($IsWindows) { 'Pokerace.Client.exe' } else { 'Pokerace.Client' }
+          & "./native/Pokerace.Client/artifacts/${{ matrix.rid }}/$name" --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pokerace-client-${{ matrix.rid }}
+          path: native/Pokerace.Client/artifacts
