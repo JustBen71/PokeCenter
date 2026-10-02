@@ -117,6 +117,30 @@ try {
 }
 catch {
     "FAILED stage=$stage : $($_.Exception.Message)" | Set-Content (Join-Path $artifacts 'result.txt')
+    # Diagnostics from this disposable runner only, before closing any dialog.
+    if ($null -ne $process -and !$process.HasExited) {
+        Add-Type @'
+using System;
+using System.Text;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class E2EWindows {
+    public delegate bool Callback(IntPtr handle, IntPtr state);
+    [DllImport("user32.dll")] static extern bool EnumWindows(Callback callback, IntPtr state);
+    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, Callback callback, IntPtr state);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr handle, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr handle, StringBuilder text, int length);
+    public static string[] Read(uint pid) {
+        var lines = new List<string>();
+        Callback read = (h, s) => { var text = new StringBuilder(2048); GetWindowText(h, text, text.Capacity); if(text.Length > 0) lines.Add(text.ToString()); return true; };
+        EnumWindows((h, s) => { uint owner; GetWindowThreadProcessId(h, out owner); if(owner == pid) { read(h, s); EnumChildWindows(h, read, s); } return true; }, IntPtr.Zero);
+        return lines.ToArray();
+    }
+}
+'@
+        [E2EWindows]::Read($process.Id) | Set-Content (Join-Path $artifacts 'windows.txt')
+        Get-Content (Join-Path $artifacts 'windows.txt') | Write-Host
+    }
     throw
 }
 finally {
