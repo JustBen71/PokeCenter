@@ -6,7 +6,11 @@ if (!$Dotnet) {
     $local = Join-Path $root '.work/dotnet/dotnet.exe'
     if (Test-Path -LiteralPath $local) { $Dotnet = $local }
     elseif (Get-Command dotnet -ErrorAction SilentlyContinue) { $Dotnet = (Get-Command dotnet).Source }
-    else {
+    if ($Dotnet) {
+        $sdks = & $Dotnet --list-sdks
+        if (!@($sdks | Where-Object { $_ -match '^(\d+)\.' -and [int]$Matches[1] -ge 8 }).Count) { $Dotnet = $null }
+    }
+    if (!$Dotnet) {
         # Portable SDK, no administrator rights and no machine-wide installation.
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Write-Host 'Premier lancement : preparation du SDK .NET portable...'

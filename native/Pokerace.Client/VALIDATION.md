@@ -7,7 +7,7 @@ Branche locale : `pokerace-client`, construite sur la branche contenant le bridg
 | Vérification | Résultat |
 |---|---|
 | Build Release, SDK .NET 8.0.425 | Succès, 0 erreur, 0 avertissement |
-| Tests xUnit du client | **50 réussis, 0 échoué, 0 ignoré** |
+| Tests xUnit du client | **56 réussis, 0 échoué, 0 ignoré** |
 | Tests API, y compris ancien client et nouveau namespace | **31 réussis, 0 échoué, 0 ignoré** |
 | Vérification TypeScript de l'API | Succès après compilation du package partagé |
 | Faux bridge : vrai TCP sur `127.0.0.1` | Succès |
@@ -22,6 +22,9 @@ Branche locale : `pokerace-client`, construite sur la branche contenant le bridg
 | Doctor avec écritures activées dans la configuration | Succès, **aucune écriture effectuée** |
 | Doctor sans bridge | Échec explicite, code de retour 1 |
 | Socket.IO 4.8.1 réel + module `/client` de production | Succès, authentification, HELLO et ping/pong Engine.IO |
+| Connexion du bridge pendant l'envoi de l'état initial | Succès, transition connectée transmise sans perte |
+| Archive BizHawk altérée | Refus avant extraction |
+| Lanceur autonome avec ROM explicite | Succès avec vrai BizHawk : installation, connexion, commandes mémoire et fermeture |
 | Publication autonome `win-x64` | Succès ; binaire `--help` exécuté sous Windows |
 | Publication autonome `linux-x64` | Succès, compilation depuis Windows |
 | Publication autonome `osx-x64` | Succès, compilation depuis Windows |
@@ -49,9 +52,15 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 
 - **UNIT_VERIFIED** : validé localement sous Windows.
 - **INTEGRATION_VERIFIED** : validé sur TCP/WebSocket réels avec mémoire factice et Socket.IO réel ; ce statut ne désigne pas un vrai émulateur.
-- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes, tests et lancements des binaires ont réussi sur Windows, Linux, macOS Intel et macOS ARM ([run 37072042136](https://github.com/JustBen71/PokeCenter/actions/runs/37072042136), commit `3933f86f2f7d2ebeaf85468f2930db250cd95e29`, 50 tests client et 31 tests API par job).
+- **CROSS_PLATFORM_BUILD_VERIFIED** : les quatre publications autonomes, tests et lancements des binaires ont réussi sur Windows, Linux, macOS Intel et macOS ARM ([run 37099458261](https://github.com/JustBen71/PokeCenter/actions/runs/37099458261), commit `5df930153e847bc3ca42e685da2eacd8cc76c533`, 56 tests client et 31 tests API par job).
 - **E2E_BIZHAWK_CLIENT_VERIFIED** : **succès**, [run 37072042070](https://github.com/JustBen71/PokeCenter/actions/runs/37072042070), même commit. Le serveur Socket.IO avec le namespace de production pilote le vrai client .NET, le vrai bridge et BizHawk 2.11.1 avec la ROM homebrew : lecture `11223344`, écriture `deadbeef`, relecture, restauration puis relecture `11223344`. Fermeture propre de BizHawk confirmée. Vérifié le 3 octobre 2026 (Europe/Paris).
 - CI Windows/Linux/macOS : **quatre jobs réussis**. Les diagnostics et les binaires sont disponibles dans les artefacts des runs ci-dessus.
+
+## Lanceur Windows autonome — 3 octobre 2026
+
+- **E2E_LAUNCHER_VERIFIED** : [run 37099201814](https://github.com/JustBen71/PokeCenter/actions/runs/37099201814), commit `cf29e1001f83f47155651d4b61162db16df56396`. Un seul exécutable publié lance sa copie portable du vrai BizHawk, installe les DLL intégrées, ouvre la ROM homebrew, connecte le client au serveur Socket.IO et exécute lecture/écriture/relecture/restauration. L'arrêt par Entrée ferme normalement BizHawk et termine le lanceur avec le code 0.
+- Le scénario utilise `play --rom` et une configuration de serveur locale explicite. La sélection graphique native et la saisie interactive ne sont pas automatisées dans ce test.
+- Le fichier `pokerace.cmd` prépare le même exécutable depuis les sources si nécessaire. La distribution de l'exécutable n'a besoin ni de Node, ni de Python, ni du SDK .NET.
 
 ## Limites connues
 
