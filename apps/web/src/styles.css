@@ -48,3 +48,5 @@
 .roulette-panel{scroll-margin-top:100px}.avatar-scroll img[src^="/sprites/"]{width:80px;height:80px;object-fit:contain}
 
 .suspended-pokemon{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.suspended-pokemon img{width:64px;height:64px;image-rendering:pixelated}.suspended-pokemon time{font-variant-numeric:tabular-nums;color:#f1ba68;font-size:20px}
+
+.native-status{padding:1.2rem;border:1px solid var(--border,#354859);border-radius:18px;background:var(--panel,#132431);margin-bottom:.65rem}.native-status dl{display:grid;gap:.35rem;font-size:.85rem}.native-status dl div{display:flex;justify-content:space-between;gap:1rem}.native-status dt{opacity:.7}.native-status dd{margin:0;text-align:right}.native-action-notice{padding:.75rem;border-left:3px solid #ffce73;font-size:.85rem}.team-money{padding:0 1.2rem;font-weight:600}

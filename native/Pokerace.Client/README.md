@@ -1,6 +1,6 @@
 # Pokerace.Client
 
-Client console **C# / .NET 8**, indépendant de BizHawk et des règles du jeu. Il relie le bridge local au serveur Pokérace, annonce l'état de connexion, exécute des commandes génériques et renvoie leur résultat. **Les écritures sont désactivées par défaut.**
+Client console **C# / .NET 8**, sans dépendance aux assemblies BizHawk. Il relie le bridge local au serveur Pokérace, annonce l'état de connexion, exécute des commandes génériques et renvoie leur résultat. Il contient également un adaptateur local Émeraude en lecture seule, détaillé dans [le guide de l’état natif](../../docs/native-game-state.md). **Les écritures génériques sont désactivées par défaut.**
 
 ```text
 BizHawk → Pokerace.BizHawkBridge → TCP 127.0.0.1 → Pokerace.Client

@@ -6,6 +6,8 @@ on:
       - 'bridges/bizhawk/src/Pokerace.BizHawkBridge.Core/**'
       - 'bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Fakes.cs'
       - 'apps/api/**'
+      - 'apps/web/**'
+      - 'emulator/profiles/**'
       - 'packages/shared/**'
       - 'package*.json'
       - '.github/workflows/pokerace-client.yml'
@@ -16,6 +18,8 @@ on:
       - 'bridges/bizhawk/src/Pokerace.BizHawkBridge.Core/**'
       - 'bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Fakes.cs'
       - 'apps/api/**'
+      - 'apps/web/**'
+      - 'emulator/profiles/**'
       - 'packages/shared/**'
       - 'package*.json'
       - '.github/workflows/pokerace-client.yml'
@@ -53,8 +57,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build -w @pokerace/shared
+      - run: npm run test -w @pokerace/shared
       - run: npm run typecheck -w @pokerace/api
       - run: npm run test -w @pokerace/api
+      - run: npm run typecheck -w @pokerace/web
+      - run: npm run test -w @pokerace/web
+      - run: npm run build -w @pokerace/web
       - run: dotnet restore native/Pokerace.Client/Pokerace.Client.sln
       - run: dotnet build native/Pokerace.Client/Pokerace.Client.sln --configuration Release --no-restore
       - run: dotnet test native/Pokerace.Client/Pokerace.Client.sln --configuration Release --no-build --logger "trx;LogFileName=client-tests.trx" --results-directory native/Pokerace.Client/artifacts/tests

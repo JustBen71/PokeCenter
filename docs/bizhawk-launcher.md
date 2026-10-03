@@ -25,7 +25,7 @@ pokerace.cmd --rom "C:\Mes jeux\ma ROM.gba"
 
 Avec le seul exécutable, utiliser `Pokerace.Client.exe play --configure` ou `Pokerace.Client.exe play --rom "C:\Mes jeux\ma ROM.gba"`. Sans argument, Windows démarre le même lanceur. La modification des réglages conserve l'identifiant du joueur.
 
-Les écritures mémoire restent désactivées par défaut. Pour les autoriser explicitement, modifier `allowMemoryWrites` dans le fichier de configuration et relancer. Le lanceur ne change pas ce choix. Ce client ne réalise pas d'extraction Pokémon : le dashboard historique mGBA ne reçoit pas automatiquement d'équipe Pokémon de ce nouveau client générique.
+Les écritures mémoire restent désactivées par défaut. Pour les autoriser explicitement, modifier `allowMemoryWrites` dans le fichier de configuration et relancer. Le lanceur ne change pas ce choix. L’adaptateur local lit désormais Émeraude pour les ROM exactement reconnues et publie les données sur le dashboard. Il reste en lecture seule ; les enchères, gages et modifications d’équipe utilisent encore l’agent historique. Voir [les conditions de reconnaissance et les diagnostics](native-game-state.md).
 
 ## Construire
 

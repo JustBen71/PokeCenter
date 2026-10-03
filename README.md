@@ -6,7 +6,7 @@ Sous Windows, double-cliquer sur **`pokerace.cmd`** à la racine du projet. Au p
 
 La distribution CI **`pokerace-launcher-win-x64`** contient aussi un seul **`Pokerace.Client.exe`** : le double-clic suffit, sans Node, Python, SDK .NET ni Docker. Une connexion Internet est nécessaire au premier lancement pour télécharger BizHawk. La ROM reste à fournir par l'utilisateur.
 
-Fermer BizHawk ou appuyer sur Entrée dans la console arrête la session. `pokerace.cmd --configure` modifie les réglages ; `pokerace.cmd --rom "C:\Jeux\ma ROM.gba"` choisit directement un fichier. Voir [le guide du lanceur](docs/bizhawk-launcher.md). Le client BizHawk est générique : l'ancien dashboard Pokémon et son agent mGBA restent un parcours distinct.
+Fermer BizHawk ou appuyer sur Entrée dans la console arrête la session. `pokerace.cmd --configure` modifie les réglages ; `pokerace.cmd --rom "C:\Jeux\ma ROM.gba"` choisit directement un fichier. Voir [le guide du lanceur](docs/bizhawk-launcher.md). Le site affiche désormais le client natif et son état de jeu : l’adaptateur Émeraude lit les ROM exactement reconnues par le manifeste local. Voir [le fonctionnement et les limites](docs/native-game-state.md). Les actions métier restent sur l’agent historique.
 
 Dashboard temps réel auto-hébergé pour une course Pokémon Émeraude. Un agent individuel reçoit les observations d’un extracteur associé à mGBA, les transmet par WebSocket et le serveur conserve le dernier état dans SQLite. Le dashboard montre les connexions, la version du jeu, le dresseur, la zone et les six Pokémon.
 
@@ -14,7 +14,7 @@ Le cahier des charges source est conservé dans [README_Pokerace.md](README_Poke
 
 ## État réel du projet
 
-Le serveur, le dashboard, les contrats JSON, l'authentification par joueur, la persistance, les diagnostics de ROM, le rendu des sprites hors ligne et le créateur de Pokémon sont implémentés. Le serveur fonctionne sous Docker ; le poste joueur utilise mGBA et l'agent Python directement sous Windows. Deux profils mémoire candidats FR/EN sont testés sur mémoire simulée, mais restent à valider avec de vraies sauvegardes. Le registre des ROM validées est vide : aucune ROM inconnue ne déclenche de lecture ou d'écriture RAM.
+Le serveur, le dashboard, les contrats JSON, l'authentification par joueur, la persistance, les diagnostics de ROM, le rendu des sprites hors ligne et le créateur de Pokémon sont implémentés. Le serveur fonctionne sous Docker ; le poste joueur utilise mGBA et l'agent Python directement sous Windows. Le manifeste contient une ROM Émeraude FR BPEF v0 validée en lecture ; le profil anglais reste candidat. Le nouveau client natif porte la lecture en C# et publie un état normalisé. Une ROM inconnue ne déclenche aucune lecture de l’adaptateur.
 
 Le nouveau [client CMD Windows](docs/player-client.md) recherche les ROM dans les dossiers Users, affiche leurs chemins et lance la sélection dans mGBA avec chargement de Lua. Le chargement passe directement par `--script`, sans automatisation des menus. Si mGBA ne propose pas cette option, `scripts/setup-mgba-windows.ps1` installe une copie portable officielle de développement adaptée.
 

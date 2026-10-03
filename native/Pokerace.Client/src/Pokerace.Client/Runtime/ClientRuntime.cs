@@ -1,3 +1,4 @@
+using Pokerace.Client.Games;
 using System.Threading.Channels;
 using Pokerace.Client.Bridge;
 using Pokerace.Client.Commands;
@@ -8,9 +9,10 @@ using Pokerace.Client.Server;
 namespace Pokerace.Client.Runtime;
 
 public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClient bridge, IServerConnection server, ClientLog log,
-    TimeSpan? pollInterval = null, TimeSpan? retryInterval = null)
+    TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null)
 {
     private readonly BridgeConnectionManager manager = new(bridge, log, pollInterval, retryInterval);
+    private readonly GameAdapterManager games = new(bridge, romIdentity);
     private readonly CommandRouter router = new(bridge, configuration);
     private readonly Channel<(ServerMessage Message, long Session)> commands = Channel.CreateBounded<(ServerMessage, long)>(64);
     private long session;
@@ -18,13 +20,14 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         var bridgeTask = manager.RunAsync(lifetime.Token);
+        var gameTask = games.RunAsync(() => manager.Snapshot, lifetime.Token);
         var commandTask = ProcessCommandsAsync(lifetime.Token);
         try { await ServerLoopAsync(lifetime.Token); }
         finally
         {
             lifetime.Cancel(); commands.Writer.TryComplete();
             await server.DisconnectAsync();
-            await Task.WhenAll(bridgeTask, commandTask);
+            await Task.WhenAll(bridgeTask, gameTask, commandTask);
         }
     }
     private async Task ServerLoopAsync(CancellationToken cancellation)
@@ -85,6 +88,7 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
     }
     private async Task HeartbeatAsync(BridgeStatus previous, CancellationToken cancellation)
     {
+        string? gameKey = null;
         var heartbeatAt = DateTimeOffset.UtcNow.AddSeconds(configuration.HeartbeatSeconds);
         while (true)
         {
@@ -94,6 +98,15 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
             {
                 await server.SendAsync("BRIDGE_STATUS", ServerProtocol.BridgeStatusMessage(current), cancellation);
                 previous = current;
+                gameKey = null;
+            }
+            var game = !current.Connected || !current.GameLoaded ? GameObservation.Unavailable("no_game")
+                : current.SystemId != "GBA" ? GameObservation.Unavailable("unsupported_system") : games.Snapshot;
+            var nextKey = game.ContentKey();
+            if (nextKey != gameKey)
+            {
+                await server.SendAsync("GAME_STATE", game.ToMessage(), cancellation);
+                gameKey = nextKey;
             }
             if (DateTimeOffset.UtcNow >= heartbeatAt)
             {

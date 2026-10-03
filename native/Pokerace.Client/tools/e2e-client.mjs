@@ -52,12 +52,14 @@ try {
   let startError;
   child.on('error', error => { startError = error; });
   const deadline = Date.now() + (launcher ? 120000 : 30000);
-  while (!registry.snapshot().some(s => s.ready && s.bridge?.bridge.connected && s.bridge?.system === fixture.expectedSystemId)) {
+  while (!registry.snapshot().some(s => s.ready && s.bridge?.bridge.connected && s.bridge?.system === fixture.expectedSystemId && s.game?.adapter.status === 'unsupported_system')) {
     if (startError) throw startError;
     assert.equal(child.exitCode, null, 'Client exited before readiness');
     assert.ok(Date.now() < deadline, 'Client readiness timeout');
     await delay(100);
   }
+  assert.equal(registry.publicSnapshot()[0].gameState, null, 'NES must not activate Pokemon reads');
+  console.log('E2E_ADAPTER_UNSUPPORTED_SYSTEM_VERIFIED');
   await readExpected(fixture.initialBytes);
   changed = true; // Restore even if the write ACK is lost.
   await command('writeMemory', { ...payload, data: fixture.writeBytes });

@@ -6,6 +6,7 @@ let pongs = 0;
 const http = createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/status') return res.end(JSON.stringify(registry.snapshot()));
+  if (req.url === '/public') return res.end(JSON.stringify(registry.publicSnapshot()));
   if (req.url === '/pongs') return res.end(JSON.stringify({ pongs }));
   res.statusCode = 404; res.end('{}');
 });

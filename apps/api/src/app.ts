@@ -22,7 +22,7 @@ export function createApp(store:Store,config:Config){
  const agent=io.of("/agent"), dashboard=io.of("/dashboard");const connected=new Map<string,number>();const agentSockets=new Map<string,Set<string>>();
  const actionLocks=new Set<string>();
  const accountsRequired=config.accountsRequired!==false;registerAccounts(app,store,accountsRequired);
- const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)));
+ const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)),clients=>dashboard.emit("native-clients",clients));
  const publicPlayers=()=>store.all().map(row=>{const account=store.accounts().find(a=>a.id===row.playerId);return {...toPublicPlayer({...row,state:{...row.state,...(account?{playerName:account.name}:{})},connected:(connected.get(row.playerId)??0)>0 && Date.now()-Date.parse(row.lastSeenAt)<config.offlineAfterMs}),account};});
  const broadcast=()=>dashboard.emit("players",publicPlayers());
  registerAuctions(app,store,publicPlayers,async(data,commandId)=>{
@@ -33,7 +33,7 @@ export function createApp(store:Store,config:Config){
   if(result?.ok!==true)throw Error(String(result?.error??'Achat non confirmé'));
  },actionLocks);
  dashboard.use((socket,next)=>{if(accountsRequired&&!store.accounts().some(a=>a.id===socket.handshake.auth?.accountId))return next(new Error("Choisissez votre compte"));next();});
- dashboard.on("connection",socket=>socket.emit("players",publicPlayers()));
+ dashboard.on("connection",socket=>{socket.emit("players",publicPlayers());socket.emit("native-clients",nativeClients.publicSnapshot());});
  agent.use((socket,next)=>{
   const auth=socket.handshake.auth;
   const playerId=String(auth.playerId??"");
@@ -55,6 +55,7 @@ export function createApp(store:Store,config:Config){
   next();
  });
  agent.on("connection",socket=>{const playerId=socket.data.playerId as string;connected.set(playerId,(connected.get(playerId)??0)+1);if(!agentSockets.has(playerId))agentSockets.set(playerId,new Set());agentSockets.get(playerId)!.add(socket.id);broadcast();socket.on("telemetry",(payload,ack)=>{const bytes=Buffer.byteLength(JSON.stringify(payload));if(bytes>MAX_MESSAGE_BYTES)return ack?.({ok:false,error:"message too large"});const parsed=agentEnvelopeSchema.safeParse(payload);if(!parsed.success)return ack?.({ok:false,error:"invalid payload"});const payloadPlayerId=parsed.data.type==="state"?parsed.data.data.playerId:parsed.data.playerId;if(payloadPlayerId!==socket.data.wirePlayerId)return ack?.({ok:false,error:"player mismatch"});const now=new Date().toISOString();if(parsed.data.type==="state")store.save({...parsed.data.data,playerId,...(socket.data.playerName?{playerName:socket.data.playerName}:{})},now);else store.heartbeat(playerId,now);broadcast();void roulette.observe().catch(error=>console.error("Roulette monitor:",error));ack?.({ok:true,receivedAt:now});});socket.on("disconnect",()=>{connected.set(playerId,Math.max(0,(connected.get(playerId)??1)-1));agentSockets.get(playerId)?.delete(socket.id);broadcast();});});
+ app.get("/api/native-clients",(_req,res)=>res.json(nativeClients.publicSnapshot()));
  app.get("/health",(_req,res)=>res.json({ok:true}));app.get("/api/players",(_req,res)=>res.json(publicPlayers()));
  app.post("/api/admin/clients",(req,res)=>{const token=String(req.headers.authorization??"").replace(/^Bearer /,"");if(!token||!safeEqual(token,config.adminToken))return res.status(401).json({error:"unauthorized"});return res.status(501).json({error:"Use scripts/manage-client.mjs to update the server token file, then restart the API."});});
  app.get(["/api/library","/api/admin/library"],(_req,res)=>res.json(store.library()));

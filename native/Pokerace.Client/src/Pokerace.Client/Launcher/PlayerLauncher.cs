@@ -1,3 +1,4 @@
+using Pokerace.Client.Games;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -49,6 +50,8 @@ public static class PlayerLauncher
         var rom = options.Rom ?? await ChooseRomAsync(cancellation);
         if (string.IsNullOrWhiteSpace(rom)) { Console.WriteLine("Choix de ROM annulé."); return 0; }
         if (!File.Exists(rom)) throw new ClientException("rom_missing", "Le fichier ROM sélectionné est introuvable.");
+        await using var romFile = new FileStream(rom, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var identity = await LocalRomIdentity.FromStreamAsync(romFile, cancellation);
         var runtime = await BizHawkInstaller.PrepareAsync(directory, cancellation);
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var reservation = new TcpListener(IPAddress.Loopback, 0); reservation.Start();
@@ -80,7 +83,7 @@ public static class PlayerLauncher
             Console.WriteLine("Fermez BizHawk ou appuyez sur Entrée ici pour arrêter la session.");
             await using var bridge = new BridgeClient(configuration, () => token);
             await using var server = new ServerConnection(configuration);
-            var client = new ClientRuntime(configuration, bridge, server, new ClientLog(Console.Out)).RunAsync(lifetime.Token);
+            var client = new ClientRuntime(configuration, bridge, server, new ClientLog(Console.Out), romIdentity: identity).RunAsync(lifetime.Token);
             var stop = Task.Run(() => Console.ReadLine());
             await Task.WhenAny(client, exited, stop);
             lifetime.Cancel();

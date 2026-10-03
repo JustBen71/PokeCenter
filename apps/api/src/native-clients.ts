@@ -1,3 +1,4 @@
+import {gameStateEventSchema,type PublicNativeClient} from '@pokerace/shared';
 import {createHash, timingSafeEqual} from 'node:crypto';
 import type {Server} from 'socket.io';
 import {z} from 'zod';
@@ -20,12 +21,22 @@ const safeEqual = (a:string,b:string) => timingSafeEqual(createHash('sha256').up
 
 type Config = {roomCode?:string; accountsRequired?:boolean};
 type Account = {id:string; name:string};
-type ClientState = {playerId:string; accountId:string; playerName:string; socketId:string; ready:boolean; lastSeenAt:string; hello?:z.infer<typeof hello>; bridge?:z.infer<typeof bridgeStatus>; status?:z.infer<typeof status>};
+type ClientState = {playerId:string; accountId:string; playerName:string; socketId:string; ready:boolean; lastSeenAt:string; hello?:z.infer<typeof hello>; bridge?:z.infer<typeof bridgeStatus>; status?:z.infer<typeof status>; game?:z.infer<typeof gameStateEventSchema>};
 
-// Additive namespace: no changes to /agent, game telemetry, dashboard or Pokémon commands.
-export function registerNativeClients(io:Server, config:Config, findAccount:(name:string)=>Account|undefined) {
+// Native observations are additive; business commands still belong to /agent.
+export function registerNativeClients(io:Server, config:Config, findAccount:(name:string)=>Account|undefined, onChange:(clients:PublicNativeClient[])=>void=()=>{}) {
  const namespace=io.of('/client');
  const clients=new Map<string,ClientState>();
+ const publicSnapshot=():PublicNativeClient[]=>[...clients.values()].map(s=>({
+  accountId:s.accountId,playerId:s.playerId,playerName:s.playerName,ready:s.ready,lastSeenAt:s.lastSeenAt,
+  clientVersion:s.hello?.clientVersion??null,platform:s.hello?.platform??null,
+  emulator:s.hello?.emulator?{name:'BizHawk'}:null,
+  bridge:{type:'bizhawk',connected:(s.bridge??s.hello)?.bridge.connected??false,gameLoaded:(s.bridge??s.hello)?.bridge.gameLoaded??false,protocolVersion:(s.bridge??s.hello)?.bridge.protocolVersion??null},
+  system:(s.bridge??s.hello)?.system??null,allowMemoryWrites:s.status?.allowMemoryWrites??false,
+  adapter:s.game?structuredClone(s.game.adapter):{id:null,status:'no_game',profileId:null,capabilities:[]},gameState:s.game?.state?structuredClone(s.game.state):null
+ }));
+ let lastPublic='';
+ const changed=()=>{const rows=publicSnapshot();const key=JSON.stringify(rows.map(({lastSeenAt,...row})=>({...row,gameState:row.gameState?{...row.gameState,observedAt:null}:null})));if(key!==lastPublic){lastPublic=key;onChange(rows);}};
  const pending=new Map<string,{socketId:string; fingerprint:string; resolve:(result:z.infer<typeof ack>)=>void; reject:(error:Error)=>void; timer:ReturnType<typeof setTimeout>; promise:Promise<z.infer<typeof ack>>}>();
  namespace.use((socket,next)=>{
   const parsed=z.object({protocolVersion:z.literal(VERSION),playerId:identity,playerName:z.string().trim().min(1).max(32).refine(v=>!/[\x00-\x1f\x7f]/.test(v)),roomCode:z.string().min(1).max(128)}).safeParse(socket.handshake.auth);
@@ -41,14 +52,14 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
  });
  namespace.on('connection',socket=>{
   const state:ClientState={...socket.data.nativeIdentity,socketId:socket.id,ready:false,lastSeenAt:new Date().toISOString()};
-  clients.set(state.playerId,state);
+  clients.set(state.playerId,state);changed();
   const emitStatus=(ready:boolean)=>socket.emit('SERVER_STATUS',{type:'SERVER_STATUS',protocolVersion:VERSION,connected:true,ready});
   emitStatus(false);
   const deadline=setTimeout(()=>{if(!state.ready)socket.disconnect(true)},10000);deadline.unref();
   socket.on('HELLO',(value:unknown)=>{
    const parsed=hello.safeParse(value);
    if(!parsed.success||parsed.data.playerId!==state.playerId){socket.disconnect(true);return;}
-   state.hello=parsed.data;state.ready=true;state.lastSeenAt=new Date().toISOString();clearTimeout(deadline);emitStatus(true);
+   state.hello=parsed.data;state.ready=true;state.lastSeenAt=new Date().toISOString();clearTimeout(deadline);emitStatus(true);changed();
   });
   for(const [name,schema] of [['CLIENT_STATUS',status],['BRIDGE_STATUS',bridgeStatus],['HEARTBEAT',heartbeat]] as const){
    socket.on(name,(value:unknown)=>{
@@ -56,9 +67,17 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
     if(!state.ready||!parsed.success){socket.disconnect(true);return;}
     state.lastSeenAt=new Date().toISOString();
     if(parsed.data.type==='CLIENT_STATUS')state.status=parsed.data;
-    if(parsed.data.type==='BRIDGE_STATUS')state.bridge=parsed.data;
+    if(parsed.data.type==='BRIDGE_STATUS'){const previous=state.bridge??state.hello;if(JSON.stringify(previous?.bridge)!==JSON.stringify(parsed.data.bridge)||previous?.system!==parsed.data.system)state.game=undefined;state.bridge=parsed.data;}
+    changed();
    });
   }
+  socket.on('GAME_STATE',(value:unknown)=>{
+   if(!state.ready||Buffer.byteLength(JSON.stringify(value)??'')>32768){socket.disconnect(true);return;}
+   const parsed=gameStateEventSchema.safeParse(value);
+   if(!parsed.success){socket.disconnect(true);return;}
+   if(parsed.data.state&&(!(state.bridge??state.hello)?.bridge.connected||!(state.bridge??state.hello)?.bridge.gameLoaded||(state.bridge??state.hello)?.system!=='GBA')){socket.disconnect(true);return;}
+   state.game=parsed.data;state.lastSeenAt=new Date().toISOString();changed();
+  });
   socket.on('COMMAND_ACK',(value:unknown)=>{
    const parsed=ack.safeParse(value);if(!state.ready||!parsed.success)return;
    const key=state.playerId+':'+parsed.data.commandId.toLowerCase();const item=pending.get(key);
@@ -67,10 +86,12 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
   });
   socket.on('disconnect',()=>{
    clearTimeout(deadline);if(clients.get(state.playerId)?.socketId===socket.id)clients.delete(state.playerId);
+   changed();
    for(const [key,item] of pending){if(item.socketId===socket.id){clearTimeout(item.timer);pending.delete(key);item.reject(new Error('Client disconnected; command outcome may be unknown'));}}
   });
  });
  return {
+  publicSnapshot,
   // No raw memory or secrets are retained in the status registry.
   snapshot:()=>[...clients.values()].map(({socketId,...state})=>structuredClone(state)),
   sendCommand(playerId:string, value:z.infer<typeof command>, timeoutMs=15000):Promise<z.infer<typeof ack>> {

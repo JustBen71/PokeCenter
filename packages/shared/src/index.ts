@@ -1,3 +1,4 @@
+export * from './native-client.js';
 export {encodePokemon} from './pokemon-encode.js';
 export * from './accounts.js';
 export * from './pokemon-builder.js';

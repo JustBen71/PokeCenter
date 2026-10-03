@@ -37,8 +37,23 @@ public sealed class SocketIoCompatibilityTests
                 await Task.Delay(20);
             }
             await server.ConnectAsync(default);
-            await server.SendAsync("HELLO", ServerProtocol.Hello(config, new(true, true, "TEST", 1)), default);
+            await server.SendAsync("HELLO", ServerProtocol.Hello(config, new(true, true, "GBA", 1)), default);
             var ready = await server.ReceiveAsync(default); Assert.Equal("SERVER_STATUS", ready.Type);
+            await server.SendAsync("GAME_STATE", (await GameAdapterTests.SampleObservationAsync()).ToMessage(), default);
+            var gameDeadline = DateTime.UtcNow.AddSeconds(5);
+            while (true)
+            {
+                var rows = System.Text.Json.Nodes.JsonNode.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/public"))!;
+                if (rows.AsArray().Count > 0 && rows[0]?["gameState"] is { } game)
+                {
+                    Assert.Equal(12500, (int)game["trainer"]!["money"]!);
+                    Assert.Single(game["party"]!.AsArray());
+                    Assert.DoesNotContain("raw", game.ToJsonString());
+                    break;
+                }
+                Assert.True(DateTime.UtcNow < gameDeadline, "Production API did not accept C# GameAdapter state.");
+                await Task.Delay(20);
+            }
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var receiving = server.ReceiveAsync(timeout.Token); // services Engine.IO ping/pong while no application event is sent
             // Assert observed protocol traffic, not a 300 ms timing margin on
