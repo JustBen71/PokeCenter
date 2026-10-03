@@ -39,9 +39,19 @@ public sealed class SocketIoCompatibilityTests
             await server.ConnectAsync(default);
             await server.SendAsync("HELLO", ServerProtocol.Hello(config, new(true, true, "TEST", 1)), default);
             var ready = await server.ReceiveAsync(default); Assert.Equal("SERVER_STATUS", ready.Type);
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var receiving = server.ReceiveAsync(timeout.Token); // services Engine.IO ping/pong while no application event is sent
-            await Task.Delay(1700);
+            // Assert observed protocol traffic, not a 300 ms timing margin on
+            // a loaded Windows runner. A client that ignores ping cannot pass.
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (true)
+            {
+                var observed = System.Text.Json.Nodes.JsonNode.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/pongs"))!;
+                if ((int)observed["pongs"]! >= 2) break;
+                Assert.True(DateTime.UtcNow < deadline, "Two Engine.IO pong packets were not received.");
+                if (receiving.IsCompleted) await receiving;
+                await Task.Delay(50);
+            }
             Assert.False(receiving.IsCompleted);
             timeout.Cancel(); await Assert.ThrowsAnyAsync<OperationCanceledException>(() => receiving);
             Assert.Equal(0, fake.Memory.Writes);
