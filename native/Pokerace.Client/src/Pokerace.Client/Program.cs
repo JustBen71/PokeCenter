@@ -14,9 +14,11 @@ public static class Program
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
         try
         {
+            if (args.Length == 0 && OperatingSystem.IsWindows() || args.FirstOrDefault() == "play")
+                return await Launcher.PlayerLauncher.RunAsync(args.Skip(args.Length == 0 ? 0 : 1).ToArray(), cancellation.Token);
             if (args.Length == 0 || args[0] is "--help" or "help")
             {
-                Console.WriteLine("Pokerace.Client configure|doctor|run [--config <path>]\nBridge token: POKERACE_BRIDGE_TOKEN environment variable.");
+                Console.WriteLine("Pokerace.Client play [--rom <path>] [--config <path>] [--configure]\nWindows: no arguments launches BizHawk and the client with a ROM picker.\nPokerace.Client configure|doctor|run [--config <path>]\nBridge token for doctor/run: POKERACE_BRIDGE_TOKEN environment variable.");
                 return 0;
             }
             if (args.Length != 1 && (args.Length != 3 || args[1] != "--config")) throw new ClientException("invalid_arguments", "Expected [--config <path>].");
@@ -39,7 +41,12 @@ public static class Program
             return 0;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return 0; }
-        catch (ClientException e) { Console.Error.WriteLine("[FAIL] " + e.Code + ": " + e.Message); return 1; }
-        catch (Exception) { Console.Error.WriteLine("[FAIL] Client failed; check configuration and connectivity."); return 1; }
+        catch (ClientException e) { Console.Error.WriteLine("[FAIL] " + e.Code + ": " + e.Message); WaitBeforeClose(args); return 1; }
+        catch (Exception) { Console.Error.WriteLine("[FAIL] Vérifiez la connexion, la configuration et les éventuels messages dans BizHawk."); WaitBeforeClose(args); return 1; }
+    }
+    private static void WaitBeforeClose(string[] args)
+    {
+        if (args.Length == 0 && OperatingSystem.IsWindows() && !Console.IsInputRedirected)
+        { Console.WriteLine("Appuyez sur Entrée pour fermer."); Console.ReadLine(); }
     }
 }

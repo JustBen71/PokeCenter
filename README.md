@@ -1,5 +1,13 @@
 # Pokérace Tracker
 
+## Lancer BizHawk et le nouveau client en un clic
+
+Sous Windows, double-cliquer sur **`pokerace.cmd`** à la racine du projet. Au premier lancement, il prépare l'exécutable autonome ; les téléchargements sont vérifiés. Le lanceur demande l'adresse HTTPS du serveur existant, le pseudo du compte et le code du salon, puis ouvre le sélecteur de ROM. Il installe sa propre copie portable de BizHawk et démarre le bridge et le client automatiquement. Il ne démarre pas de serveur local.
+
+La distribution CI **`pokerace-launcher-win-x64`** contient aussi un seul **`Pokerace.Client.exe`** : le double-clic suffit, sans Node, Python, SDK .NET ni Docker. Une connexion Internet est nécessaire au premier lancement pour télécharger BizHawk. La ROM reste à fournir par l'utilisateur.
+
+Fermer BizHawk ou appuyer sur Entrée dans la console arrête la session. `pokerace.cmd --configure` modifie les réglages ; `pokerace.cmd --rom "C:\Jeux\ma ROM.gba"` choisit directement un fichier. Voir [le guide du lanceur](docs/bizhawk-launcher.md). Le client BizHawk est générique : l'ancien dashboard Pokémon et son agent mGBA restent un parcours distinct.
+
 Dashboard temps réel auto-hébergé pour une course Pokémon Émeraude. Un agent individuel reçoit les observations d’un extracteur associé à mGBA, les transmet par WebSocket et le serveur conserve le dernier état dans SQLite. Le dashboard montre les connexions, la version du jeu, le dresseur, la zone et les six Pokémon.
 
 Le cahier des charges source est conservé dans [README_Pokerace.md](README_Pokerace.md). Cette implémentation suit sa règle la plus importante : **aucun hash, profil mémoire ou résultat d’extraction n’est inventé**.

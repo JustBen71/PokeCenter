@@ -12,6 +12,8 @@ Le projet suit [le cahier des charges client](../../README_POKERACE_CLIENT_CODEX
 
 ## Démarrage sous Windows
 
+**Lancement automatique recommandé :** double-cliquer sur `pokerace.cmd` à la racine du projet, ou sur l'exécutable de la distribution `pokerace-launcher-win-x64`. Il propose la ROM, prépare BizHawk et démarre le bridge et le client vers votre serveur existant. Voir [le guide du lanceur](../../docs/bizhawk-launcher.md). Les commandes ci-dessous restent disponibles pour une installation manuelle.
+
 Utiliser la distribution `win-x64` ou la construire avec les commandes ci-dessous. Ouvrir une console dans son dossier puis :
 
 ```powershell
@@ -28,7 +30,7 @@ $env:POKERACE_BRIDGE_TOKEN = 'le-token-de-session-utilisé-par-le-bridge'
 ./Pokerace.Client.exe run
 ```
 
-Le bridge doit déjà être lancé. Voir [son installation](../../bridges/bizhawk/README.md). Le client ne lance pas l'émulateur et ne recherche aucune ROM. `Ctrl+C` arrête proprement le client. Il reste actif si le bridge ou le serveur devient indisponible, puis tente de se reconnecter avec un délai progressif.
+Avec `run` ou `doctor`, le bridge doit déjà être lancé. Voir [son installation](../../bridges/bizhawk/README.md). La commande `play` (ou le double-clic sur la distribution avec lanceur) gère au contraire le choix de ROM et le lancement de BizHawk. `Ctrl+C` arrête proprement le client. Il reste actif si le bridge ou le serveur devient indisponible, puis tente de se reconnecter avec un délai progressif.
 
 Sur Linux/macOS, utiliser `./Pokerace.Client` et définir `POKERACE_BRIDGE_TOKEN` dans l'environnement. Le client est portable ; la disponibilité d'un bridge compatible sur ces OS est une condition séparée. Cette tâche ne revendique pas la compatibilité d'une installation BizHawk sur chaque OS.
 

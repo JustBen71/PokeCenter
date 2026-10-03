@@ -149,6 +149,13 @@ try {
     $stage = 'close'
     if (![E2EWindows]::Close($process.Id) -or !$process.WaitForExit(10000)) { throw 'BizHawk did not shut down cleanly.' }
     if ($process.ExitCode -ne 0) { throw "BizHawk exit code $($process.ExitCode)." }
+    if ($ClientE2E) {
+        $stage = 'single-executable-launcher'
+        & (Join-Path $repo 'native/Pokerace.Client/tools/build-launcher.ps1') -Dotnet $Dotnet -BizHawkDir $runtime
+        & node --import tsx (Join-Path $repo 'native/Pokerace.Client/tools/e2e-client.mjs') $Dotnet --launcher 2>&1 |
+            Tee-Object -FilePath (Join-Path $artifacts 'launcher-e2e.log')
+        if ($LASTEXITCODE -ne 0) { throw 'Single executable launcher E2E failed.' }
+    }
     'E2E_BIZHAWK_VERIFIED: real DLL + homebrew + read/write/read-back/restore + clean exit' | Set-Content (Join-Path $artifacts 'result.txt')
     Write-Host 'E2E_BIZHAWK_VERIFIED'
 }

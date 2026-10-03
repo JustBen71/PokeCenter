@@ -1,10 +1,10 @@
 name: BizHawk bridge
 on:
   pull_request:
-    paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'apps/api/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
+    paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'pokerace.cmd', 'apps/api/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
   push:
     branches: [master, main, 'bizhawk-bridge']
-    paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'apps/api/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
+    paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'pokerace.cmd', 'apps/api/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
     tags: ['bizhawk-bridge-*']
   workflow_dispatch:
 
@@ -57,3 +57,7 @@ jobs:
         with:
           name: bridge-e2e-results
           path: bridges/bizhawk/artifacts/e2e
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokerace-launcher-win-x64
+          path: native/Pokerace.Client/artifacts/launcher-win-x64/Pokerace.Client.exe

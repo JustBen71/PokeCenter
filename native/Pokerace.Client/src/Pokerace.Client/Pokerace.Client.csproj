@@ -1,3 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><Version>0.1.0</Version></PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../../../bridges/bizhawk/e2e/bizhawk-version.json" LogicalName="Launcher.bizhawk-version.json" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(BundleBridge)' == 'true'">
+    <EmbeddedResource Include="../../../../bridges/bizhawk/src/Pokerace.BizHawkBridge/bin/$(Configuration)/net48/Pokerace.BizHawkBridge.dll" LogicalName="Launcher.Pokerace.BizHawkBridge.dll" />
+    <EmbeddedResource Include="../../../../bridges/bizhawk/src/Pokerace.BizHawkBridge/bin/$(Configuration)/net48/Pokerace.BizHawkBridge.Core.dll" LogicalName="Launcher.Pokerace.BizHawkBridge.Core.dll" />
+  </ItemGroup>
 </Project>
