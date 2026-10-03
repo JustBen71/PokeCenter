@@ -40,14 +40,15 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 Interlocked.Increment(ref session);
                 failures = 0;
                 log.Write("INFO", "server_connected");
-                await server.SendAsync("HELLO", ServerProtocol.Hello(configuration, manager.Snapshot), connection.Token);
+                var initialSnapshot = manager.Snapshot;
+                await server.SendAsync("HELLO", ServerProtocol.Hello(configuration, initialSnapshot), connection.Token);
                 var clientStatus = ServerProtocol.Message("CLIENT_STATUS");
                 clientStatus["connected"] = true; clientStatus["allowMemoryWrites"] = configuration.AllowMemoryWrites;
                 await server.SendAsync("CLIENT_STATUS", clientStatus, connection.Token);
-                await server.SendAsync("BRIDGE_STATUS", ServerProtocol.BridgeStatusMessage(manager.Snapshot), connection.Token);
-                await server.SendAsync("HEARTBEAT", ServerProtocol.Heartbeat(manager.Snapshot), connection.Token);
+                await server.SendAsync("BRIDGE_STATUS", ServerProtocol.BridgeStatusMessage(initialSnapshot), connection.Token);
+                await server.SendAsync("HEARTBEAT", ServerProtocol.Heartbeat(initialSnapshot), connection.Token);
                 receive = ReceiveCommandsAsync(connection.Token);
-                heartbeat = HeartbeatAsync(connection.Token);
+                heartbeat = HeartbeatAsync(initialSnapshot, connection.Token);
                 await await Task.WhenAny(receive, heartbeat);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { break; }
@@ -82,9 +83,8 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
             }
         }
     }
-    private async Task HeartbeatAsync(CancellationToken cancellation)
+    private async Task HeartbeatAsync(BridgeStatus previous, CancellationToken cancellation)
     {
-        var previous = manager.Snapshot;
         var heartbeatAt = DateTimeOffset.UtcNow.AddSeconds(configuration.HeartbeatSeconds);
         while (true)
         {
