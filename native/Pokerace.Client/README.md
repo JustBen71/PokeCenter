@@ -149,11 +149,11 @@ L'authentification transporte `protocolVersion`, `playerId`, `playerName`, `acco
 }
 ```
 
-Commandes autorisées : `bridge.ping`, `bridge.getStatus`, `bridge.getSystem`, `bridge.getGameInfo`, `bridge.listMemoryDomains`, `bridge.readMemory`, `bridge.writeMemory`. Les adresses sur le fil sont des entiers décimaux. Cet exemple de RAM est illustratif : aucune adresse de jeu n'est codée dans le client.
+Commandes autorisées : `bridge.ping`, `bridge.getStatus`, `bridge.getSystem`, `bridge.getGameInfo`, `bridge.listMemoryDomains`, `bridge.readMemory`, `bridge.writeMemory`. Les adresses sur le fil sont des entiers décimaux. Cet exemple de RAM est illustratif ; les adresses du lecteur Émeraude proviennent uniquement des profils embarqués.
 
 Le module serveur additionnel [`apps/api/src/native-clients.ts`](../../apps/api/src/native-clients.ts) expose `snapshot()` et `sendCommand(playerId, command)`, accessibles via `createApp(...).nativeClients`. `sendCommand` attend un `COMMAND_ACK` corrélé et rejette les déconnexions/timeouts sans prétendre que l'opération n'a pas eu lieu. Il s'agit d'une API interne pour la future orchestration, pas d'un endpoint public d'écriture mémoire.
 
-Les anciens namespaces `/agent` et `/dashboard`, `player.cmd`, l'agent Python, mGBA et les commandes Pokémon restent distincts. Ce nouveau client ne publie aucune fausse équipe Pokémon dans le dashboard et ne réalise ni enchère, ni roulette, ni lecture d'équipe. Une interface dédiée et des `GameAdapter` pourront être ajoutés ensuite.
+Le namespace `/agent`, `player.cmd`, l’agent Python, mGBA et les commandes métier Pokémon restent disponibles. Le client natif publie désormais `GAME_STATE` via son adaptateur Émeraude en lecture seule ; le dashboard reçoit la projection `native-clients` et fusionne l’affichage par compte. Les enchères, la roulette et les écritures métier restent sur l’ancien agent. Voir [le contrat et les diagnostics](../../docs/native-game-state.md).
 
 ## Sécurité des commandes et doublons
 
@@ -184,4 +184,4 @@ Voir [VALIDATION.md](VALIDATION.md) pour les commandes réellement exécutées e
 
 Le [workflow multiplateforme](../../.github/workflows/pokerace-client.yml) teste Windows x64, Linux x64, macOS x64 et macOS arm64. Les statuts `UNIT_VERIFIED`, `INTEGRATION_VERIFIED` et `CROSS_PLATFORM_BUILD_VERIFIED` doivent rester distincts d'une CI réellement verte sur tous les OS et de `E2E_BIZHAWK_CLIENT_VERIFIED`.
 
-L'E2E avec vrai BizHawk est validé en environnement CI jetable : serveur → client → bridge → émulateur → ROM homebrew, avec lecture, écriture, relecture, restauration et fermeture propre. Le commit et les runs de preuve figurent dans [VALIDATION.md](VALIDATION.md). Aucun test n'utilise de ROM privée, sauvegarde, BIOS ou installation BizHawk personnelle. Le client ne contient aucun `GameAdapter` ni aucune logique Pokémon.
+L'E2E avec vrai BizHawk est validé en environnement CI jetable : serveur → client → bridge → émulateur → ROM homebrew, avec lecture, écriture, relecture, restauration et fermeture propre. Le commit et les runs de preuve figurent dans [VALIDATION.md](VALIDATION.md). Aucun test n'utilise de ROM privée, sauvegarde, BIOS ou installation BizHawk personnelle. L’adaptateur Émeraude est testé sur mémoire synthétique ; la ROM NES homebrew vérifie uniquement le statut `unsupported_system` et l’absence de snapshot Pokémon.

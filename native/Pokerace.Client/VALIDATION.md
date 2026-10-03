@@ -2,13 +2,17 @@
 
 Branche locale : `pokerace-client`, construite sur la branche contenant le bridge. Aucun changement n'a été fusionné dans `master`.
 
+## État natif et GameAdapter — 3 octobre 2026
+
+Le commit `3ebbf88ee9b4632e7d3eceb1a89b8d091c4a571a` a passé les quatre jobs du [run 37116708167](https://github.com/JustBen71/PokeCenter/actions/runs/37116708167) : 99 tests client, 37 API, 13 Web et 8 shared, contrôles TypeScript, build Web et publications autonomes. Les tests incluent une observation issue du décodeur C# acceptée par le vrai Socket.IO de production. L’affichage des équipes, les actions désactivées et la progression ont également été vérifiés dans le navigateur avec un joueur synthétique. Le commit `b36fdf352080b0b64b920ba9f5b45b2fed28cffd` a également passé les quatre plateformes ([run 37117596616](https://github.com/JustBen71/PokeCenter/actions/runs/37117596616)) et le bridge avec E2E réel ([run 37117596624](https://github.com/JustBen71/PokeCenter/actions/runs/37117596624)) : client, exécutable unique, lecture/écriture/relecture/restauration de la mémoire homebrew, arrêt propre et `unsupported_system` sans état Pokémon sur NES.
+
 ## Résultats réellement obtenus
 
 | Vérification | Résultat |
 |---|---|
 | Build Release, SDK .NET 8.0.425 | Succès, 0 erreur, 0 avertissement |
-| Tests xUnit du client | **56 réussis, 0 échoué, 0 ignoré** |
-| Tests API, y compris ancien client et nouveau namespace | **31 réussis, 0 échoué, 0 ignoré** |
+| Tests xUnit du client | **99 réussis, 0 échoué, 0 ignoré** |
+| Tests API, y compris ancien client et nouveau namespace | **37 réussis, 0 échoué, 0 ignoré** |
 | Vérification TypeScript de l'API | Succès après compilation du package partagé |
 | Faux bridge : vrai TCP sur `127.0.0.1` | Succès |
 | Lecture, écriture, relecture mémoire | Succès sur mémoire factice |
@@ -68,6 +72,6 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 - Les tests de transport utilisent WS local avec autorisation explicite dans la configuration du fixture. En production, HTTPS/WSS est obligatoire et la validation des certificats .NET est conservée. Aucun serveur public réel n'a été utilisé pour ces tests.
 - La version de BizHawk n'est pas disponible dans le protocole actuel du bridge et n'est donc pas annoncée par le client.
 - Le nouveau namespace `/client` doit être présent sur le serveur. Un ancien serveur sans ce namespace est refusé explicitement ; aucun basculement silencieux vers `/agent`.
-- Aucune équipe Pokémon, enchère ou roulette n'est implémentée ici. Le dashboard existant n'est pas alimenté en données de jeu par ce client générique.
+- L’adaptateur Émeraude alimente désormais les équipes et la progression du dashboard. Les enchères, la roulette et les écritures métier restent sur l’ancien agent ; aucune validation sur ROM commerciale réelle dans BizHawk n’est revendiquée.
 - La compatibilité de l'émulateur/bridge sur Linux ou macOS est distincte de la portabilité du client.
 - Aucune ROM, sauvegarde, donnée mémoire privée ou installation personnelle de BizHawk n'a été utilisée.
