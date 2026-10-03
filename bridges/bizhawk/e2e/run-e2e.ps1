@@ -139,6 +139,8 @@ try {
     if ($ClientE2E) {
         $stage = 'server-client-bridge-read-write-restore'
         $repo = [IO.Path]::GetFullPath((Join-Path $root '../..'))
+        & npm --prefix $repo run build -w '@pokerace/shared'
+        if ($LASTEXITCODE -ne 0) { throw 'Shared protocol build failed.' }
         $project = Join-Path $repo 'native/Pokerace.Client/src/Pokerace.Client/Pokerace.Client.csproj'
         & $Dotnet build $project --configuration Release
         if ($LASTEXITCODE -ne 0) { throw 'Client build failed.' }
