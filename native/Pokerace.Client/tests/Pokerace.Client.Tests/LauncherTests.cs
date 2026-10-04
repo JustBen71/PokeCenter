@@ -47,6 +47,35 @@ public sealed class LauncherTests
         }
         finally { File.Delete(path); }
     }
+    [Theory]
+    [InlineData("88.184.14.248", "http://88.184.14.248")]
+    [InlineData(" 88.184.14.248:47500/ ", "http://88.184.14.248:47500")]
+    [InlineData("http://88.184.14.248:47500/", "http://88.184.14.248:47500")]
+    [InlineData("https://race.example.com", "https://race.example.com")]
+    [InlineData("http//88.184.14.248", null)]
+    [InlineData("ftp://host", null)]
+    [InlineData("", null)]
+    public void TypedServerAddressesAreNormalized(string typed, string? expected) => Assert.Equal(expected, LaunchOptions.NormalizeServerUrl(typed));
+    [Fact] public void FirstLaunchWithoutSchemeAndPortArgumentWorks()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+        try
+        {
+            // First launch: address typed without http://, port given with pokerace.cmd 47500.
+            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false, 47500), new StringReader("pas une adresse\n88.184.14.248\nBen\nsalon\n"), new StringWriter());
+            Assert.Equal("http://88.184.14.248:47500", result.ServerUrl);
+            Assert.Equal("Ben", result.PlayerName);
+        }
+        finally { File.Delete(path); }
+    }
+    [Fact] public void ConnectionFailuresGiveAReadableCause()
+    {
+        Assert.Equal("server_not_found", Pokerace.Client.Server.ConnectionErrors.Code(new HttpRequestException("x", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound))));
+        Assert.Equal("server_refused", Pokerace.Client.Server.ConnectionErrors.Code(new HttpRequestException("x", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused))));
+        Assert.Equal("server_timeout", Pokerace.Client.Server.ConnectionErrors.Code(new TaskCanceledException()));
+        Assert.Equal("server_rejected", Pokerace.Client.Server.ConnectionErrors.Code(new ClientException("server_rejected", "x")));
+        Assert.Contains("http://88.184.14.248:47500", Pokerace.Client.Server.ConnectionErrors.Hint("server_not_found", "http://88.184.14.248:47500"));
+    }
     [Fact] public void PortOptionIsValidated()
     {
         Assert.Equal(3000, LaunchOptions.Parse(["--port", "3000"]).Port);

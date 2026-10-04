@@ -16,6 +16,7 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
     private readonly CommandRouter router = new(bridge, configuration, romIdentity: romIdentity);
     private readonly Channel<(ServerMessage Message, long Session)> commands = Channel.CreateBounded<(ServerMessage, long)>(64);
     private long session;
+    private string? lastError;
     public async Task RunAsync(CancellationToken cancellation)
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -43,6 +44,8 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 Interlocked.Increment(ref session);
                 failures = 0;
                 log.Write("INFO", "server_connected");
+                if (lastError != null) Console.Error.WriteLine("[OK] Connecté au serveur " + configuration.ServerUrl);
+                lastError = null;
                 var initialSnapshot = manager.Snapshot;
                 await server.SendAsync("HELLO", ServerProtocol.Hello(configuration, initialSnapshot), connection.Token);
                 var clientStatus = ServerProtocol.Message("CLIENT_STATUS");
@@ -56,7 +59,13 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 await await Task.WhenAny(receive, heartbeat);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { break; }
-            catch (Exception e) { log.Write("WARN", "server_disconnected", e is ClientException ce ? ce.Code : "transport_error"); }
+            catch (Exception e)
+            {
+                var code = ConnectionErrors.Code(e);
+                log.Write("WARN", "server_disconnected", code);
+                // A readable hint once per distinct cause, so a wrong address or port is obvious to the player.
+                if (code != lastError) { lastError = code; Console.Error.WriteLine("[!] " + ConnectionErrors.Hint(code, configuration.ServerUrl)); }
+            }
             finally
             {
                 connection.Cancel(); await server.DisconnectAsync();

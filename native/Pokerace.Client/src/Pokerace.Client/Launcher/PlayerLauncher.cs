@@ -32,11 +32,25 @@ public sealed record LaunchOptions(string ConfigPath, string? Rom, bool Configur
         }
         return new(Path.GetFullPath(path), rom == null ? null : Path.GetFullPath(rom), configure, port);
     }
+    /// <summary>
+    /// Accepts what players actually type: "88.184.14.248", "88.184.14.248:47500", "http://host/" or "https://host".
+    /// Returns "scheme://host[:port]" (no path), or null when it cannot be a server address.
+    /// </summary>
+    public static string? NormalizeServerUrl(string? value)
+    {
+        var text = value?.Trim().TrimEnd('/') ?? "";
+        if (text.Length == 0 || text.Any(char.IsWhiteSpace)) return null;
+        if (!text.Contains("://", StringComparison.Ordinal)) text = "http://" + text;
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0 ||
+            uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 || uri.AbsolutePath != "/") return null;
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
     public static int? ParsePort(string? value) => int.TryParse(value, out var port) && port is >= 1 and <= 65535 ? port : null;
     // Same server, another port: http://host:8080 -> http://host:3000 (no path, as the configuration requires).
     public static string WithPort(string serverUrl, int port)
     {
-        if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri)) throw new ClientException("invalid_configuration", "Adresse du serveur invalide.");
+        if (!Uri.TryCreate(NormalizeServerUrl(serverUrl) ?? "", UriKind.Absolute, out var uri))
+            throw new ClientException("invalid_configuration", "Adresse du serveur invalide. Exemple : http://88.184.14.248 — relancez avec --configure.");
         return new UriBuilder(uri) { Port = port }.Uri.GetLeftPart(UriPartial.Authority);
     }
 }
@@ -124,9 +138,20 @@ public static class PlayerLauncher
             var answer = input.ReadLine()?.Trim();
             return string.IsNullOrEmpty(answer) ? current ?? "" : answer;
         }
+        // Asked again until it is usable, instead of failing later on a typo.
+        string AskServer()
+        {
+            while (true)
+            {
+                var url = LaunchOptions.NormalizeServerUrl(Ask("Adresse du serveur (ex. http://88.184.14.248)", existing?.ServerUrl));
+                if (url != null) return url;
+                output.WriteLine("Adresse invalide. Exemple : http://88.184.14.248 ou 88.184.14.248");
+                if (input.Peek() == -1) throw new ClientException("invalid_configuration", "Adresse du serveur invalide. Exemple : http://88.184.14.248");
+            }
+        }
         var value = (existing ?? new ClientConfiguration()) with
         {
-            ServerUrl = existing != null && !options.Configure ? existing.ServerUrl : Ask("Adresse HTTP ou HTTPS du serveur", existing?.ServerUrl),
+            ServerUrl = existing != null && !options.Configure && LaunchOptions.NormalizeServerUrl(existing.ServerUrl) != null ? LaunchOptions.NormalizeServerUrl(existing.ServerUrl)! : AskServer(),
             PlayerName = existing != null && !options.Configure ? existing.PlayerName : Ask("Pseudo", existing?.PlayerName),
             RoomCode = Ask("Code du salon à rejoindre (voir le portail)", existing?.RoomCode, secret: true)
         };
