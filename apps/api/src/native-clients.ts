@@ -10,13 +10,15 @@ const bridge = z.object({type:z.literal('bizhawk'),connected:z.boolean(),protoco
 const envelope = z.object({type:z.string(),protocolVersion:z.literal(VERSION)});
 const hello = envelope.extend({type:z.literal('HELLO'),clientVersion:z.string().max(32),playerId:identity,
  platform:z.string().max(64),bridge,emulator:z.object({name:z.literal('BizHawk')}).strict().nullable(),system}).strict();
-const status = envelope.extend({type:z.literal('CLIENT_STATUS'),connected:z.boolean(),allowMemoryWrites:z.boolean()}).strict();
+const status = envelope.extend({type:z.literal('CLIENT_STATUS'),connected:z.boolean(),allowMemoryWrites:z.boolean(),canPurchase:z.boolean().optional()}).strict();
 const bridgeStatus = envelope.extend({type:z.literal('BRIDGE_STATUS'),bridge,system}).strict();
 const heartbeat = envelope.extend({type:z.literal('HEARTBEAT'),clientVersion:z.string().max(32),bridgeConnected:z.boolean(),system}).strict();
 const ack = envelope.extend({type:z.literal('COMMAND_ACK'),commandId:z.string().uuid(),ok:z.boolean(),result:z.record(z.unknown()).optional(),error:z.object({code:z.string().max(64)}).optional()}).strict();
 const command = envelope.extend({type:z.literal('COMMAND'),commandId:z.string().uuid(),command:z.enum([
- 'bridge.ping','bridge.getStatus','bridge.getSystem','bridge.getGameInfo','bridge.listMemoryDomains','bridge.readMemory','bridge.writeMemory'
+ 'pokemon.purchase','game.money.add','game.money.remove','game.money.set','game.pokemon.insert','game.pokemon.remove','game.pokemon.replace','game.party.snapshot','bridge.ping','bridge.getStatus','bridge.getSystem','bridge.getGameInfo','bridge.listMemoryDomains','bridge.readMemory','bridge.writeMemory'
 ]),payload:z.record(z.unknown())}).strict();
+export type NativeCommand=z.infer<typeof command>;
+export type NativeAck=z.infer<typeof ack>;
 const safeEqual = (a:string,b:string) => timingSafeEqual(createHash('sha256').update(a).digest(),createHash('sha256').update(b).digest());
 
 type Config = {roomCode?:string; accountsRequired?:boolean};
@@ -32,7 +34,7 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
   clientVersion:s.hello?.clientVersion??null,platform:s.hello?.platform??null,
   emulator:s.hello?.emulator?{name:'BizHawk'}:null,
   bridge:{type:'bizhawk',connected:(s.bridge??s.hello)?.bridge.connected??false,gameLoaded:(s.bridge??s.hello)?.bridge.gameLoaded??false,protocolVersion:(s.bridge??s.hello)?.bridge.protocolVersion??null},
-  system:(s.bridge??s.hello)?.system??null,allowMemoryWrites:s.status?.allowMemoryWrites??false,
+  canPurchase:s.status?.canPurchase===true,system:(s.bridge??s.hello)?.system??null,allowMemoryWrites:s.status?.allowMemoryWrites??false,
   adapter:s.game?structuredClone(s.game.adapter):{id:null,status:'no_game',profileId:null,capabilities:[]},gameState:s.game?.state?structuredClone(s.game.state):null
  }));
  let lastPublic='';

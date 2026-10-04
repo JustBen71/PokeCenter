@@ -53,6 +53,46 @@ public sealed class BridgeService
                     result = new { written = data.Length, verified = true };
                     break;
                 }
+                case "compareWrite":
+                {
+                    RequireGame();
+                    var info = host.GetGameInfo();
+                    if (host.SystemId != "GBA" || info == null || !string.Equals((string?)JObject.FromObject(info)["hash"], Protocol.Text(request, "gameHash"), StringComparison.OrdinalIgnoreCase))
+                        throw new BridgeException("state_changed", "Loaded game changed.");
+                    var edits = request["edits"] as JArray;
+                    if (edits == null || edits.Count < 1 || edits.Count > 12) throw new BridgeException("invalid_data", "Invalid transaction.");
+                    var operations = edits.Select(node => {
+                        var item = node as JObject ?? throw new BridgeException("invalid_data", "Invalid edit.");
+                        var domain = Domain(item); var address = Protocol.Integer(item, "address");
+                        var expected = Protocol.Hex(Protocol.Text(item, "expected"));
+                        var data = (item["data"] == null || item["data"]!.Type == JTokenType.Null) ? expected : Protocol.Hex(Protocol.Text(item, "data"));
+                        Range(domain, address, expected.Length);
+                        if (expected.Length != data.Length || !domain.Writable) throw new BridgeException("invalid_data", "Invalid edit range.");
+                        return new { domain, address, expected, data };
+                    }).ToArray();
+                    for (var i = 0; i < operations.Length; i++)
+                    {
+                        var op = operations[i];
+                        if (operations.Take(i).Any(other => other.domain.Name == op.domain.Name && op.address < other.address + other.expected.Length && other.address < op.address + op.expected.Length))
+                            throw new BridgeException("invalid_data", "Overlapping edits.");
+                        if (!Read(op.domain, op.address, op.expected.Length).SequenceEqual(op.expected)) throw new BridgeException("state_changed", "Game state changed.");
+                    }
+                    // Execute on the emulator dispatcher in one turn: no emulated frame between checks and writes.
+                    try
+                    {
+                        foreach (var op in operations.Where(op => !op.expected.SequenceEqual(op.data)))
+                            for (var i = 0; i < op.data.Length; i++) op.domain.WriteByte(op.address + i, op.data[i]);
+                        foreach (var op in operations)
+                            if (!Read(op.domain, op.address, op.data.Length).SequenceEqual(op.data)) throw new InvalidOperationException();
+                    }
+                    catch (Exception)
+                    {
+                        try { foreach (var op in operations.Where(op => !op.expected.SequenceEqual(op.data))) for (var i = 0; i < op.expected.Length; i++) op.domain.WriteByte(op.address + i, op.expected[i]); }
+                        catch (Exception) { }
+                        throw new BridgeException("write_failed", "Transaction could not be verified; inspect game before retrying.");
+                    }
+                    result = new { verified = true }; break;
+                }
                 default: throw new BridgeException("unknown_command", "Unknown request type.");
             }
             return Protocol.Ok(id, result);

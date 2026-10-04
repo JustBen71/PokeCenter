@@ -1,6 +1,8 @@
 # Pokerace.Client
 
-Client console **C# / .NET 8**, sans dépendance aux assemblies BizHawk. Il relie le bridge local au serveur Pokérace, annonce l'état de connexion, exécute des commandes génériques et renvoie leur résultat. Il contient également un adaptateur local Émeraude en lecture seule, détaillé dans [le guide de l’état natif](../../docs/native-game-state.md). **Les écritures génériques sont désactivées par défaut.**
+> Mise à jour du 4 octobre 2026 : le client natif prend désormais en charge les achats aux enchères, même seul, et la copie exacte vers la bibliothèque. Les mentions de lecture seule ci-dessous concernent l’ancien périmètre ; réinjection, suppression et gages restent sur l’agent historique. Voir le README principal pour l’état actuel.
+
+Client console **C# / .NET 8**, sans dépendance aux assemblies BizHawk. Il relie le bridge local au serveur Pokérace, annonce l'état de connexion, exécute des commandes génériques et renvoie leur résultat. Il contient également un adaptateur local Émeraude avec lecture et achat conditionnel, détaillé dans [le guide de l’état natif](../../docs/native-game-state.md). **Les écritures génériques sont désactivées par défaut.**
 
 ```text
 BizHawk → Pokerace.BizHawkBridge → TCP 127.0.0.1 → Pokerace.Client
@@ -20,7 +22,7 @@ Utiliser la distribution `win-x64` ou la construire avec les commandes ci-dessou
 ./Pokerace.Client.exe configure
 ```
 
-Renseigner l'URL **HTTPS** du serveur, le nom du joueur et le code du salon. Si les comptes sont obligatoires sur le serveur, ce nom doit correspondre à un compte créé sur le portail. Un identifiant local est généré et conservé dans la configuration ; un fichier existant n'est pas écrasé par `configure`.
+Renseigner l'URL **HTTP ou HTTPS** du serveur, le nom du joueur et le code du salon. Si les comptes sont obligatoires sur le serveur, ce nom doit correspondre à un compte créé sur le portail. Un identifiant local est généré et conservé dans la configuration ; un fichier existant n'est pas écrasé par `configure`.
 
 Le client et BizHawk doivent recevoir le **même token de session**, choisi lors du lancement du bridge :
 
@@ -87,14 +89,15 @@ Toutes les commandes acceptent `--config <chemin>`. Voir [client.example.json](c
 
 | Champ | Rôle |
 |---|---|
-| `serverUrl` | Origine HTTPS/WSS, sans chemin, identifiants intégrés ni paramètres d'URL |
+| `serverUrl` | Origine HTTP/HTTPS ou WS/WSS, sans chemin, identifiants intégrés ni paramètres d'URL |
 | `roomCode` | Code de salon joueur ; aucun `ADMIN_TOKEN` n'est requis |
 | `playerName` | Nom du compte/joueur, 1 à 32 caractères |
 | `playerId` | Identité persistante obligatoire dans le fichier |
 | `bridgeHost` | Obligatoirement `127.0.0.1` |
 | `bridgePort` | Port du bridge, `43821` par défaut |
-| `allowMemoryWrites` | `false` par défaut ; seul un changement local à `true` autorise l'écriture |
-| `allowInsecureLocalServer` | `false` ; mode de test HTTP/WS limité à `localhost`, `127.0.0.1` ou `::1` |
+| `allowMemoryWrites` | `false` par défaut ; autorise les écritures mémoire génériques |
+| `allowPokemonPurchases` | `true` par défaut ; autorise les achats Pokémon vérifiés |
+| `allowInsecureLocalServer` | Conservé pour compatibilité des configurations ; HTTP/WS est maintenant accepté sans ce réglage |
 | `heartbeatSeconds` | 5 par défaut, de 1 à 60 secondes |
 
 Le token du bridge vient uniquement de l'environnement `POKERACE_BRIDGE_TOKEN` (au moins 32 caractères), jamais du fichier. Un redémarrage du bridge avec un nouveau token nécessite de relancer le client avec ce nouveau token. Une reconnexion à token inchangé est automatique.
@@ -151,9 +154,9 @@ L'authentification transporte `protocolVersion`, `playerId`, `playerName`, `acco
 
 Commandes autorisées : `bridge.ping`, `bridge.getStatus`, `bridge.getSystem`, `bridge.getGameInfo`, `bridge.listMemoryDomains`, `bridge.readMemory`, `bridge.writeMemory`. Les adresses sur le fil sont des entiers décimaux. Cet exemple de RAM est illustratif ; les adresses du lecteur Émeraude proviennent uniquement des profils embarqués.
 
-Le module serveur additionnel [`apps/api/src/native-clients.ts`](../../apps/api/src/native-clients.ts) expose `snapshot()` et `sendCommand(playerId, command)`, accessibles via `createApp(...).nativeClients`. `sendCommand` attend un `COMMAND_ACK` corrélé et rejette les déconnexions/timeouts sans prétendre que l'opération n'a pas eu lieu. Il s'agit d'une API interne pour la future orchestration, pas d'un endpoint public d'écriture mémoire.
+Le module serveur additionnel [`apps/api/src/native-clients.ts`](../../apps/api/src/native-clients.ts) expose `snapshot()` et `sendCommand(playerId, command)`, accessibles via `createApp(...).nativeClients`. `sendCommand` attend un `COMMAND_ACK` corrélé et rejette les déconnexions/timeouts sans prétendre que l'opération n'a pas eu lieu. Il s'agit d'une API interne pour l’orchestration des achats, pas d'un endpoint public d'écriture mémoire.
 
-Le namespace `/agent`, `player.cmd`, l’agent Python, mGBA et les commandes métier Pokémon restent disponibles. Le client natif publie désormais `GAME_STATE` via son adaptateur Émeraude en lecture seule ; le dashboard reçoit la projection `native-clients` et fusionne l’affichage par compte. Les enchères, la roulette et les écritures métier restent sur l’ancien agent. Voir [le contrat et les diagnostics](../../docs/native-game-state.md).
+Le namespace `/agent`, `player.cmd`, l’agent Python, mGBA et les commandes métier Pokémon restent disponibles. Le client natif publie désormais `GAME_STATE` via son adaptateur Émeraude en lecture seule ; le dashboard reçoit la projection `native-clients` et fusionne l’affichage par compte. Les achats utilisent pokemon.purchase ; la copie bibliothèque utilise raw. Roulette, réinjection et suppression restent sur l’ancien agent. Voir [le contrat et les diagnostics](../../docs/native-game-state.md).
 
 ## Sécurité des commandes et doublons
 

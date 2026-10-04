@@ -1,2 +1,2 @@
 import {defineConfig} from "vite";import react from "@vitejs/plugin-react";
-export default defineConfig({plugins:[react()],server:{proxy:{"/api":"http://localhost:3000","/socket.io":"ws://localhost:3000"}},build:{outDir:"dist"}});
+export default defineConfig({plugins:[react()],server:{proxy:{"/rooms":{target:"http://localhost:3000",ws:true},"/api":"http://localhost:3000","/socket.io":"ws://localhost:3000"}},build:{outDir:"dist"}});

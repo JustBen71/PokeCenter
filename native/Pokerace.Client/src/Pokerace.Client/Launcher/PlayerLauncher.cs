@@ -103,26 +103,27 @@ public static class PlayerLauncher
         }
     }
 
-    private static ClientConfiguration Configure(LaunchOptions options)
+    public static ClientConfiguration Configure(LaunchOptions options, TextReader? input = null, TextWriter? output = null)
     {
         var existing = File.Exists(options.ConfigPath) ? ConfigurationStore.Load(options.ConfigPath) : null;
-        if (existing != null && !options.Configure) return existing;
-        if (Console.IsInputRedirected) throw new ClientException("configuration_required", "Lancez une première fois Pokerace en mode interactif pour configurer le serveur.");
-        Console.WriteLine("Utilisez le pseudo du compte créé sur le portail de votre serveur.");
+        if (input == null && Console.IsInputRedirected && existing != null && !options.Configure) return existing;
+        if (input == null && Console.IsInputRedirected) throw new ClientException("configuration_required", "Lancez une première fois Pokerace en mode interactif pour configurer le serveur.");
+        input ??= Console.In; output ??= Console.Out;
+        output.WriteLine("Utilisez le pseudo du compte créé sur le portail de votre serveur.");
         string Ask(string label, string? current, bool secret = false)
         {
-            Console.Write(label + (current == null ? "" : secret ? " [Entrée pour conserver]" : " [" + current + "]") + " : ");
-            var answer = Console.ReadLine()?.Trim();
+            output.Write(label + (current == null ? "" : secret ? " [Entrée pour conserver]" : " [" + current + "]") + " : ");
+            var answer = input.ReadLine()?.Trim();
             return string.IsNullOrEmpty(answer) ? current ?? "" : answer;
         }
         var value = (existing ?? new ClientConfiguration()) with
         {
-            ServerUrl = Ask("Adresse HTTPS du serveur", existing?.ServerUrl),
-            PlayerName = Ask("Pseudo", existing?.PlayerName),
-            RoomCode = Ask("Code du salon", existing?.RoomCode, secret: true)
+            ServerUrl = existing != null && !options.Configure ? existing.ServerUrl : Ask("Adresse HTTP ou HTTPS du serveur", existing?.ServerUrl),
+            PlayerName = existing != null && !options.Configure ? existing.PlayerName : Ask("Pseudo", existing?.PlayerName),
+            RoomCode = Ask("Code du salon à rejoindre (voir le portail)", existing?.RoomCode, secret: true)
         };
         ConfigurationStore.Save(options.ConfigPath, value);
-        Console.WriteLine("Réglages enregistrés. Pour les modifier : Pokerace.Client.exe play --configure");
+        output.WriteLine("Réglages enregistrés. Pour les modifier : Pokerace.Client.exe play --configure");
         return value;
     }
 

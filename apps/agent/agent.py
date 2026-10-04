@@ -2,6 +2,9 @@ import json, logging, os, socket, time, threading, uuid
 from pathlib import Path
 from datetime import datetime, timezone
 import socketio
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+import re
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),format="%(asctime)s %(levelname)s %(message)s")
@@ -84,10 +87,20 @@ def send(kind,data):
   if not ack.get("ok"): logging.warning("Telemetry rejected: %s",ack.get("error"))
   return ack.get("ok") is True
  except Exception as exc: logging.warning("Telemetry delivery failed: %s",exc)
+def room_socket_path():
+ try:
+  request=Request(SERVER_URL+'/api/rooms/resolve',data=json.dumps({'roomCode':ROOM_CODE,'playerName':PLAYER_NAME}).encode(),headers={'Content-Type':'application/json'})
+  with urlopen(request,timeout=10) as response: path=json.load(response)['socketPath']
+  if not re.fullmatch(r'/(rooms/[a-zA-Z0-9-]+/)?socket\.io/?',path): raise ValueError('Invalid room transport path')
+  return path.strip('/')
+ except HTTPError as exc:
+  if exc.code==404:return 'socket.io'
+  raise RuntimeError('Code incorrect ou compte absent du salon : rejoignez le salon sur le portail') from exc
+
 def connect_server():
  while True:
   if not sio.connected:
-   try:sio.connect(SERVER_URL,auth={"playerId":PLAYER_ID,"playerName":PLAYER_NAME,"accountName":PLAYER_NAME,"roomCode":ROOM_CODE,"token":PLAYER_TOKEN},namespaces=["/agent"],transports=["websocket"])
+   try:sio.connect(SERVER_URL,socketio_path=room_socket_path(),auth={"playerId":PLAYER_ID,"playerName":PLAYER_NAME,"accountName":PLAYER_NAME,"roomCode":ROOM_CODE,"token":PLAYER_TOKEN},namespaces=["/agent"],transports=["websocket"])
    except Exception as exc: logging.warning("Retrying server in 5s: %s",exc)
   time.sleep(5)
 def lua_stream():

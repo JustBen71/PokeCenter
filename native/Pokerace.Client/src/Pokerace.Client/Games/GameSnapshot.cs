@@ -7,7 +7,7 @@ public sealed record GameAdapterState(string? Id, string Status, string? Profile
 public sealed record GameIdentity(string Family, int Generation, string Title, string Language, string Revision);
 public sealed record TrainerSnapshot(string Name, uint Money, int PlayTimeSeconds, int PartyCount);
 public sealed record LocationSnapshot(int MapGroup, int MapNumber, string Label);
-public sealed record PokemonSnapshot(int Slot, int SpeciesId, string SpeciesName, string? Nickname, int Level, int CurrentHp, int MaxHp, bool Shiny);
+public sealed record PokemonSnapshot(int Slot, int SpeciesId, string SpeciesName, string? Nickname, int Level, int CurrentHp, int MaxHp, bool Shiny, string? Raw = null);
 public sealed record ProgressionSnapshot(int Version, string[] Completed);
 public sealed record GameSnapshot(int GameStateVersion, GameAdapterState Adapter, GameIdentity Game, TrainerSnapshot Trainer,
     LocationSnapshot Location, PokemonSnapshot[] Party, ProgressionSnapshot Progression, string[] Capabilities, string ObservedAt);

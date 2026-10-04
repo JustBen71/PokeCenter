@@ -10,6 +10,16 @@ namespace Pokerace.Client.Tests;
 
 public sealed class ClientTests
 {
+    [Fact] public async Task ResolvesRoomTransportBeforeConnecting()
+    {
+        await using var server = await FakeServer.StartAsync();
+        server.RoomSocketPath = "/rooms/test-room/socket.io";
+        await using var connection = new ServerConnection(new ClientConfiguration { ServerUrl = $"http://127.0.0.1:{server.Port}", PlayerName = "Test", RoomCode = "test-room" });
+        await connection.ConnectAsync(default);
+        Assert.True(connection.IsConnected);
+        Assert.Equal(1, server.Connections);
+        Assert.Equal("/rooms/test-room/socket.io/", server.ConnectedPath);
+    }
     internal static JsonObject Command(string command = "bridge.readMemory", string? id = null, JsonObject? payload = null) => new()
     { ["type"] = "COMMAND", ["protocolVersion"] = 1, ["commandId"] = id ?? Guid.NewGuid().ToString("D"), ["command"] = command,
         ["payload"] = payload ?? new() { ["domain"] = "RAM", ["address"] = 256, ["length"] = 4 } };
@@ -91,9 +101,12 @@ public sealed class ClientTests
         await bridge.ConnectAsync(default);
         Assert.Equal(expected, (await Assert.ThrowsAsync<ClientException>(() => bridge.WriteMemoryAsync(domain, address, new byte[length], default))).Code);
     }
-    [Theory] [InlineData("http://example.com")] [InlineData("https://user:secret@example.com")] [InlineData("https://example.com/?token=secret")] [InlineData("https://example.com/path")]
+    [Theory] [InlineData("ftp://example.com")] [InlineData("https://user:secret@example.com")] [InlineData("https://example.com/?token=secret")] [InlineData("https://example.com/path")]
     public void RejectsUnsafeServerConfiguration(string url)
     { Assert.Throws<ClientException>(() => new ClientConfiguration { ServerUrl = url, PlayerName = "Test", RoomCode = "room", AllowInsecureLocalServer = true }.Validate()); }
+    [Theory] [InlineData("http://example.com")] [InlineData("http://192.168.1.10:8080")] [InlineData("https://example.com")] [InlineData("ws://192.168.1.10:8080")] [InlineData("wss://example.com")]
+    public void AcceptsSupportedServerTransports(string url)
+    { new ClientConfiguration { ServerUrl = url, PlayerName = "Test", RoomCode = "room" }.Validate(); }
     [Fact] public void RejectsNonLoopbackBridge() => Assert.Throws<ClientException>(() => new ClientConfiguration { BridgeHost = "192.168.1.2", PlayerName = "Test", RoomCode = "room" }.Validate());
     [Fact] public void ConfigurationRoundtripPreservesIdentityAndDefaultWriteProtection()
     {

@@ -23,12 +23,20 @@ public sealed class FakeServer : IAsyncDisposable
     public int Connections => Volatile.Read(ref connections);
     public int Pongs => Volatile.Read(ref pongs);
     public int ProtocolVersion { get; set; } = 1;
+    public string? RoomSocketPath { get; set; }
+    public string? ConnectedPath { get; private set; }
     public int Port { get; private set; }
     private FakeServer(int port)
     {
         var builder = WebApplication.CreateBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:" + port);
         app = builder.Build(); app.UseWebSockets();
         app.Map("/socket.io/", HandleAsync);
+        app.Map("/rooms/test-room/socket.io/", HandleAsync);
+        app.MapPost("/api/rooms/resolve", async context =>
+        {
+            if (RoomSocketPath == null) { context.Response.StatusCode = 404; return; }
+            await context.Response.WriteAsJsonAsync(new { socketPath = RoomSocketPath });
+        });
     }
     public static async Task<FakeServer> StartAsync(int port = 0)
     {
@@ -40,6 +48,7 @@ public sealed class FakeServer : IAsyncDisposable
     {
         if (!context.WebSockets.IsWebSocketRequest || context.Request.Query["EIO"] != "4") { context.Response.StatusCode = 400; return; }
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
+        ConnectedPath = context.Request.Path;
         var peer = new Peer(socket);
         var id = Interlocked.Increment(ref connections);
         try

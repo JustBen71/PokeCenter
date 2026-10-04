@@ -18,3 +18,8 @@ public interface IBridgeClient : IAsyncDisposable
     Task<byte[]> ReadMemoryAsync(string domain, long address, int length, CancellationToken cancellation);
     Task WriteMemoryAsync(string domain, long address, ReadOnlyMemory<byte> data, CancellationToken cancellation);
 }
+
+public interface ITransactionalBridge
+{
+    Task CompareWriteAsync(string gameHash, JsonArray edits, CancellationToken cancellation);
+}

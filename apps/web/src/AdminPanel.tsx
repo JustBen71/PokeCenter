@@ -1,4 +1,4 @@
-import {apiFetch} from './session';
+import {apiFetch} from './api/client';
 import {Save} from "lucide-react";
 import {useEffect,useState} from "react";
 import type {PokemonInjection,PublicPlayer} from "@pokerace/shared";
@@ -8,7 +8,7 @@ import {buildPokemon,type BuiltPokemon} from "./pokemon-builder";
 
 const initialPokemon:PokemonInjection={playerId:"joueur-01",slot:1,speciesId:255,nickname:"POUSSIFEU",level:5,experience:135,currentHp:19,stats:{maxHp:19,attack:11,defense:9,speed:9,spAttack:12,spDefense:10},moves:[{id:10,pp:35},{id:45,pp:40},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:0,friendship:70,otName:"POKER",trainerId:12345,secretId:54321,ivs:{hp:0,attack:0,defense:0,speed:0,spAttack:0,spDefense:0},evs:{hp:0,attack:0,defense:0,speed:0,spAttack:0,spDefense:0},shiny:false};
 const Num=({label,value,onChange,min=0,max=999,disabled=false}:{label:string,value:number,onChange:(n:number)=>void,min?:number,max?:number,disabled?:boolean})=><label>{label}<input type="number" disabled={disabled} min={min} max={max} value={value} onChange={e=>onChange(Number(e.target.value))}/></label>;
-export function AdminPanel({players,onSaved}:{players:PublicPlayer[];onSaved:()=>void}){
+export function AdminPanel({onSaved}:{onSaved:()=>void}){
  const [open,setOpen]=useState(false),[form,setForm]=useState<PokemonInjection>(initialPokemon),[message,setMessage]=useState("");
  const [mode,setMode]=useState<'manual'|'auto'>('auto');
  const [generated,setGenerated]=useState<{key:string;data:BuiltPokemon}|null>(null);
@@ -28,7 +28,6 @@ export function AdminPanel({players,onSaved}:{players:PublicPlayer[];onSaved:()=
    },300);
    return ()=>{active=false;clearTimeout(timer);};
  },[mode,autoKey,retry]);
- useEffect(()=>{if(players.length&&!players.some(p=>p.playerId===form.playerId))setForm(current=>({...current,playerId:players[0].playerId}));},[players,form.playerId]);
  const patch=(next:Partial<PokemonInjection>)=>setForm(v=>({...v,...next}));
  const submit=async(e:React.FormEvent)=>{
    e.preventDefault();if(!autoReady||sending)return;

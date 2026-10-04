@@ -22,8 +22,26 @@ public sealed class ServerConnection(ClientConfiguration configuration) : IServe
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(TimeSpan.FromSeconds(10));
         var uri = new UriBuilder(configuration.ServerUrl);
+        var lookup = new UriBuilder(configuration.ServerUrl);
+        lookup.Scheme = lookup.Scheme is "https" or "wss" ? "https" : "http";
+        lookup.Path = "/api/rooms/resolve";
+        var socketPath = "/socket.io/";
+        using (var http = new HttpClient())
+        {
+            using var body = new StringContent(new JsonObject { ["roomCode"] = configuration.RoomCode, ["playerName"] = configuration.PlayerName }.ToJsonString(), Encoding.UTF8, "application/json");
+            using var response = await http.PostAsync(lookup.Uri, body, deadline.Token);
+            // Older servers do not expose room discovery.
+            if (response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                if (!response.IsSuccessStatusCode) throw new ClientException("server_rejected", "Code du salon incorrect ou compte absent du salon. Rejoignez le salon sur le portail.");
+                var result = JsonNode.Parse(await response.Content.ReadAsStringAsync(deadline.Token));
+                socketPath = result?["socketPath"]?.GetValue<string>() ?? "";
+                if (!System.Text.RegularExpressions.Regex.IsMatch(socketPath, @"^/(rooms/[a-zA-Z0-9-]+/)?socket\.io/?$"))
+                    throw new ClientException("invalid_protocol", "Invalid room transport path.");
+            }
+        }
         uri.Scheme = uri.Scheme is "https" or "wss" ? "wss" : "ws";
-        uri.Path = "/socket.io/"; uri.Query = "EIO=4&transport=websocket";
+        uri.Path = socketPath.TrimEnd('/') + "/"; uri.Query = "EIO=4&transport=websocket";
         socket = new ClientWebSocket();
         try
         {

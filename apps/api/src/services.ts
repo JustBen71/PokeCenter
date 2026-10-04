@@ -1,0 +1,41 @@
+import type {PublicNativeClient} from '@pokerace/shared';
+import type {createApp} from './app.js';
+import type {PortalDomain} from './store.js';
+import {CurrentGameService} from './game/current-game-service.js';
+import {GameCommandService} from './game/game-command-service.js';
+import {LibraryService} from './library/library-service.js';
+import {PokemonService} from './pokemon/pokemon-service.js';
+import {TransactionService} from './money/transaction-service.js';
+import {ObjectiveService} from './objectives/objective-service.js';
+import {BankService} from './money/bank-service.js';
+import {AuctionService} from './auctions/auction-service.js';
+import type {generateLot} from './auction-generator.js';
+import {WheelService} from './wheels/wheel-service.js';
+import {ShopService} from './shop/shop-service.js';
+import {JackpotService} from './money/jackpot-service.js';
+
+export type Services=ReturnType<typeof createServices>;
+type Course=ReturnType<typeof createApp>;
+
+// Composition of the portal services; each lobby's course app provides its native clients and action locks.
+export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot}){
+ const course=(lobbyId:string)=>{const c=courses.get(lobbyId);if(!c)throw new Error(`Lobby ${lobbyId} is not running`);return c;};
+ const currentGame=new CurrentGameService({lobbies:domain.lobbies,runs:domain.runs,clients:(lobbyId):PublicNativeClient[]=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],staleAfterMs:options.staleAfterMs});
+ const commands=new GameCommandService({db:domain.db,audit:domain.audit,timeoutMs:options.commandTimeoutMs,
+  sender:(lobbyId,playerId,command,timeoutMs)=>course(lobbyId).nativeClients.sendCommand(playerId,command,timeoutMs),
+  locks:lobbyId=>course(lobbyId).actionLocks});
+ const library=new LibraryService(domain.db);
+ const pokemon=new PokemonService({currentGame,commands,library});
+ const transactions=new TransactionService({ledger:domain.ledger,currentGame,commands,audit:domain.audit});
+ const objectives=new ObjectiveService({db:domain.db,runs:domain.runs,audit:domain.audit,transactions:()=>transactions,changed:lobbyId=>options.changed(lobbyId,'objectives')});
+ const bank=new BankService({domain,transactions});
+ const jackpot=new JackpotService({domain,transactions,commands});
+ const auctions=new AuctionService({domain,db:domain.db,currentGame,transactions,library,generate:options.generateLot,
+  clients:lobbyId=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],changed:lobbyId=>options.changed(lobbyId,'auctions')});
+ const wheels=new WheelService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'wheels'),
+  notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n),spun:(lobbyId,r)=>options.emit(lobbyId,'wheel-spin',r)});
+ const shop=new ShopService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'shop')});
+ const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop};
+ wheels.attach(services);shop.attach(services);
+ return services;
+}

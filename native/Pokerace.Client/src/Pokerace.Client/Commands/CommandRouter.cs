@@ -6,7 +6,7 @@ using Pokerace.Client.Configuration;
 
 namespace Pokerace.Client.Commands;
 
-public sealed class CommandRouter(IBridgeClient bridge, ClientConfiguration configuration, int capacity = 4096)
+public sealed class CommandRouter(IBridgeClient bridge, ClientConfiguration configuration, int capacity = 4096, Pokerace.Client.Games.LocalRomIdentity? romIdentity = null)
 {
     private readonly object sync = new();
     private readonly Dictionary<Guid, (string Fingerprint, Task<CommandResult> Task)> cache = new();
@@ -51,6 +51,17 @@ public sealed class CommandRouter(IBridgeClient bridge, ClientConfiguration conf
     }
     private async Task<JsonObject> ExecuteAsync(CommandContext command, CancellationToken cancellation)
     {
+        if (command.Command == "pokemon.purchase")
+        {
+            if (!configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Pokemon purchases disabled locally.");
+            return await Pokerace.Client.Games.Pokemon.Gen3.Gen3Purchase.ExecuteAsync(bridge, romIdentity, command.Payload, cancellation);
+        }
+        // Business writes go through the game adapter only; "allowPokemonPurchases" is the local switch for all of them.
+        if (Pokerace.Client.Games.Pokemon.Gen3.Gen3Writes.Commands.Contains(command.Command))
+        {
+            if (command.Command != "game.party.snapshot" && !configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Game writes disabled locally.");
+            return await Pokerace.Client.Games.Pokemon.Gen3.Gen3Writes.ExecuteAsync(command.Command, bridge, romIdentity, command.Payload, cancellation);
+        }
         if (command.Command == "bridge.writeMemory" && !configuration.AllowMemoryWrites)
             throw new ClientException("writes_disabled", "Memory writes are disabled locally.");
         if (!new[] { "bridge.ping", "bridge.getStatus", "bridge.getSystem", "bridge.getGameInfo", "bridge.listMemoryDomains", "bridge.readMemory", "bridge.writeMemory" }.Contains(command.Command))

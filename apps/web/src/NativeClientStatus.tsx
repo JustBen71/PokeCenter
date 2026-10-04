@@ -12,7 +12,7 @@ export function NativeClientStatus({client,legacyActionsAvailable}:{client:Publi
    <div><dt>Version</dt><dd>{client.clientVersion??'—'} · {client.platform??'—'}</dd></div>
    <div><dt>Écritures locales</dt><dd>{client.allowMemoryWrites?'Autorisées dans les réglages':'Désactivées'}</dd></div>
   </dl>
-  <small>L’adaptateur du jeu fonctionne uniquement en lecture.</small>
-  {!legacyActionsAvailable&&<p className="native-action-notice">{nativeActionUnavailable}</p>}
+  <small>{client.canPurchase?'Achats dans le jeu et copie vers la bibliothèque disponibles.':'Lecture du jeu ; mettez à jour le lanceur pour les achats.'}</small>
+  {!legacyActionsAvailable&&!client.canPurchase&&<p className="native-action-notice">{nativeActionUnavailable}</p>}
  </aside>;
 }

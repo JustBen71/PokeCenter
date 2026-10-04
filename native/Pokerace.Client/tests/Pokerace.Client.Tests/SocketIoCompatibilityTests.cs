@@ -48,7 +48,7 @@ public sealed class SocketIoCompatibilityTests
                 {
                     Assert.Equal(12500, (int)game["trainer"]!["money"]!);
                     Assert.Single(game["party"]!.AsArray());
-                    Assert.DoesNotContain("raw", game.ToJsonString());
+                    Assert.Equal(200, game["party"]![0]!["raw"]!.GetValue<string>().Length);
                     break;
                 }
                 Assert.True(DateTime.UtcNow < gameDeadline, "Production API did not accept C# GameAdapter state.");

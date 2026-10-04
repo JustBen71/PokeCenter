@@ -3,6 +3,18 @@ from unittest.mock import patch
 from apps.agent import agent
 from apps.agent.agent import State
 class ValidationTest(unittest.TestCase):
+ def test_room_transport_resolution(self):
+  from io import BytesIO
+  with patch.object(agent,'urlopen',return_value=BytesIO(b'{"socketPath":"/rooms/course-a/socket.io"}')):
+   self.assertEqual(agent.room_socket_path(),'rooms/course-a/socket.io')
+  with patch.object(agent,'urlopen',return_value=BytesIO(b'{"socketPath":"https://other.example/socket.io"}')):
+   with self.assertRaises(ValueError):agent.room_socket_path()
+ def test_room_rejection_does_not_fall_back_to_global_transport(self):
+  from urllib.error import HTTPError
+  with patch.object(agent,'urlopen',side_effect=HTTPError('http://localhost',403,'Forbidden',{},None)):
+   with self.assertRaises(RuntimeError):agent.room_socket_path()
+  with patch.object(agent,'urlopen',side_effect=HTTPError('http://localhost',404,'Not Found',{},None)):
+   self.assertEqual(agent.room_socket_path(),'socket.io')
  def test_autosave_schedule_commits_only_after_ack(self):
   clock=[0];delays=[]
   def sleep(seconds):

@@ -1,11 +1,33 @@
 using System.Security.Cryptography;
 using Pokerace.Client.Launcher;
 using Xunit;
+using Pokerace.Client.Configuration;
 
 namespace Pokerace.Client.Tests;
 
 public sealed class LauncherTests
 {
+    [Theory]
+    [InlineData("nouveau-salon", "nouveau-salon")]
+    [InlineData("", "ancien-salon")]
+    public void EveryInteractiveLaunchAsksForRoomAndPreservesIdentity(string answer, string expected)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var initial = new ClientConfiguration { ServerUrl = "http://localhost:8080", PlayerName = "Ben", RoomCode = "ancien-salon" };
+            ConfigurationStore.Save(path, initial);
+            var output = new StringWriter();
+            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false), new StringReader(answer + "\n"), output);
+            Assert.Contains("Code du salon", output.ToString());
+            Assert.Equal(expected, result.RoomCode);
+            Assert.Equal(initial.PlayerId, result.PlayerId);
+            Assert.Equal(initial.ServerUrl, result.ServerUrl);
+            Assert.Equal("Ben", result.PlayerName);
+            Assert.Equal(expected, ConfigurationStore.Load(path).RoomCode);
+        }
+        finally { File.Delete(path); }
+    }
     [Fact] public void PathsAreArgumentsAndIdentityConfigIsExplicit()
     {
         var options = LaunchOptions.Parse(["--rom", "ROM avec espaces & caractères.gba", "--config", "other/client.json", "--configure"]);

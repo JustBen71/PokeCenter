@@ -31,6 +31,6 @@ public sealed class Gen3PokemonDecoder(JsonObject data, string language)
             throw new InvalidDataException("Invalid Pokemon fields.");
         var nickname = Text(bytes.Slice(8, 10));
         return new(slot, species, data["species"]![language]![species.ToString()]!.GetValue<string>(), nickname.Length == 0 ? null : nickname,
-            level, hp, maxHp, ((ot & 65535) ^ (ot >> 16) ^ (pid & 65535) ^ (pid >> 16)) < 8);
+            level, hp, maxHp, ((ot & 65535) ^ (ot >> 16) ^ (pid & 65535) ^ (pid >> 16)) < 8, Convert.ToHexString(bytes).ToLowerInvariant());
     }
 }

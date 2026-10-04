@@ -1,6 +1,8 @@
 # Client natif, état public et lecture Émeraude
 
-Implémentation de [README_WEB_NATIVE_CLIENT_CODEX.md](../README_WEB_NATIVE_CLIENT_CODEX.md), étapes A et B. Les commandes métier de l’étape 40 restent sur l’ancien agent.
+> Mise à jour du 4 octobre 2026 : le client natif prend désormais en charge les achats aux enchères, même seul, et la copie exacte vers la bibliothèque. Les mentions de lecture seule ci-dessous concernent l’ancien périmètre ; réinjection, suppression et gages restent sur l’agent historique. Voir le README principal pour l’état actuel.
+
+État actuel : voir le [README principal](../README.md). Les cahiers des charges décrivent aussi des étapes historiques.
 
 ## Utilisation
 
@@ -8,7 +10,7 @@ Lancer `pokerace.cmd` ou la distribution Windows `Pokerace.Client.exe`, sélecti
 
 Une seule carte est affichée par compte, même si l’ancien agent et le client natif sont connectés ensemble. Les données natives valides ont priorité pour les équipes et la carte de progression. Sinon, l’affichage reprend les données de l’ancien agent ou indique uniquement la connexion native.
 
-La copie brute des Pokémon, leur injection, suppression, les enchères et les gages ne sont pas migrés. Les commandes historiques continuent de viser exclusivement `/agent`. Les Pokémon du nouvel affichage ne disposent pas de copie brute : les boutons de copie et suppression sont désactivés. Sans agent historique connecté, un message explique que ces actions ne sont pas encore disponibles avec le nouveau client.
+Les copies bibliothèque et achats natifs sont disponibles. Réinjection, suppression et gages restent sur /agent.
 
 ## Reconnaissance et lecture locales
 
@@ -32,7 +34,7 @@ La lecture tourne toutes les 750 ms, indépendamment des heartbeats et des recon
 GAME_STATE { type, protocolVersion: 1, gameStateVersion: 1, adapter, state }
 ```
 
-`adapter` contient `id`, `status`, `profileId`, `capabilities`. `state` vaut `null` pour un diagnostic ou contient l’observation normalisée de version 1. L’objet d’adaptateur est répété dans l’observation et doit être identique à celui de l’enveloppe. Les champs inattendus, écritures métier, copies brutes et états incohérents sont refusés.
+`adapter` contient `id`, `status`, `profileId`, `capabilities`. `state` vaut `null` pour un diagnostic ou contient l’observation normalisée de version 1. L’objet d’adaptateur est répété dans l’observation et doit être identique à celui de l’enveloppe. Les champs inattendus et états incohérents sont refusés. Le champ Pokémon optionnel raw accepte une copie hexadécimale de 100 octets validée par le décodeur partagé.
 
 `GET /api/native-clients` et l’événement `/dashboard` `native-clients` utilisent la même projection explicite `PublicNativeClient` du package shared. Les contrôles de compte existants s’appliquent à la route et au dashboard. L’événement envoie la liste initiale, puis les changements utiles, et retire les clients déconnectés. `accountId` désigne le compte du serveur ; `playerId` désigne l’installation du client. Aucun objet interne de socket n’est publié.
 

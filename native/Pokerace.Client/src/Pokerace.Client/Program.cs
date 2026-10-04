@@ -26,7 +26,7 @@ public static class Program
             if (args[0] == "configure")
             {
                 if (File.Exists(path)) throw new ClientException("configuration_exists", "Configuration exists; edit it explicitly to preserve identity.");
-                Console.Write("Server URL (https://...): "); var url = Console.ReadLine() ?? "";
+                Console.Write("Server URL (http://... or https://...): "); var url = Console.ReadLine() ?? "";
                 Console.Write("Player name: "); var name = Console.ReadLine() ?? "";
                 Console.Write("Room code: "); var room = Console.ReadLine() ?? "";
                 ConfigurationStore.Save(path, new() { ServerUrl = url, PlayerName = name, RoomCode = room });

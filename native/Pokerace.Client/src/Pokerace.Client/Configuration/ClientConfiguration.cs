@@ -13,6 +13,7 @@ public sealed record ClientConfiguration
     public string BridgeHost { get; init; } = "127.0.0.1";
     public int BridgePort { get; init; } = 43821;
     public bool AllowMemoryWrites { get; init; }
+    public bool AllowPokemonPurchases { get; init; } = true;
     public bool AllowInsecureLocalServer { get; init; }
     public int HeartbeatSeconds { get; init; } = 5;
 
@@ -20,9 +21,8 @@ public sealed record ClientConfiguration
     {
         if (!Uri.TryCreate(ServerUrl, UriKind.Absolute, out var uri) ||
             uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 || uri.AbsolutePath != "/" ||
-            (uri.Scheme is not ("https" or "wss") && !(AllowInsecureLocalServer && (uri.Scheme is "http" or "ws") &&
-                (uri.Host is "127.0.0.1" or "[::1]" or "localhost"))))
-            throw new ClientException("invalid_configuration", "Server URL must use HTTPS/WSS (no credentials, query or path). HTTP/WS is permitted only on explicit local test mode.");
+            uri.Scheme is not ("https" or "wss" or "http" or "ws"))
+            throw new ClientException("invalid_configuration", "Server URL must use HTTP/HTTPS or WS/WSS (no credentials, query or path).");
         if (BridgeHost != "127.0.0.1" || BridgePort is < 1 or > 65535)
             throw new ClientException("invalid_configuration", "Bridge must use 127.0.0.1 and a valid port.");
         if (string.IsNullOrEmpty(PlayerId) || !Regex.IsMatch(PlayerId, "^[a-z0-9][a-z0-9_-]{1,39}$") || string.IsNullOrWhiteSpace(PlayerName) || PlayerName.Trim().Length > 32 || PlayerName.Any(char.IsControl))

@@ -12,8 +12,8 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
     TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null)
 {
     private readonly BridgeConnectionManager manager = new(bridge, log, pollInterval, retryInterval);
-    private readonly GameAdapterManager games = new(bridge, romIdentity);
-    private readonly CommandRouter router = new(bridge, configuration);
+    private readonly GameAdapterManager games = new(bridge, romIdentity, configuration.AllowPokemonPurchases);
+    private readonly CommandRouter router = new(bridge, configuration, romIdentity: romIdentity);
     private readonly Channel<(ServerMessage Message, long Session)> commands = Channel.CreateBounded<(ServerMessage, long)>(64);
     private long session;
     public async Task RunAsync(CancellationToken cancellation)
@@ -46,6 +46,7 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 var initialSnapshot = manager.Snapshot;
                 await server.SendAsync("HELLO", ServerProtocol.Hello(configuration, initialSnapshot), connection.Token);
                 var clientStatus = ServerProtocol.Message("CLIENT_STATUS");
+                clientStatus["canPurchase"] = configuration.AllowPokemonPurchases && romIdentity != null;
                 clientStatus["connected"] = true; clientStatus["allowMemoryWrites"] = configuration.AllowMemoryWrites;
                 await server.SendAsync("CLIENT_STATUS", clientStatus, connection.Token);
                 await server.SendAsync("BRIDGE_STATUS", ServerProtocol.BridgeStatusMessage(initialSnapshot), connection.Token);

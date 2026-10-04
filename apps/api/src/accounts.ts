@@ -1,6 +1,7 @@
 import type {Express} from 'express';
-import {randomUUID} from 'node:crypto';
-import {accountInput,accountKey,type Account} from '@pokerace/shared';
+import {accountKey} from '@pokerace/shared';
+import {AccountService} from './accounts/account-service.js';
+import {currentAccount,route} from './http.js';
 import type {Store} from './store.js';
 export function registerAccounts(app:Express,store:Store,required=true){
  store.accounts();
@@ -10,11 +11,9 @@ export function registerAccounts(app:Express,store:Store,required=true){
   if(!store.accounts().some(a=>a.id===row.playerId||accountKey(a.name)===accountKey(name)))store.putAccount({id:row.playerId,name,sprite:'brendan',admin:false},accountKey(name));
  }
  app.get('/api/accounts',(_req,res)=>res.json(store.accounts()));
- app.post('/api/accounts',(req,res)=>{
-  const parsed=accountInput.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Choisissez un nom valide et un sprite'});
-  const data=parsed.data;if(store.accounts().some(a=>accountKey(a.name)===accountKey(data.name)))return res.status(409).json({error:'Ce nom existe déjà : sélectionnez ce compte'});
-  const account={...data,id:'p-'+randomUUID().replaceAll('-','')};store.putAccount(account,accountKey(data.name));return res.status(201).json(account);
- });
+ // Account writes need the portal database (accounts are global); course databases never expose them.
+ const service=store.portal&&new AccountService(store.portal.accounts,store.portal.audit);
+ if(service)app.post('/api/accounts',route((req,res)=>{res.status(201);return service.create(req.body);}));
  app.use('/api',(req,res,next)=>{
   if(!required)return next();
   const account=store.accounts().find(a=>a.id===req.header('x-account-id'));if(!account)return res.status(401).json({error:'Choisissez votre compte pour vous connecter'});
@@ -29,12 +28,5 @@ export function registerAccounts(app:Express,store:Store,required=true){
   }
   next();
  });
- app.patch('/api/accounts/:id',(req,res)=>{
-  const actor=res.locals.account as Account|undefined,id=String(req.params.id);
-  if(!actor||(!actor.admin&&actor.id!==id))return res.status(403).json({error:'Choisissez votre propre compte'});
-  const parsed=accountInput.safeParse(req.body);if(!parsed.success)return res.status(400).json({error:'Profil invalide'});
-  if(!store.accounts().some(a=>a.id===id))return res.status(404).json({error:'Compte introuvable'});
-  if(store.accounts().some(a=>a.id!==id&&accountKey(a.name)===accountKey(parsed.data.name)))return res.status(409).json({error:'Nom déjà utilisé'});
-  const account={...parsed.data,id};store.putAccount(account,accountKey(account.name));return res.json(account);
- });
+ if(service)app.patch('/api/accounts/:id',route((req,res)=>service.update(currentAccount(res),String(req.params.id),req.body)));
 }

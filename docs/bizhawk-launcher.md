@@ -1,9 +1,11 @@
 # Lanceur Windows : BizHawk et client
 
+> Mise à jour du 4 octobre 2026 : le client natif prend désormais en charge les achats aux enchères, même seul, et la copie exacte vers la bibliothèque. Les mentions de lecture seule ci-dessous concernent l’ancien périmètre ; réinjection, suppression et gages restent sur l’agent historique. Voir le README principal pour l’état actuel.
+
 ## Utilisation
 
 1. Depuis le projet, double-cliquer sur `pokerace.cmd`. Sinon, récupérer l'artefact **pokerace-launcher-win-x64** du workflow **BizHawk bridge**, extraire le ZIP et double-cliquer sur **Pokerace.Client.exe**.
-2. Au premier lancement, renseigner l'adresse **HTTPS** du serveur existant, le pseudo du compte créé sur son portail et le code de son salon. Le serveur doit prendre en charge le namespace `/client`.
+2. Au premier lancement, renseigner l'adresse **HTTP ou HTTPS** du serveur existant, le pseudo du compte créé sur son portail et le code de son salon. Le serveur doit prendre en charge le namespace `/client`.
 3. Choisir sa ROM dans la fenêtre de sélection. Annuler cette fenêtre ne lance aucune session.
 4. BizHawk s'ouvre avec la ROM, le bridge et le client démarrent automatiquement. Les connexions au serveur sont affichées dans la console.
 5. Sauvegarder normalement dans le jeu. Fermer BizHawk ou appuyer sur **Entrée** dans la console pour arrêter la session. Si BizHawk attend une confirmation de sauvegarde, le lanceur ne force pas sa fermeture.
@@ -25,7 +27,7 @@ pokerace.cmd --rom "C:\Mes jeux\ma ROM.gba"
 
 Avec le seul exécutable, utiliser `Pokerace.Client.exe play --configure` ou `Pokerace.Client.exe play --rom "C:\Mes jeux\ma ROM.gba"`. Sans argument, Windows démarre le même lanceur. La modification des réglages conserve l'identifiant du joueur.
 
-Les écritures mémoire restent désactivées par défaut. Pour les autoriser explicitement, modifier `allowMemoryWrites` dans le fichier de configuration et relancer. Le lanceur ne change pas ce choix. L’adaptateur local lit désormais Émeraude pour les ROM exactement reconnues et publie les données sur le dashboard. Il reste en lecture seule ; les enchères, gages et modifications d’équipe utilisent encore l’agent historique. Voir [les conditions de reconnaissance et les diagnostics](native-game-state.md).
+Les écritures mémoire génériques sont désactivées par défaut (allowMemoryWrites). Les achats vérifiés sont autorisés séparément par allowPokemonPurchases, activé par défaut. La copie bibliothèque est disponible ; les gages et autres modifications d’équipe restent sur l’agent historique.
 
 ## Construire
 

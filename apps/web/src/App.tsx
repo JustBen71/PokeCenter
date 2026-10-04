@@ -1,20 +1,79 @@
-import {playerViews,nativeActionUnavailable} from './native-clients';
-import {NativeClientStatus} from './NativeClientStatus';
-import type {PublicNativeClient} from '@pokerace/shared';
-import {avatarUrl} from '@pokerace/shared';
-import {AccountGate,AccountBar,useSession} from './Accounts';
-import {apiFetch} from './session';
-import {Auctions} from "./Auctions";
-import {Roulette} from "./Roulette";
-import {Progressions} from "./Progressions";
-import {useEffect,useMemo,useState} from "react";import {io} from "socket.io-client";import {Gavel,Library,Save,Trash2,Activity,Clock3,Gamepad2,MapPin,Radio,Trophy,Wifi,WifiOff} from "lucide-react";import type {PublicPlayer} from "@pokerace/shared";
-import {PokemonLibrary,type Capture} from "./PokemonLibrary";
-const elapsed=(iso:string,now:number)=>{const seconds=Math.max(0,Math.floor((now-Date.parse(iso))/1000));if(seconds<5)return "à l’instant";if(seconds<60)return `il y a ${seconds} s`;const minutes=Math.floor(seconds/60);if(minutes<60)return `il y a ${minutes} min`;return `il y a ${Math.floor(minutes/60)} h`;};
-const playtime=(seconds:number)=>`${Math.floor(seconds/3600)} h ${String(Math.floor(seconds%3600/60)).padStart(2,"0")} min`;
-const label=(p:PublicPlayer)=>p.state.game.romStatus==="recognized"?`${p.state.game.language?.toUpperCase()} • ${p.state.game.revision??p.state.game.profileId}`:p.state.game.romStatus==="missing"?"ROM absente":"ROM non reconnue";
-function PokemonSlot({pokemon,onSave,onDelete,canDelete}:{pokemon:PublicPlayer["state"]["party"][number]|undefined;onSave:()=>void;onDelete:()=>void;canDelete:boolean}){if(!pokemon)return <div className="slot empty"><div className="pokeball"/><span>Emplacement vide</span></div>;const hp=Math.round(pokemon.currentHp/pokemon.maxHp*100);return <div className="slot"><div className="sprite-wrap">{pokemon.shiny&&<span className="shiny" aria-label="Chromatique">✦</span>}<img src={`/sprites/${pokemon.shiny?"shiny/":""}${pokemon.speciesId}.png`} onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src="/sprites/fallback.svg"}} alt={pokemon.speciesName}/></div><div className="mon-info"><div><strong>{pokemon.nickname||pokemon.speciesName}</strong><span>Niv. {pokemon.level}</span></div>{pokemon.nickname&&<small>{pokemon.speciesName}</small>}<div className="hp"><span style={{width:`${hp}%`}} className={hp<25?"low":hp<50?"mid":""}/></div><small>{pokemon.currentHp} / {pokemon.maxHp} PV</small><button className="save-mon" disabled={!pokemon.raw} onClick={onSave} aria-label={`Enregistrer ${pokemon.nickname||pokemon.speciesName}`} title={pokemon.raw?"Sauvegarder dans la bibliothèque":nativeActionUnavailable}><Save size={15}/></button><button className="delete-mon" disabled={!canDelete} onClick={onDelete} title={pokemon.raw?"Supprimer de l’équipe":nativeActionUnavailable} aria-label={`Supprimer ${pokemon.nickname||pokemon.speciesName} de l’équipe`}><Trash2 size={15}/></button></div></div>}
-function PlayerCard({player,now,index,onSave}:{player:PublicPlayer;now:number;index:number;onSave:(p:Capture)=>void}){const {account}=useSession();const [deleting,setDeleting]=useState(false),[error,setError]=useState('');
-const remove=async(pokemon:PublicPlayer['state']['party'][number])=>{if(!pokemon.raw||deleting)return;setDeleting(true);setError('');try{const response=await apiFetch('/api/pokemon',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'remove',playerId:player.playerId,slot:pokemon.slot,raw:pokemon.raw})});const body=await response.json();if(!response.ok)throw new Error(body.error);setError('Suppression confirmée. Sauvegardez dans le jeu pour la conserver.');}catch(e){setError(String(e));}finally{setDeleting(false);}};
-const s=player.state;const unknown=s.game.romStatus!=="recognized";return <article className={`player ${player.connected?"online":"offline"}`}><header><img className="team-avatar" src={avatarUrl(player.account?.sprite??'brendan')} alt=""/><div className="rank">{String(index+1).padStart(2,"0")}</div><div><p className="kicker">{s.playerName??"DRESSEUR"}</p><h2>{s.trainer?.name??s.playerName??player.playerId}</h2><span className="version">{label(player)}</span>{s.trainer?.playTimeSeconds!==undefined&&<small>Temps de jeu : {playtime(s.trainer.playTimeSeconds)} • Équipe : {s.trainer.partyCount??0}/6</small>}</div><div className={`status ${player.connected?"on":"off"}`}>{player.connected?<Wifi size={14}/>:<WifiOff size={14}/>} {player.connected?"En ligne":"Hors ligne"}</div></header><div className="meta"><div><MapPin/><span>{s.location?.label??"Zone inconnue"}</span>{s.location&&<small>Carte {s.location.mapGroup}:{s.location.mapNumber}</small>}</div><div><Clock3/><span>{elapsed(player.lastSeenAt,now)}</span><small>{new Date(player.receivedAt).toLocaleString("fr-FR")}</small></div></div>{!player.connected&&<div className="stale">Dernière donnée reçue</div>}{unknown&&<div className="warning"><strong>{label(player)}</strong><span>{s.diagnostic??"La lecture mémoire est désactivée pour protéger l’intégrité des données."}</span>{s.game.header&&<small>{s.game.header.title} • {s.game.header.gameCode} • v{s.game.header.version}</small>}</div>}<p role="status">{error}</p>{s.trainer?.money!==undefined&&<p className="team-money">Argent : {s.trainer.money.toLocaleString("fr-FR")} ₽</p>}<div className="party">{Array.from({length:6},(_,i)=><PokemonSlot key={i} pokemon={s.party.find(p=>p.slot===i+1)} canDelete={(account.admin||account.id===player.playerId)&&player.connected&&!deleting&&s.party.length>1&&!!s.party.find(p=>p.slot===i+1)?.raw} onDelete={()=>{const p=s.party.find(p=>p.slot===i+1);if(p)void remove(p);}} onSave={()=>{const pokemon=s.party.find(p=>p.slot===i+1);if(pokemon)onSave({pokemon,source:s.playerName??player.playerId,capturedAt:s.observedAt});}}/>)}</div></article>}
-export function App(){return <AccountGate><Portal/></AccountGate>;}
-function Portal(){const {account}=useSession();const [page,setPage]=useState(()=>window.location.hash==='#/encheres'?'auctions':window.location.hash==='#/roulette'?'roulette':window.location.hash==='#/progressions'?'progress':window.location.hash==='#/bibliotheque'?'library':'teams'),[capture,setCapture]=useState<Capture|null>(null);const [nativeClients,setNativeClients]=useState<PublicNativeClient[]>([]);const [players,setPlayers]=useState<PublicPlayer[]>([]),[connected,setConnected]=useState(false),[now,setNow]=useState(Date.now());useEffect(()=>{let nativeEventReceived=false;apiFetch("/api/native-clients").then(r=>r.ok?r.json():Promise.reject()).then(rows=>{if(!nativeEventReceived)setNativeClients(rows)}).catch(()=>{});apiFetch("/api/players").then(r=>r.json()).then(setPlayers).catch(()=>{});const socket=io("/dashboard",{auth:{accountId:account.id}});socket.on("connect",()=>setConnected(true));socket.on("disconnect",()=>setConnected(false));socket.on("players",setPlayers);socket.on("native-clients",rows=>{nativeEventReceived=true;setNativeClients(rows)});return()=>{socket.close()}},[]);useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);useEffect(()=>{const navigate=()=>{setPage(window.location.hash==='#/encheres'?'auctions':window.location.hash==='#/roulette'?'roulette':window.location.hash==='#/progressions'?'progress':window.location.hash==='#/bibliotheque'?'library':'teams');window.scrollTo(0,0);};window.addEventListener('hashchange',navigate);return()=>window.removeEventListener('hashchange',navigate);},[]);const views=useMemo(()=>playerViews(players,nativeClients),[players,nativeClients]);const online=views.filter(p=>p.display.connected).length;return <><header className="top"><div className="brand"><span><Trophy/></span><div><strong>Pokérace</strong><small>TRACKER LIVE</small></div></div><nav className="main-menu" aria-label="Menu principal"><a href="#/equipes" aria-current={page==='teams'?'page':undefined}><Gamepad2 size={18}/>Équipes</a><a href="#/bibliotheque" aria-current={page==='library'?'page':undefined}><Library size={18}/>Bibliothèque</a><a href="#/progressions" aria-current={page==='progress'?'page':undefined}><MapPin size={18}/>Progressions</a><a href="#/roulette" aria-current={page==='roulette'?'page':undefined}><Trophy size={18}/>Roulette</a><a href="#/encheres" aria-current={page==='auctions'?'page':undefined}><Gavel size={18}/>Enchères</a></nav><AccountBar/><div className={`live ${connected?"":"lost"}`}><Radio/> {connected?"DIRECT":"RECONNEXION"}</div></header><main>{["auctions","roulette","library"].includes(page)&&views.some(v=>v.accountId===account.id&&v.native&&!v.legacyActionsAvailable)&&<p className="native-action-notice" role="status">{nativeActionUnavailable}</p>}{page==='teams'?<><section className="hero"><div><p className="eyebrow">POKÉRACE • COURSE EN DIRECT</p><h1>La route vers la victoire.</h1><p>Suivez chaque dresseur, chaque équipe et chaque mouvement — en temps réel.</p></div><div className="summary"><Activity/><div><strong>{online}</strong><span>joueur{online>1?"s":""} en ligne</span></div><div><strong>{views.length}</strong><span>inscrit{views.length>1?"s":""}</span></div></div></section>{views.length?<section className="grid">{views.map((view,i)=><section key={view.accountId}>{view.native&&<NativeClientStatus client={view.native} legacyActionsAvailable={view.legacyActionsAvailable}/>}<PlayerCard player={view.display} now={now} index={i} onSave={snapshot=>{setCapture(structuredClone(snapshot));window.location.hash='/bibliotheque';}}/></section>)}</section>:<section className="empty-state"><Gamepad2/><h2>En attente des dresseurs</h2><p>Démarrez Pokérace sur un PC joueur. Sa carte apparaîtra ici dès la connexion du client.</p></section>}</>:page==='auctions'?<Auctions players={players}/>:page==='roulette'?<Roulette players={players}/>:page==='progress'?<Progressions players={views.map(v=>v.display)}/>:<PokemonLibrary players={players} capture={capture} clearCapture={()=>setCapture(null)}/>}</main><footer>Pokérace Tracker <span>•</span> Les données restent sur votre serveur. Aucune ROM ni sauvegarde complète n’est transmise. Les copies Pokémon sont conservées sur le serveur.</footer></>}
+import {useState} from 'react';
+import {Save,Trash2} from 'lucide-react';
+import {ToastProvider} from './components/Toasts';
+import {useToast} from './components/toast-context';
+import {SessionProvider} from './auth/SessionProvider';
+import {useSession} from './auth/session-context';
+import {LobbyProvider} from './lobby/LobbyProvider';
+import {LiveDataProvider} from './realtime/LiveData';
+import {useLive,useLiveTopic} from './realtime/live-context';
+import type {ObjectivesSnapshot} from '@pokerace/shared';
+import {Shell} from './app/Shell';
+import {ErrorBoundary} from './components/ErrorBoundary';
+import {useRoute} from './app/use-route';
+import {CoursePage} from './course/CoursePage';
+import type {CourseRow} from './course/course-model';
+import {PokemonSheet} from './pokemon/PokemonSheet';
+import {api} from './api/client';
+import {useLobby} from './lobby/lobby-context';
+import {confirmOutOfBattle,nativeCan,partyAction} from './pokemon/game-actions';
+import {AuctionsPage} from './auctions/AuctionsPage';
+import {WheelOverlay} from './wheels/WheelOverlay';
+import {WheelsAdminPage} from './wheels/WheelsAdminPage';
+import {Progressions} from './Progressions';
+import {PokemonLibrary,type Capture} from './PokemonLibrary';
+import {ManagementPage} from './admin/ManagementPage';
+import {BankPage} from './bank/BankPage';
+import {ShopPage} from './shop/ShopPage';
+import {JackpotPage} from './jackpot/JackpotPage';
+import {LogsPage} from './audit/LogsPage';
+import {nativeActionUnavailable} from './native-clients';
+
+export function App(){
+ return <ErrorBoundary><ToastProvider><SessionProvider><LobbyProvider><LiveDataProvider><ErrorBoundary><Portal/></ErrorBoundary></LiveDataProvider></LobbyProvider></SessionProvider></ToastProvider></ErrorBoundary>;
+}
+
+type Sheet={row:CourseRow;slot:number};
+
+function MapRoute(){
+ const {views}=useLive();
+ const lobbyObjectives=useLiveTopic<ObjectivesSnapshot>('objectives',{objectives:[],completions:[]});
+ return <Progressions players={views.map(v=>v.display)} lobbyObjectives={lobbyObjectives}/>;
+}
+
+function Portal(){
+ const route=useRoute();const {account}=useSession();const {lobby}=useLobby();const {views,players}=useLive();const toast=useToast();
+ const [capture,setCapture]=useState<Capture|null>(null),[sheet,setSheet]=useState<Sheet|null>(null),[busy,setBusy]=useState(false);
+ // The sheet follows live data: it closes by itself if the Pokémon leaves the team.
+ const pokemon=sheet?views.find(v=>v.accountId===sheet.row.accountId)?.display.state.party.find(p=>p.slot===sheet.slot):undefined;
+ const sheetView=sheet&&views.find(v=>v.accountId===sheet.row.accountId);
+ const nativeRemove=nativeCan(sheetView??undefined,'pokemon.remove');
+ const removePokemon=async()=>{
+  if(!sheet||!pokemon?.raw||!confirmOutOfBattle(sheet.row.name,`Retirer ${pokemon.nickname||pokemon.speciesName} de l’équipe de ${sheet.row.name} ?`))return;
+  setBusy(true);
+  try{
+   if(nativeRemove)await partyAction(lobby.id,sheet.row.accountId,{action:'remove',slot:pokemon.slot});
+   else await api('/api/pokemon',{method:'POST',body:{action:'remove',playerId:sheetView!.display.playerId,slot:pokemon.slot,raw:pokemon.raw}});
+   toast.success('Suppression confirmée par le jeu. Sauvegardez dans le jeu pour la conserver.');setSheet(null);
+  }catch(e){toast.error(e);}finally{setBusy(false);}
+ };
+ return <Shell route={route}>
+  {route==='course'&&<CoursePage onPokemon={(row,p)=>setSheet({row,slot:p.slot})}/>}
+  {route==='map'&&<MapRoute/>}
+  {route==='auctions'&&<AuctionsPage/>}
+  {route==='wheels'&&<WheelsAdminPage/>}
+  {route==='shop'&&<ShopPage/>}
+  {route==='bank'&&<BankPage/>}
+  {route==='jackpot'&&<JackpotPage/>}
+  {route==='management'&&<ManagementPage/>}
+  {route==='logs'&&<LogsPage/>}
+  {route==='library'&&<PokemonLibrary capture={capture} clearCapture={()=>setCapture(null)}/>}
+  <WheelOverlay/>
+  {sheet&&pokemon&&<PokemonSheet pokemon={pokemon} owner={sheet.row.name} onClose={()=>setSheet(null)} actions={account.admin?[
+   {label:'Sauvegarder dans la bibliothèque',icon:<Save size={15}/>,disabled:!pokemon.raw,title:pokemon.raw?undefined:nativeActionUnavailable,
+    onClick:()=>{setCapture({pokemon:structuredClone(pokemon),source:sheet.row.name,capturedAt:sheetView?.display.state.observedAt??new Date().toISOString()});setSheet(null);window.location.hash='/bibliotheque';}},
+   {label:'Retirer de l’équipe',icon:<Trash2 size={15}/>,danger:true,disabled:busy||!pokemon.raw||!(nativeRemove||sheetView?.legacyActionsAvailable)||(sheetView?.display.state.party.length??0)<2,
+    title:nativeRemove||sheetView?.legacyActionsAvailable?undefined:'Le jeu de ce joueur ne permet pas cette écriture',onClick:()=>void removePokemon()}
+  ]:[]}/>}
+ </Shell>;
+}

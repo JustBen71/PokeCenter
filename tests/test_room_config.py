@@ -7,7 +7,7 @@ from apps.agent.player_client import read_config
 
 
 class RoomConfigTests(unittest.TestCase):
-    def test_first_launch_then_silent_reuse_and_nickname_change(self):
+    def test_first_launch_then_room_confirmation_and_nickname_change(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {}, clear=True):
             path=Path(folder)/'player.env'
             answers=iter(['', 'Bén', '123'])
@@ -16,7 +16,12 @@ class RoomConfigTests(unittest.TestCase):
             self.assertEqual(first['PLAYER_NAME'],'Bén')
             self.assertEqual(first['ROOM_CODE'],'123')
             self.assertRegex(first['PLAYER_ID'],r'^p-[a-f0-9]{32}$')
-            second=read_config(path,prompt=lambda _:self.fail('Configuration should be remembered'))
+            prompts=[]
+            second=read_config(path,prompt=lambda label:(prompts.append(label) or '456'))
+            self.assertEqual(len(prompts),1)
+            self.assertIn('Code du salon',prompts[0])
+            self.assertEqual(second['ROOM_CODE'],'456')
+            self.assertEqual(second['SERVER_URL'],first['SERVER_URL'])
             self.assertEqual(first['PLAYER_ID'],second['PLAYER_ID'])
             answers=iter(['','Nouveau pseudo',''])
             third=read_config(path,force=True,prompt=lambda _:next(answers))
@@ -27,7 +32,8 @@ class RoomConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {}, clear=True):
             path=Path(folder)/'player.env'
             path.write_text('SERVER_URL=http://localhost:8080\nACCOUNT_NAME=Ben\nPLAYER_NAME=Old name\nPLAYER_ID=joueur-01\nROOM_CODE=123\n',encoding='utf-8')
-            result=read_config(path,prompt=lambda _:self.fail('No prompt expected'))
+            result=read_config(path,prompt=lambda _:'')
+            self.assertEqual(result['ROOM_CODE'],'123')
             self.assertEqual(result['ACCOUNT_NAME'],'Ben')
             self.assertEqual(result['PLAYER_NAME'],'Ben')
             self.assertEqual(result['PLAYER_ID'],'joueur-01')

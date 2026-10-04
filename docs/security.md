@@ -1,7 +1,11 @@
 # Sécurité d’exploitation
 
-Le serveur n’expose que Caddy et SQLite reste dans son volume. Sur le poste Windows, le diagnostic/extracteur écoute uniquement sur `127.0.0.1`. La ROM et la sauvegarde restent sous le contrôle de mGBA local et ne sont jamais envoyées au serveur.
+Le modèle de comptes est déclaratif et destiné à un groupe de confiance : il ne fournit pas une authentification personnelle forte. Le portail permet de créer un compte et de déclarer son rôle administrateur. Le code d’un salon contrôle son accès, sans prouver l’identité du joueur.
 
-Les joueurs rejoignent le serveur avec un pseudo et le code de salon commun défini par `ROOM_CODE`. Le client conserve automatiquement un identifiant local stable. Ce mode convient à un groupe d'amis qui se font confiance ; le code de salon ne fournit pas d'identité personnelle vérifiée. La clé administrateur reste distincte du code de salon. Pour changer le code, modifier `.env` et recréer le service API avec `docker compose up -d`. L'ancien mode par jetons reste disponible pour les installations manuelles qui configurent `PLAYER_TOKENS_FILE`.
+Les salons créés depuis le portail conservent leur code en SQLite. ROOM_CODE concerne le salon historique ; modifier cette variable ne constitue pas une procédure de rotation des codes des nouveaux salons. Les anciens modes ADMIN_TOKEN et PLAYER_TOKENS_FILE restent distincts.
 
-En production, utiliser un domaine HTTPS dans Caddy, mettre `CORS_ORIGIN` à cette origine exacte, filtrer 80/443 au pare-feu et sauvegarder régulièrement le volume SQLite. Les logs n’écrivent ni jeton ni SHA complet.
+HTTP et HTTPS sont acceptés. HTTP ne chiffre pas les échanges. Le bridge natif écoute sur 127.0.0.1 avec un token de session local ; la ROM et les sauvegardes complètes restent locales. La télémétrie et les copies des structures Pokémon sont envoyées au serveur.
+
+Les écritures génériques natives sont désactivées par défaut. Les achats vérifiés disposent du réglage séparé allowPokemonPurchases. Une confirmation perdue impose de contrôler le jeu avant de résoudre l’achat incertain.
+
+En production, configurer Caddy et CORS_ORIGIN pour l’origine utilisée et sauvegarder toutes les bases des salons avec une procédure compatible SQLite WAL. Voir le [README de reprise](../README.md).

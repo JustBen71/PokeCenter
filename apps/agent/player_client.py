@@ -100,17 +100,19 @@ def read_config(path=None, force=False, prompt=None):
                 env["SERVER_URL"] = value.rstrip("/")
                 break
             print("Indiquez une adresse http:// ou https://.")
-        for key, label, maximum in (("PLAYER_NAME", "Nom du compte créé sur le portail", 32), ("ROOM_CODE", "Code du salon", 128)):
-            previous = env.get(key, "")
-            while True:
-                hint = f" [{previous}]" if key == "PLAYER_NAME" and previous else ""
-                if key == "ROOM_CODE" and previous:
-                    hint = " [EntrÃ©e pour conserver le code enregistrÃ©]"
-                value = prompt(label + hint + " : ").strip() or previous
-                if value and len(value) <= maximum and not any(ord(c) < 32 or ord(c) == 127 for c in value):
-                    env[key] = value
-                    break
-                print(f"Renseignez entre 1 et {maximum} caractÃ¨res.")
+    fields = [("PLAYER_NAME", "Nom du compte créé sur le portail", 32)] if first_run else []
+    fields.append(("ROOM_CODE", "Code du salon à rejoindre (voir le portail)", 128))
+    for key, label, maximum in fields:
+        previous = env.get(key, "")
+        while True:
+            hint = f" [{previous}]" if key == "PLAYER_NAME" and previous else ""
+            if key == "ROOM_CODE" and previous:
+                hint = " [Entrée pour conserver le code enregistré]"
+            value = prompt(label + hint + " : ").strip() or previous
+            if value and len(value) <= maximum and not any(ord(c) < 32 or ord(c) == 127 for c in value):
+                env[key] = value
+                break
+            print(f"Renseignez entre 1 et {maximum} caractÃ¨res.")
     env["ACCOUNT_NAME"] = env["PLAYER_NAME"]
     # Local installation ID stays stable across launches, independently of the nickname.
     previous_id = saved.get("PLAYER_ID", "")

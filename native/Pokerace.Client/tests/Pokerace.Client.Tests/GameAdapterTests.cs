@@ -64,7 +64,7 @@ public sealed class GameAdapterTests
         Assert.All(result.Capabilities, c => Assert.EndsWith(".read", c));
         if (count > 0) { Assert.True(result.Party[0].Shiny); Assert.Equal(0, result.Party[0].CurrentHp); Assert.Equal(1, result.Party[0].SpeciesId); }
         var json = new GameObservation(result.Adapter, result).ToMessage().ToJsonString();
-        foreach (var forbidden in new[] { "raw", "sha256", "address", KnownHash, "romPath" }) Assert.DoesNotContain(forbidden, json);
+        foreach (var forbidden in new[] { "sha256", "address", KnownHash, "romPath" }) Assert.DoesNotContain(forbidden, json);
     }
     [Theory][InlineData("checksum")][InlineData("empty")][InlineData("hp")][InlineData("count")][InlineData("pointer")][InlineData("money")]
     public async Task InvalidStructuresRejectEntireSnapshot(string corruption)
@@ -113,9 +113,11 @@ public sealed class GameAdapterTests
         Assert.Equal(a.ContentKey(), (a with { State = a.State! with { ObservedAt = "later" } }).ContentKey());
     }
 
-    private sealed class MemoryBridge : IBridgeClient
+    internal sealed class MemoryBridge : IBridgeClient, ITransactionalBridge
     {
         public readonly byte[] Ewram = new byte[0x40000], Iwram = new byte[0x8000];
+        public Action? BeforeTransaction;
+        public int Transactions;
         public int Reads; public bool Fail; public string Hash = Identity.Sha1;
         public IReadOnlyList<MemoryDomainInfo> Domains = [new("EWRAM", 0x40000, true), new("IWRAM", 0x8000, true)];
         public MemoryBridge()
@@ -157,6 +159,25 @@ public sealed class GameAdapterTests
             Assert.True(domain is "EWRAM" or "IWRAM"); return Task.FromResult((domain == "EWRAM" ? Ewram : Iwram).AsSpan((int)address, length).ToArray());
         }
         public Task WriteMemoryAsync(string d, long a, ReadOnlyMemory<byte> data, CancellationToken c) => throw new Xunit.Sdk.XunitException("Read-only adapter attempted a write");
+        public Task CompareWriteAsync(string hash, JsonArray edits, CancellationToken c)
+        {
+            BeforeTransaction?.Invoke();
+            var service = new Pokerace.BizHawkBridge.Core.BridgeService(new TransactionHost(this));
+            var response = service.Execute(Newtonsoft.Json.Linq.JObject.Parse(new JsonObject { ["type"] = "compareWrite", ["gameHash"] = hash, ["edits"] = edits }.ToJsonString()));
+            if (!(bool)response["ok"]!) throw new ClientException((string)response["error"]!["code"]!, "Transaction rejected");
+            Transactions++; return Task.CompletedTask;
+        }
+        private sealed class Domain(string name, byte[] bytes) : Pokerace.BizHawkBridge.Core.IMemoryDomainAdapter
+        {
+            public string Name => name; public long Size => bytes.Length; public bool Writable => true;
+            public byte ReadByte(long address) => bytes[address]; public void WriteByte(long address, byte value) => bytes[address] = value;
+        }
+        private sealed class TransactionHost(MemoryBridge bridge) : Pokerace.BizHawkBridge.Core.IEmulatorHost
+        {
+            public bool IsGameLoaded => true; public string SystemId => "GBA";
+            public object GetGameInfo() => new { hash = bridge.Hash };
+            public IReadOnlyList<Pokerace.BizHawkBridge.Core.IMemoryDomainAdapter> GetMemoryDomains() => [new Domain("EWRAM", bridge.Ewram), new Domain("IWRAM", bridge.Iwram)];
+        }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

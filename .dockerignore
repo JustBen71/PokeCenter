@@ -9,3 +9,16 @@ node_modules
 *.gba
 *.sav
 coverage
+.work
+.player-runtime
+.venv-player
+**/__pycache__
+**/bin
+**/obj
+**/artifacts
+**/.runtime
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
+**/.env.*
+!**/.env.example

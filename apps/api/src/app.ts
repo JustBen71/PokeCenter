@@ -1,3 +1,4 @@
+import {auctionParticipants} from './auction-participants.js';
 import {assertKeptPokemon} from './roulette-effects.js';
 import {registerNativeClients} from './native-clients.js';
 import {registerAccounts} from './accounts.js';
@@ -10,28 +11,37 @@ import cors from "cors";
 import helmet from "helmet";
 import {Server as HttpServer} from "node:http";
 import {Server as SocketServer} from "socket.io";
-import {agentEnvelopeSchema,libraryInputSchema,restorePokemonSchema,removePokemonSchema,MAX_MESSAGE_BYTES,pokemonInjectionSchema,toPublicPlayer} from "@pokerace/shared";
+import {encodePokemon,agentEnvelopeSchema,libraryInputSchema,restorePokemonSchema,removePokemonSchema,MAX_MESSAGE_BYTES,pokemonInjectionSchema,toPublicPlayer} from "@pokerace/shared";
 import {Store} from "./store.js";
+import type {PublicNativeClient} from "@pokerace/shared";
 
-type Config={accountsRequired?:boolean;corsOrigin:string;offlineAfterMs:number;tokens?:Record<string,string>;roomCode?:string;adminToken:string};
+export type Config={auctionGenerator?:typeof import('./auction-generator.js').generateLot;commandTimeoutMs?:number;accountsRequired?:boolean;corsOrigin:string;offlineAfterMs:number;tokens?:Record<string,string>;roomCode?:string;adminToken:string};
 const hash=(s:string)=>createHash("sha256").update(s).digest();
 const safeEqual=(a:string,b:string)=>{const aa=hash(a),bb=hash(b);return timingSafeEqual(aa,bb)};
-export function createApp(store:Store,config:Config){
+// hooks.nativeClientsChanged lets the portal react to game observations (objectives, rankings) without polling.
+export function createApp(store:Store,config:Config,transport?:{server:HttpServer;path:string},hooks:{nativeClientsChanged?:(clients:PublicNativeClient[])=>void}={}){
  const app=express();app.disable("x-powered-by");app.use(helmet({contentSecurityPolicy:false}));app.use(cors({origin:config.corsOrigin}));app.use(express.json({limit:MAX_MESSAGE_BYTES}));
- const server=new HttpServer(app);const io=new SocketServer(server,{cors:{origin:config.corsOrigin},maxHttpBufferSize:MAX_MESSAGE_BYTES,transports:["websocket","polling"]});
+ const server=transport?.server??new HttpServer(app);const io=new SocketServer(server,{path:transport?.path??"/socket.io",destroyUpgrade:false,cors:{origin:config.corsOrigin},maxHttpBufferSize:MAX_MESSAGE_BYTES,transports:["websocket","polling"]});
  const agent=io.of("/agent"), dashboard=io.of("/dashboard");const connected=new Map<string,number>();const agentSockets=new Map<string,Set<string>>();
  const actionLocks=new Set<string>();
  const accountsRequired=config.accountsRequired!==false;registerAccounts(app,store,accountsRequired);
- const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)),clients=>dashboard.emit("native-clients",clients));
+ const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)),clients=>{dashboard.emit("native-clients",clients);hooks.nativeClientsChanged?.(clients);});
  const publicPlayers=()=>store.all().map(row=>{const account=store.accounts().find(a=>a.id===row.playerId);return {...toPublicPlayer({...row,state:{...row.state,...(account?{playerName:account.name}:{})},connected:(connected.get(row.playerId)??0)>0 && Date.now()-Date.parse(row.lastSeenAt)<config.offlineAfterMs}),account};});
  const broadcast=()=>dashboard.emit("players",publicPlayers());
- registerAuctions(app,store,publicPlayers,async(data,commandId)=>{
+ const auctionPlayers=()=>auctionParticipants(publicPlayers(),nativeClients.publicSnapshot());
+ registerAuctions(app,store,auctionPlayers,async(data,commandId)=>{
   const sockets=agentSockets.get(data.playerId);
-  if(sockets?.size!==1)throw Error('Joueur hors ligne ou connecté plusieurs fois');
+  if(!sockets?.size){
+   const native=nativeClients.publicSnapshot().find(c=>c.accountId===data.playerId&&c.canPurchase);
+   if(!native)throw Error('Client achat indisponible');
+   const result=await nativeClients.sendCommand(native.playerId,{type:'COMMAND',protocolVersion:1,commandId,command:'pokemon.purchase',payload:{price:data.price,expectedMoney:data.expectedMoney,expectedCount:data.expectedCount,raw:encodePokemon(data)}});
+   if(!result.ok)throw Error(result.error?.code??'Achat non confirmé');return;
+  }
+  if(sockets.size!==1)throw Error('Joueur connecté plusieurs fois');
   const target=agent.sockets.get([...sockets][0]);if(!target)throw Error('Joueur déconnecté');
   const result=await target.timeout(10000).emitWithAck('command',{type:'injectPokemon',commandId,data});
   if(result?.ok!==true)throw Error(String(result?.error??'Achat non confirmé'));
- },actionLocks);
+ },actionLocks,undefined,()=>auctionParticipants(publicPlayers(),nativeClients.publicSnapshot()));
  dashboard.use((socket,next)=>{if(accountsRequired&&!store.accounts().some(a=>a.id===socket.handshake.auth?.accountId))return next(new Error("Choisissez votre compte"));next();});
  dashboard.on("connection",socket=>{socket.emit("players",publicPlayers());socket.emit("native-clients",nativeClients.publicSnapshot());});
  agent.use((socket,next)=>{
@@ -94,5 +104,5 @@ export function createApp(store:Store,config:Config){
    return res.json({ok:true,commandId,confirmed:true});
   } catch {return res.status(504).json({commandId,error:"Confirmation timeout; check game before retrying"});} finally {actionLocks.delete(parsed.data.playerId);}
  });
- const timer=setInterval(broadcast,5000);timer.unref();return {app,server,io,nativeClients};
+ const timer=setInterval(broadcast,5000);timer.unref();server.once("close",()=>clearInterval(timer));return {app,server,io,nativeClients,actionLocks};
 }

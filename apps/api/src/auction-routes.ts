@@ -9,7 +9,7 @@ import {generateLot} from './auction-generator.js';
 export function publicAuction(a:Auction):PublicAuction{
  const {template,settlement,...visible}=a;return visible;
 }
-export function registerAuctions(app:Express,store:Store,players:()=>PublicPlayer[],send:(data:Purchase,commandId:string)=>Promise<void>,locks:Set<string>,generate=generateLot){
+export function registerAuctions(app:Express,store:Store,players:()=>PublicPlayer[],send:(data:Purchase,commandId:string)=>Promise<void>,locks:Set<string>,generate=generateLot,generationPlayers=players){
  let generating=false;
  for(const a of store.auctions())if(a.status==='settling'||a.status==='review'){
   a.status='review';if(a.settlement)locks.add(a.settlement.playerId);store.putAuction(a);
@@ -30,7 +30,7 @@ export function registerAuctions(app:Express,store:Store,players:()=>PublicPlaye
   generating=true;
   try{
    const {uncertainty}=z.object({uncertainty:z.number().int().min(0).max(100).default(25)}).parse(req.body??{});
-   const lot=await generate(players());
+   const lot=await generate(generationPlayers());
    const a:Auction={...lot,uncertainty,hints:auctionHints(lot.template,uncertainty),id:randomUUID(),createdAt:new Date().toISOString(),status:'open',bids:[],log:['Enchère ouverte. Les caractéristiques sont présentées par fourchettes.']};store.putAuction(a);return res.status(201).json(publicAuction(a));
   }catch(e){return res.status(400).json({error:String(e)});}finally{generating=false;}
  });

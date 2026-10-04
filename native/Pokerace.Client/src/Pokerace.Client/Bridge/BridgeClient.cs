@@ -6,7 +6,7 @@ using Pokerace.Client.Configuration;
 
 namespace Pokerace.Client.Bridge;
 
-public sealed class BridgeClient(ClientConfiguration configuration, Func<string?> tokenProvider) : IBridgeClient
+public sealed class BridgeClient(ClientConfiguration configuration, Func<string?> tokenProvider) : IBridgeClient, ITransactionalBridge
 {
     private readonly SemaphoreSlim gate = new(1);
     private TcpClient? tcp;
@@ -52,7 +52,7 @@ public sealed class BridgeClient(ClientConfiguration configuration, Func<string?
         {
             var code = result["error"] is JsonObject error ? BridgeProtocol.Text(error, "code") : "bridge_error";
             // Only known codes are propagated; remote messages can contain arbitrary data/secrets.
-            if (!new[] { "no_game", "unknown_domain", "read_only", "invalid_range", "invalid_data", "write_failed", "verification_failed", "host_error", "timeout", "protocol_mismatch", "unauthorized" }.Contains(code)) code = "bridge_error";
+            if (!new[] { "state_changed", "no_game", "unknown_domain", "read_only", "invalid_range", "invalid_data", "write_failed", "verification_failed", "host_error", "timeout", "protocol_mismatch", "unauthorized" }.Contains(code)) code = "bridge_error";
             throw new ClientException(code, "Bridge rejected the operation: " + code);
         }
         return result;
@@ -118,6 +118,12 @@ public sealed class BridgeClient(ClientConfiguration configuration, Func<string?
         var response = await CallAsync(new JsonObject { ["type"] = "writeMemory", ["domain"] = domain, ["address"] = address, ["data"] = Convert.ToHexString(data.Span).ToLowerInvariant() }, cancellation);
         if (!BridgeProtocol.Boolean(response, "verified") || BridgeProtocol.Integer(response, "written") != data.Length)
             throw new ClientException("verification_failed", "Bridge did not confirm a verified write.");
+    }
+    public async Task CompareWriteAsync(string gameHash, JsonArray edits, CancellationToken cancellation)
+    {
+        if (!configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Pokemon purchases are disabled.");
+        var response = await CallAsync(new JsonObject { ["type"] = "compareWrite", ["gameHash"] = gameHash, ["edits"] = edits }, cancellation);
+        if (!BridgeProtocol.Boolean(response, "verified")) throw new ClientException("verification_failed", "Purchase not verified.");
     }
     public async ValueTask DisposeAsync() { await DisconnectAsync(); gate.Dispose(); }
 }
