@@ -152,6 +152,8 @@ Double-cliquer `pokerace.cmd`. Le script utilise `native/Pokerace.Client/artifac
 ./pokerace.cmd --configure
 ```
 
+À chaque lancement, le code du salon puis le **port du serveur** sont demandés (Entrée conserve la valeur affichée). Pour donner le port directement : `pokerace.cmd 3000` ou `pokerace.cmd --port 3000` (le port du portail de dev est 3000, celui du Docker 8080 par défaut).
+
 `%LOCALAPPDATA%\Pokerace\client.json` : `allowPokemonPurchases` (vrai par défaut) autorise **toutes** les écritures métier ; `allowMemoryWrites` (faux par défaut) ne concerne que les écritures génériques de diagnostic.
 
 ### Client historique

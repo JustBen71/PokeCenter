@@ -28,6 +28,33 @@ public sealed class LauncherTests
         }
         finally { File.Delete(path); }
     }
+    [Theory]
+    [InlineData("salon\n3000\n", null, "http://localhost:3000")]
+    [InlineData("salon\n\n", null, "http://localhost:8080")]
+    [InlineData("salon\nabc\n4000\n", null, "http://localhost:4000")]
+    [InlineData("salon\n", 5000, "http://localhost:5000")]
+    public void PortIsAskedAtEachLaunchOrGivenOnTheCommandLine(string answers, int? argument, string expected)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            ConfigurationStore.Save(path, new ClientConfiguration { ServerUrl = "http://localhost:8080", PlayerName = "Ben", RoomCode = "ancien" });
+            var output = new StringWriter();
+            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false, argument), new StringReader(answers), output);
+            Assert.Equal(expected, result.ServerUrl);
+            Assert.Equal(expected, ConfigurationStore.Load(path).ServerUrl);
+            Assert.Equal(argument == null, output.ToString().Contains("Port du serveur"));
+        }
+        finally { File.Delete(path); }
+    }
+    [Fact] public void PortOptionIsValidated()
+    {
+        Assert.Equal(3000, LaunchOptions.Parse(["--port", "3000"]).Port);
+        Assert.Throws<ClientException>(() => LaunchOptions.Parse(["--port", "0"]));
+        Assert.Throws<ClientException>(() => LaunchOptions.Parse(["--port", "http"]));
+        Assert.Equal("https://race.example.com:8443", LaunchOptions.WithPort("https://race.example.com", 8443));
+        Assert.Equal("https://race.example.com", LaunchOptions.WithPort("https://race.example.com:8443", 443));
+    }
     [Fact] public void PathsAreArgumentsAndIdentityConfigIsExplicit()
     {
         var options = LaunchOptions.Parse(["--rom", "ROM avec espaces & caractères.gba", "--config", "other/client.json", "--configure"]);

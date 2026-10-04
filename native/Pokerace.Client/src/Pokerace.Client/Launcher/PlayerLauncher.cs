@@ -14,22 +14,30 @@ using Pokerace.Client.Server;
 
 namespace Pokerace.Client.Launcher;
 
-public sealed record LaunchOptions(string ConfigPath, string? Rom, bool Configure)
+public sealed record LaunchOptions(string ConfigPath, string? Rom, bool Configure, int? Port = null)
 {
     public static LaunchOptions Parse(string[] args)
     {
-        var path = ConfigurationStore.DefaultPath; string? rom = null; var configure = false;
+        var path = ConfigurationStore.DefaultPath; string? rom = null; var configure = false; int? port = null;
         var seen = new HashSet<string>();
         for (var i = 0; i < args.Length; i++)
         {
             var option = args[i];
             if (!seen.Add(option)) throw new ClientException("invalid_arguments", "Option répétée.");
             if (option == "--configure") { configure = true; continue; }
-            if (option is not ("--config" or "--rom") || ++i == args.Length)
-                throw new ClientException("invalid_arguments", "play [--rom <fichier>] [--config <fichier>] [--configure]");
-            if (option == "--config") path = args[i]; else rom = args[i];
+            if (option is not ("--config" or "--rom" or "--port") || ++i == args.Length)
+                throw new ClientException("invalid_arguments", "play [--rom <fichier>] [--config <fichier>] [--port <1-65535>] [--configure]");
+            if (option == "--port") port = ParsePort(args[i]) ?? throw new ClientException("invalid_arguments", "Le port doit être un nombre entre 1 et 65535.");
+            else if (option == "--config") path = args[i]; else rom = args[i];
         }
-        return new(Path.GetFullPath(path), rom == null ? null : Path.GetFullPath(rom), configure);
+        return new(Path.GetFullPath(path), rom == null ? null : Path.GetFullPath(rom), configure, port);
+    }
+    public static int? ParsePort(string? value) => int.TryParse(value, out var port) && port is >= 1 and <= 65535 ? port : null;
+    // Same server, another port: http://host:8080 -> http://host:3000 (no path, as the configuration requires).
+    public static string WithPort(string serverUrl, int port)
+    {
+        if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri)) throw new ClientException("invalid_configuration", "Adresse du serveur invalide.");
+        return new UriBuilder(uri) { Port = port }.Uri.GetLeftPart(UriPartial.Authority);
     }
 }
 
@@ -122,6 +130,16 @@ public static class PlayerLauncher
             PlayerName = existing != null && !options.Configure ? existing.PlayerName : Ask("Pseudo", existing?.PlayerName),
             RoomCode = Ask("Code du salon à rejoindre (voir le portail)", existing?.RoomCode, secret: true)
         };
+        // Like the room code, the port is asked at every interactive launch (Enter keeps it) unless --port is given.
+        var currentPort = Uri.TryCreate(value.ServerUrl, UriKind.Absolute, out var current) ? current.Port : (int?)null;
+        var port = options.Port;
+        while (port == null && currentPort != null)
+        {
+            var answer = Ask("Port du serveur", currentPort.ToString());
+            port = LaunchOptions.ParsePort(answer);
+            if (port == null) output.WriteLine("Le port doit être un nombre entre 1 et 65535.");
+        }
+        if (port != null && port != currentPort) value = value with { ServerUrl = LaunchOptions.WithPort(value.ServerUrl, port.Value) };
         ConfigurationStore.Save(options.ConfigPath, value);
         output.WriteLine("Réglages enregistrés. Pour les modifier : Pokerace.Client.exe play --configure");
         return value;
