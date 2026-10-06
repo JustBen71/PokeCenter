@@ -33,11 +33,11 @@ export function createServices(domain:PortalDomain,courses:Map<string,Course>,op
  const transactions=new TransactionService({ledger:domain.ledger,currentGame,commands,audit:domain.audit});
  const handlers=options.passiveHandlers??passiveHandlers,passiveEngine=new PassiveEngine(handlers);
  const objectives=new ObjectiveService({db:domain.db,runs:domain.runs,audit:domain.audit,transactions:()=>transactions,changed:lobbyId=>options.changed(lobbyId,'objectives'),
-  completed:(lobbyId,accountId,objective,initial)=>passiveEngine.emit({lobbyId,accountId,id:`objective:${objective.id}`,type:'OBJECTIVE_COMPLETED',data:{objectiveId:objective.id,name:objective.name,initial}})});
+  completed:(lobbyId,accountId,objective,{initial,batch})=>passiveEngine.emit({lobbyId,accountId,id:`objective:${objective.id}`,type:'OBJECTIVE_COMPLETED',data:{objectiveId:objective.id,name:objective.name,initial,batch}})});
  const bank=new BankService({domain,transactions});
  const jackpot=new JackpotService({domain,transactions,commands});
  const auctions=new AuctionService({domain,db:domain.db,currentGame,transactions,library,generate:options.generateLot,
-  clients:lobbyId=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],changed:lobbyId=>options.changed(lobbyId,'auctions')});
+  clients:lobbyId=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],changed:lobbyId=>options.changed(lobbyId,'auctions'),events:e=>passiveEngine.emit(e)});
  const wheels=new WheelService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'wheels'),
   notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n),spun:(lobbyId,r)=>options.emit(lobbyId,'wheel-spin',r)});
  const shop=new ShopService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'shop')});

@@ -13,6 +13,8 @@ test('passive progression is worded from the server counters',()=>{
  assert.deepEqual(progressLines(owned('bargain-hunter',{losses:1})),['Enchères perdues : 1 / 3']);
  assert.deepEqual(progressLines(owned('bargain-hunter',{losses:0,armed:true})),['Révélation prête pour la prochaine enchère']);
  assert.deepEqual(progressLines(owned('counterspell')),['Aucune roue hostile subie']);
+ assert.deepEqual(progressLines(owned('counterspell',{lastBadGage:{id:'g',name:'Amende'}})),['Dernier gage hostile : « Amende » (exclu du prochain tirage)']);
+ assert.deepEqual(progressLines(owned('sixth-man',{badges:['badge1','badge2'],rewarded:['badge2']})),['Badges récompensés : 1']);
  assert.deepEqual(progressLines(owned('rivalry')),[]);
  assert.equal(isConsumed(owned('usurper',{consumed:true})),true);
 });

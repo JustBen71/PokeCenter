@@ -19,8 +19,8 @@ export function progressLines(owned:OwnedPassive):string[]{
   case 'collector':return [`${count(p.species)} espèce(s) différente(s)`,`Prochain ticket : ${step(count(p.species),every)}`];
   case 'bargain-hunter':return [p.armed?'Révélation prête pour la prochaine enchère':`Enchères perdues : ${count(p.losses)} / ${def?.params.losses??3}`];
   case 'second-wind':return [`Activations : ${count(p.uses)} / ${def?.params.max??3}`];
-  case 'counterspell':return [p.lastBadGage?`Dernier gage hostile : « ${String(p.lastBadGage)} » (exclu du prochain tirage)`:'Aucune roue hostile subie'];
-  case 'sixth-man':return [`Badges récompensés : ${count(p.badges)}`];
+  case 'counterspell':return [p.lastBadGage?`Dernier gage hostile : « ${(p.lastBadGage as {name?:string}).name??'?'} » (exclu du prochain tirage)`:'Aucune roue hostile subie'];
+  case 'sixth-man':return [`Badges récompensés : ${count(p.rewarded)}`];
   case 'scout':return p.next?[`Prochain objectif : ${String(p.next)}`]:[];
   default:return [];
  }

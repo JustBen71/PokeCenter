@@ -11,6 +11,7 @@ import type {PortalDomain} from '../store.js';
 import type {CurrentGameService} from '../game/current-game-service.js';
 import type {LibraryService} from '../library/library-service.js';
 import type {TransactionService} from '../money/transaction-service.js';
+import type {DomainEvent} from '../passives/passive-events.js';
 
 type Row={id:string;lobby_id:string;status:AuctionStatus;species_id:number;name:string;level:number;sample_size:number;uncertainty:number;hints_json:string;template_json:string;log_json:string;
  winner_account_id:string|null;price:number|null;command_id:string|null;created_at:string;closed_at:string|null};
@@ -24,7 +25,9 @@ const FINISHED:AuctionStatus[]=['SOLD','CANCELLED'];
 export class AuctionService{
  private generating=new Set<string>();
  constructor(private readonly deps:{domain:PortalDomain;db:Database.Database;currentGame:CurrentGameService;transactions:TransactionService;library:LibraryService;
-  clients:(lobbyId:string)=>PublicNativeClient[];generate?:typeof generateLot;changed:(lobbyId:string)=>void}){}
+  clients:(lobbyId:string)=>PublicNativeClient[];generate?:typeof generateLot;changed:(lobbyId:string)=>void;
+  // Passive events: joined (each bid, deduplicated by id), won and lost once the lot is sold.
+  events?:(event:DomainEvent)=>void}){}
 
  private row(id:string,lobbyId:string){
   const row=this.deps.db.prepare('SELECT * FROM lobby_auctions WHERE id=? AND lobby_id=?').get(id,lobbyId) as Row|undefined;
@@ -93,7 +96,16 @@ export class AuctionService{
    this.update(auctionId,{log:best?`${bidder.name} mise ${amount} ₽`:`Première mise : ${bidder.name}, ${amount} ₽. L’enchère est lancée !`});
   })();
   this.deps.changed(lobbyId);
+  this.deps.events?.({lobbyId,accountId:bidder.id,id:`auction-joined:${auctionId}`,type:'AUCTION_JOINED',data:{auctionId}});
   return this.toPublic(this.row(auctionId,lobbyId));
+ }
+
+ // Winner and losers of a sold lot, for the passives.
+ private sold(lobbyId:string,auctionId:string,winnerId:string){
+  for(const accountId of new Set(this.bids(auctionId).map(b=>b.account_id)))
+   this.deps.events?.(accountId===winnerId
+    ?{lobbyId,accountId,id:`auction-won:${auctionId}`,type:'AUCTION_WON',data:{auctionId}}
+    :{lobbyId,accountId,id:`auction-lost:${auctionId}`,type:'AUCTION_LOST',data:{auctionId}});
  }
 
  cancel(lobbyId:string,auctionId:string,actor:Account):LobbyAuction{
@@ -129,6 +141,7 @@ export class AuctionService{
      return {command:'pokemon.purchase',payload:{price:best.amount,expectedMoney:state.trainer.money,expectedCount:state.party.length,raw:encodePokemon({...template,slot:state.party.length+1})}};
     }}});
    this.update(auctionId,{status:'SOLD',closed:true,commandId:result.commandId,log:'Paiement et ajout dans l’équipe confirmés par le jeu.'});
+   this.sold(lobbyId,auctionId,best.account_id);
   }catch(error){
    const code=error instanceof DomainError?error.code:'INTERNAL_ERROR';
    if(code==='COMMAND_OUTCOME_UNKNOWN'){
@@ -148,6 +161,7 @@ export class AuctionService{
  commandResolved(commandId:string,applied:boolean){
   const r=this.deps.db.prepare("SELECT * FROM lobby_auctions WHERE command_id=? AND status='REVIEW'").get(commandId) as Row|undefined;
   if(!r)return;
+  if(applied&&r.winner_account_id)this.sold(r.lobby_id,r.id,r.winner_account_id);
   this.update(r.id,applied?{status:'SOLD',closed:true,log:'Vérification : paiement et Pokémon présents dans le jeu.'}:{status:'OPEN',winner:null,price:null,commandId:null,log:'Vérification : rien n’a été appliqué, l’enchère est rouverte.'});
   this.deps.changed(r.lobby_id);
  }

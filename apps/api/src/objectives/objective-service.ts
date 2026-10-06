@@ -21,7 +21,7 @@ export class ObjectiveService{
  private readonly inFlight=new Set<string>();
  constructor(private readonly deps:{db:Database.Database;runs:RunService;audit:AuditService;transactions:()=>TransactionService;changed:(lobbyId:string)=>void;
   // Domain event for the passives: initial = first completions recorded for this player (catch-up of an existing save).
-  completed?:(lobbyId:string,accountId:string,objective:Objective,initial:boolean)=>void}){}
+  completed?:(lobbyId:string,accountId:string,objective:Objective,context:{initial:boolean;batch:string[]})=>void}){}
 
  // New lobbies start with the Emerald story objectives in game order, without reward.
  seed(lobbyId:string){
@@ -35,6 +35,22 @@ export class ObjectiveService{
  completions(lobbyId:string):ObjectiveCompletion[]{
   return (this.deps.db.prepare('SELECT * FROM objective_completions WHERE lobby_id=? ORDER BY completed_at').all(lobbyId) as CompletionRow[])
    .map(r=>({objectiveId:r.objective_id,accountId:r.account_id,runId:r.run_id,completedAt:r.completed_at,rewardStatus:r.reward_status}));
+ }
+ /**
+  * Race score of every member, as the Course page ranks them: enabled objectives reached ×1000 + furthest one.
+  * `without` removes completions of one player, to compare the ranking just before them.
+  */
+ scores(lobbyId:string,without?:{accountId:string;objectiveIds:readonly string[]}):Map<string,number>{
+  const enabled=this.list(lobbyId).filter(o=>o.enabled).sort((a,b)=>a.order-b.order);
+  const position=new Map(enabled.map((o,i)=>[o.id,i+1]));
+  const members=this.deps.db.prepare('SELECT account_id FROM lobby_members WHERE lobby_id=?').all(lobbyId) as {account_id:string}[];
+  const reached=new Map(members.map(m=>[m.account_id,{count:0,furthest:0}]));
+  for(const c of this.completions(lobbyId)){
+   const at=position.get(c.objectiveId),row=reached.get(c.accountId);
+   if(!at||!row||without&&c.accountId===without.accountId&&without.objectiveIds.includes(c.objectiveId))continue;
+   row.count++;row.furthest=Math.max(row.furthest,at);
+  }
+  return new Map([...reached].map(([id,r])=>[id,r.count*1000+r.furthest]));
  }
  snapshot(lobbyId:string):ObjectivesSnapshot{return {objectives:this.list(lobbyId),completions:this.completions(lobbyId)};}
 
@@ -64,7 +80,8 @@ export class ObjectiveService{
    if(inserted){changed=true;reached.push(objective);this.deps.audit.record({lobbyId,targetAccountId:accountId,runId:run?.id??null,category:'RUN',action:'objective.completed',status:'SUCCESS',message:`Objectif atteint : ${objective.name}`});}
   }
   if(changed)this.deps.changed(lobbyId);
-  for(const objective of reached)this.deps.completed?.(lobbyId,accountId,objective,initial);
+  const batch=reached.map(o=>o.id);
+  for(const objective of reached)this.deps.completed?.(lobbyId,accountId,objective,{initial,batch});
   await this.payPending(lobbyId,accountId);
  }
 

@@ -105,8 +105,10 @@ export class WheelService{
   if(!wheel.enabled)throw new DomainError('CONFLICT','Cette roue est désactivée');
   const owner=this.member(lobbyId,ownerId,'Le bénéficiaire')!,target=this.member(lobbyId,targetId,'La cible');
   const blocked=this.beforeSpin({lobbyId,wheel,owner,target,ticketId,ticketReceivedAt});
-  const total=wheel.gages.reduce((n,g)=>n+g.weight,0);
-  let roll=randomInt(total);const gage=wheel.gages.find(g=>(roll-=g.weight)<0)!;
+  // The target's passives may remove gages before the weighted draw (Contre-sort); the animation keeps every name.
+  const gages=wheel.tone==='BAD'&&target&&!blocked?this.services.passiveEngine.filterHostileGages(lobbyId,target.id,wheel.gages):wheel.gages;
+  const total=gages.reduce((n,g)=>n+g.weight,0);
+  let roll=randomInt(total);const gage=gages.find(g=>(roll-=g.weight)<0)!;
   const strip=Array.from({length:STRIP_LENGTH},(_,i)=>i===WINNER_INDEX?gage.name:wheel.gages[randomInt(wheel.gages.length)].name);
   const status:ResolutionStatus=blocked?'BLOCKED':(gage.requiresTarget&&!target)||PARTY_HANDLERS.includes(gage.handler)?'AWAITING_CHOICE':'DRAWN';
   const id=randomUUID();
@@ -114,9 +116,14 @@ export class WheelService{
    .run(id,lobbyId,wheel.id,JSON.stringify(gage),owner.id,target?.id??null,ticketId,status,JSON.stringify(strip),blocked,actor?.id??null,nowIso(),blocked?nowIso():null);
   this.services.domain.audit.record({lobbyId,actorAccountId:actor?.id??null,targetAccountId:target?.id??owner.id,category:'WHEEL',action:'wheel.spin',status:blocked?'INFO':'SUCCESS',
    message:blocked??`${wheel.name} : « ${gage.name} » tiré pour ${owner.name}${target?` (cible ${target.name})`:''}`,metadata:{resolutionId:id,gage:gage.name,handler:gage.handler}});
+  if(target&&!blocked)this.suffered(lobbyId,id,wheel.tone,gage,target.id);
   const resolution=this.resolution(lobbyId,id);
   this.deps.spun(lobbyId,resolution);this.deps.changed(lobbyId);
   return resolution;
+ }
+ // Passive event: the target suffered this gage (same id at draw and at apply, processed once).
+ private suffered(lobbyId:string,resolutionId:string,tone:WheelTone,gage:Gage,targetId:string){
+  this.services.passiveEngine.emit({lobbyId,accountId:targetId,id:`wheel:${resolutionId}`,type:'WHEEL_RESOLVED',data:{resolutionId,tone,gageId:gage.id,gageName:gage.name,role:'target'}});
  }
 
  /** Applies the drawn gage once. A refusal leaves it pending (retry or abandon); an unknown outcome goes to REVIEW. */
@@ -136,6 +143,7 @@ export class WheelService{
   try{
    const message=await wheelHandlers[before.gage.handler]({lobbyId,resolutionId:id,actorId:actor.id,gage:before.gage,owner,target,choice,services:this.services});
    finish('SUCCESS',message);
+   if(target)this.suffered(lobbyId,id,before.tone,before.gage,target.id);
    this.services.domain.audit.record({lobbyId,actorAccountId:actor.id,targetAccountId:target?.id??owner.id,category:'WHEEL',action:'wheel.apply',status:'SUCCESS',message,metadata:{resolutionId:id}});
    this.deps.notify(lobbyId,{kind:'success',message:`✔ ${before.gage.name} — ${message}`});
   }catch(error){

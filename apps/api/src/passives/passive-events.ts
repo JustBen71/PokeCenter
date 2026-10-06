@@ -9,7 +9,8 @@ export type DomainEvent={lobbyId:string;accountId:string;id:string}&(
  |{type:'RUN_STARTED';data:{runId:string;number:number;afterLoss:boolean}}
  |{type:'RUN_LOST';data:{runId:string}}
  // initial: first completions recorded for this player (catch-up of an existing save), not a race move.
- |{type:'OBJECTIVE_COMPLETED';data:{objectiveId:string;name:string;initial:boolean}}
+ // batch: every objective reached in the same game observation (one ranking move).
+ |{type:'OBJECTIVE_COMPLETED';data:{objectiveId:string;name:string;initial:boolean;batch:string[]}}
  |{type:'AUCTION_JOINED';data:{auctionId:string}}
  |{type:'AUCTION_LOST';data:{auctionId:string}}
  |{type:'AUCTION_WON';data:{auctionId:string}}
