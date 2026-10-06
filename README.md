@@ -112,6 +112,7 @@ Détails : [commandes de jeu](docs/game-commands.md), [ledger](docs/money-ledger
 | Page | Qui | Résumé | Doc |
 |---|---|---|---|
 | Course | tous | Cartes joueur en direct (rang, Run, client, position, ₽, 6 Pokémon), panneau joueur, fiche Pokémon | [runs.md](docs/runs.md) |
+| Combats commandités | admin / tous | Vrai combat de dresseur dans la partie d'un joueur (Miroir, équipe d'un joueur, du #1, personnalisée), niveaux recalculés, lancé dès que le jeu est sur la carte ; gage de roue START_BATTLE | [battle-encounters.md](docs/battle-encounters.md) |
 | Passifs | tous / admin | Bonus permanents de course : choix initial parmi 3 cartes privées, badges sous chaque équipe, roues qui donnent ou volent un passif | [passives.md](docs/passives.md) |
 | Carte | tous | Carte du jeu (Hoenn pour Émeraude) avec les avatars, classement ex æquo par objectifs, récompenses ; sans carte pour un autre jeu, positions dans le classement | [objectives.md](docs/objectives.md) |
 | Enchères | tous / admin | Lots générés, statistiques cachées (fourchettes), mises sûres, clôture payée en jeu | [auctions.md](docs/auctions.md) |
@@ -197,12 +198,12 @@ L'E2E navigateur démarre lui-même l'API de test et `vite preview` sur des port
 Résultats obtenus le 6 octobre 2026 sur la branche `pokerace-client` (Linux x64, Node 22, .NET 8.0.425), à relire sur GitHub Actions pour le dernier commit poussé :
 
 ```text
-Shared          PASS   15 tests
-API             PASS   93 tests
-Web             PASS   27 tests
-Pokerace.Client PASS   174 tests
+Shared          PASS   17 tests
+API             PASS   99 tests
+Web             PASS   28 tests
+Pokerace.Client PASS   178 tests
 Bridge Unit     PASS   45 tests
-Web E2E         PASS   13 scénarios Playwright (Chromium, dont 3 pour les passifs), exécutés localement ; workflow web-e2e.yml ajouté, pas encore exécuté sur GitHub
+Web E2E         PASS   15 scénarios Playwright (Chromium, dont 3 pour les passifs et 2 pour les combats commandités), exécutés localement ; workflow web-e2e.yml ajouté, pas encore exécuté sur GitHub
 BizHawk E2E     NON CONFIRMÉ — correctif appliqué et vérifié contre un bridge simulé ; le workflow réel (Windows + BizHawk) doit être relancé
 ```
 
@@ -220,6 +221,7 @@ Workflows : `pokerace-client.yml` (shared/API/Web + client sur Windows, Linux, m
 | `REAL_BIZHAWK_VERIFIED` | BizHawk 2.11.1 + bridge + ROM homebrew NES : lecture, écriture, relecture et restauration (confirmées par le dernier workflow) ; chaîne avec le client .NET confirmée le 3 octobre (run 37099201814), cassée ensuite par le timeout corrigé ici, **à reconfirmer** |
 | `MANUAL_VERIFIED` | Pages du portail et overlay des roues, vérifiés à la main lors des sprints précédents |
 | `MANUAL_VERIFIED` (passifs) | Test utilisateur réel du 6 octobre 2026 (BizHawk Linux, 2 clients, ROM BPEF v0) : sélection, Deuxième souffle, Contre-sort, roues de passifs, vol, Cartographe, redémarrages sans double récompense. Rivalité, Éclaireur, Le sixième homme et les légendaires : tests automatisés seulement |
+| `MANUAL_VERIFIED` (combats commandités) | Émeraude réelle, BizHawk Linux, BPEF v0 : combat Miroir déclenché depuis la carte, joué et gagné, XP et argent réels, résultat WON enregistré, RAM temporaire restaurée (adresses de la section `battle` du profil, justifiées par le code de la ROM FR) |
 | `NOT_YET_VERIFIED` | Écritures Émeraude via le lanceur Windows `play` (vérifiées le 6 octobre 2026 sous Linux avec `run --rom`, voir le README du client) ; rendu mobile détaillé ; déploiement du serveur ; adaptateurs Gen IV+ (non implémentés) |
 
 ### 9.4 Smoke-test manuel Émeraude (mainteneur)
@@ -268,6 +270,7 @@ Guides :
 - [enchères](docs/auctions.md)
 - [roues, boutique et protections](docs/wheels.md)
 - [passifs de course](docs/passives.md)
+- [combats commandités](docs/battle-encounters.md)
 - [administration](docs/admin.md)
 - [audit](docs/audit.md)
 - [lanceur BizHawk](docs/bizhawk-launcher.md)
