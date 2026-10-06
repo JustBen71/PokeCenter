@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {passiveRaritySchema} from './passives.js';
 
 export const wheelToneSchema=z.enum(['GOOD','BAD','NEUTRAL']);
 export type WheelTone=z.infer<typeof wheelToneSchema>;
@@ -12,7 +13,8 @@ export const ticketIconSchema=z.enum(ticketIcons);
  * A gage only names a handler implemented and tested on the server, plus validated parameters.
  * The configuration never becomes a programming language.
  */
-export const gageHandlers=['NOTICE','GIVE_MONEY','TAKE_MONEY','STEAL_MONEY','REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','JACKPOT_FIXED','JACKPOT_PERCENT','JACKPOT_SHARE','JACKPOT_EMPTY'] as const;
+export const gageHandlers=['NOTICE','GIVE_MONEY','TAKE_MONEY','STEAL_MONEY','REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','JACKPOT_FIXED','JACKPOT_PERCENT','JACKPOT_SHARE','JACKPOT_EMPTY',
+ 'PASSIVE_GRANT_RANDOM','PASSIVE_GRANT_RARITY','PASSIVE_STEAL'] as const;
 export const gageHandlerSchema=z.enum(gageHandlers);
 export type GageHandler=z.infer<typeof gageHandlerSchema>;
 const amount=z.number().int().min(1).max(999999);
@@ -26,7 +28,10 @@ export const gageParamsSchemas={
  JACKPOT_FIXED:z.object({amount}).strict(),
  JACKPOT_PERCENT:z.object({percent:z.number().int().min(1).max(100)}).strict(),
  JACKPOT_SHARE:z.object({}).strict(),
- JACKPOT_EMPTY:z.object({}).strict()
+ JACKPOT_EMPTY:z.object({}).strict(),
+ PASSIVE_GRANT_RANDOM:z.object({rarities:z.array(passiveRaritySchema).min(1).max(4).refine(v=>new Set(v).size===v.length)}).strict(),
+ PASSIVE_GRANT_RARITY:z.object({rarity:passiveRaritySchema}).strict(),
+ PASSIVE_STEAL:z.object({}).strict()
 } satisfies Record<GageHandler,z.ZodTypeAny>;
 export const gageHandlerInfo:Record<GageHandler,{label:string;target:'none'|'required';help:string}>={
  NOTICE:{label:'Gage à réaliser',target:'none',help:'Aucun effet en jeu : le gage est annoncé à tous.'},
@@ -38,7 +43,10 @@ export const gageHandlerInfo:Record<GageHandler,{label:string;target:'none'|'req
  JACKPOT_FIXED:{label:'Jackpot : montant fixe',target:'none',help:'Le bénéficiaire reçoit un montant pris dans le jackpot.'},
  JACKPOT_PERCENT:{label:'Jackpot : pourcentage',target:'none',help:'Le bénéficiaire reçoit une part du jackpot.'},
  JACKPOT_SHARE:{label:'Jackpot partagé',target:'none',help:'Le jackpot est réparti entre tous les joueurs en jeu.'},
- JACKPOT_EMPTY:{label:'Jackpot vidé',target:'none',help:'Le bénéficiaire remporte tout le jackpot.'}
+ JACKPOT_EMPTY:{label:'Jackpot vidé',target:'none',help:'Le bénéficiaire remporte tout le jackpot.'},
+ PASSIVE_GRANT_RANDOM:{label:'Passif aléatoire',target:'none',help:'Le bénéficiaire gagne un passif compatible qu’il ne possède pas, parmi les raretés choisies.'},
+ PASSIVE_GRANT_RARITY:{label:'Passif d’une rareté',target:'none',help:'Le bénéficiaire gagne un passif compatible de cette rareté.'},
+ PASSIVE_STEAL:{label:'Vol de passif',target:'required',help:'Choisis une cible puis l’un de ses passifs : il passe au bénéficiaire avec sa progression.'}
 };
 
 export const gageInputSchema=z.object({
@@ -64,5 +72,5 @@ export type WheelResolution={
 export type WheelsSnapshot={wheels:WheelType[];resolutions:WheelResolution[]};
 
 export const spinSchema=z.object({ownerId:z.string().min(1).max(64),targetId:z.string().min(1).max(64).optional()}).strict();
-export const applySchema=z.object({targetId:z.string().min(1).max(64).optional(),slot:z.number().int().min(1).max(6).optional(),confirmOutOfBattle:z.boolean().optional()}).strict();
+export const applySchema=z.object({targetId:z.string().min(1).max(64).optional(),slot:z.number().int().min(1).max(6).optional(),confirmOutOfBattle:z.boolean().optional(),passiveId:z.string().min(1).max(40).optional()}).strict();
 export type LobbyNotification={kind:'success'|'error'|'warning'|'info';message:string};

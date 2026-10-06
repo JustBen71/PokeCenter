@@ -320,3 +320,4 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 .passive-owned-admin small,.passive-catalog-admin small{color:var(--muted);font-size:11px;flex:1;min-width:160px}
 .passive-catalog-admin li.unavailable .passive-badge{opacity:.55}
 .passive-rewards li{display:flex;align-items:center;gap:8px;font-size:13px}
+.rarity-picker{display:flex;flex-wrap:wrap;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.rarity-picker legend{font-size:13px;color:#c5bcda;padding:0 4px}

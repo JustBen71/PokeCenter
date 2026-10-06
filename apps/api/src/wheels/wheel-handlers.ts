@@ -1,11 +1,11 @@
 import {randomInt} from 'node:crypto';
-import {depositSplit,gageParamsSchemas,type Account,type Gage,type GageHandler} from '@pokerace/shared';
+import {depositSplit,gageParamsSchemas,passiveById,passiveRarityLabels,type Account,type Gage,type GageHandler,type PassiveRarity} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import type {Services} from '../services.js';
 
 export type HandlerContext={
  lobbyId:string;resolutionId:string;actorId:string;gage:Gage;owner:Account;target:Account|null;
- choice:{slot?:number;confirmOutOfBattle?:boolean};services:Services;
+ choice:{slot?:number;confirmOutOfBattle?:boolean;passiveId?:string};services:Services;
 };
 type Handler=(ctx:HandlerContext)=>Promise<string>;
 
@@ -28,6 +28,15 @@ const gameMoney=(ctx:HandlerContext,account:Account,amount:number,direction:'in'
 
 const fmt=(n:number)=>`${n.toLocaleString('fr-FR')} ₽`;
 const payout=(ctx:HandlerContext)=>({actorAccountId:ctx.actorId,idempotencyKey:key(ctx,'jackpot'),label:ctx.gage.name,metadata:{resolutionId:ctx.resolutionId}});
+// A passive drawn among compatible, enabled, not owned ones; no fake success when there is none.
+const grantPassive=(ctx:HandlerContext,rarities:PassiveRarity[])=>{
+ const {passives}=ctx.services;
+ const passive=passives.pick(ctx.lobbyId,ctx.owner.id,{rarities});
+ if(!passive)throw new DomainError('NO_PASSIVE_AVAILABLE',`Aucun passif ${rarities.map(r=>passiveRarityLabels[r]).join(' / ')} compatible à donner à ${ctx.owner.name}`);
+ passives.grant(ctx.lobbyId,ctx.owner.id,passive.id,'WHEEL',{actorId:ctx.actorId,metadata:{resolutionId:ctx.resolutionId,wheel:ctx.gage.name},
+  announce:`✨ ${passive.rarity==='LEGENDARY'?'Passif légendaire':'Nouveau passif'} — ${ctx.gage.name} accorde « ${passive.name} » à ${ctx.owner.name}`});
+ return `${ctx.owner.name} obtient le passif « ${passive.name} » (${passiveRarityLabels[passive.rarity]})`;
+};
 const jackpotResult=(ctx:HandlerContext,paid:number,suffix='')=>paid>0?`${ctx.owner.name} remporte ${fmt(paid)} du jackpot${suffix}`:'Le jackpot est vide : rien à gagner cette fois';
 
 /** Every handler is server code covered by tests; a gage only selects one and gives it validated parameters. */
@@ -78,5 +87,16 @@ export const wheelHandlers:Record<GageHandler,Handler>={
   if(each<=0)return 'Personne ne peut recevoir le jackpot pour l’instant';
   if(failed.length)throw new DomainError('GAME_COMMAND_FAILED',`Jackpot partagé : ${paid.map(a=>a.name).join(', ')||'personne'} payé(s), échec pour ${failed.map(a=>a.name).join(', ')}`);
   return `Le jackpot est partagé : ${fmt(each)} pour ${paid.map(a=>a.name).join(', ')}`;
+ },
+ PASSIVE_GRANT_RANDOM:async ctx=>grantPassive(ctx,params(ctx,'PASSIVE_GRANT_RANDOM').rarities),
+ PASSIVE_GRANT_RARITY:async ctx=>grantPassive(ctx,[params(ctx,'PASSIVE_GRANT_RARITY').rarity]),
+ // A real transfer (with progression), atomic in SQLite; the stolen passive is chosen after the draw.
+ PASSIVE_STEAL:async ctx=>{
+  const target=needTarget(ctx);
+  if(target.id===ctx.owner.id)throw new DomainError('VALIDATION_FAILED','On ne se vole pas soi-même');
+  if(!ctx.choice.passiveId)throw new DomainError('VALIDATION_FAILED','Choisissez le passif à voler');
+  const {passives}=ctx.services;
+  passives.transfer(ctx.lobbyId,target.id,ctx.owner.id,ctx.choice.passiveId,{actorId:ctx.actorId,source:'WHEEL',metadata:{resolutionId:ctx.resolutionId,wheel:ctx.gage.name}});
+  return `${ctx.owner.name} vole « ${passiveById.get(ctx.choice.passiveId)?.name} » à ${target.name}`;
  }
 };

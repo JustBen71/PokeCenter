@@ -11,8 +11,9 @@ type WheelRow={id:string;name:string;description:string;price:number;icon:WheelT
 type GageRow={id:string;name:string;description:string;handler:GageHandler;params_json:string;weight:number};
 type ResolutionRow={id:string;lobby_id:string;wheel_type_id:string;gage_json:string;owner_account_id:string;target_account_id:string|null;ticket_id:string|null;status:ResolutionStatus;strip_json:string;result:string|null;created_at:string;applied_at:string|null};
 
-// Party changes need an explicit "not in battle" confirmation, so they always wait for the admin form.
-const PARTY_HANDLERS:GageHandler[]=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON'];
+// Party changes need an explicit "not in battle" confirmation and a steal needs the passive to take:
+// they always wait for the admin form.
+const PARTY_HANDLERS:GageHandler[]=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','PASSIVE_STEAL'];
 const STRIP_LENGTH=30,WINNER_INDEX=26;
 
 const defaults:WheelInput[]=[

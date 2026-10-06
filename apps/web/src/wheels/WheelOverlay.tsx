@@ -6,6 +6,7 @@ import {useLobby} from '../lobby/lobby-context';
 import {useLive,useLiveTopic} from '../realtime/live-context';
 import {useToast} from '../components/toast-context';
 import {TicketIcon} from './TicketIcon';
+import {definition,usePassives} from '../passives/passives-data';
 
 const ROW=56,VISIBLE=5,DURATION=3000;
 import {launchedHere} from './launched';
@@ -18,16 +19,18 @@ export function WheelOverlay(){
  const {socket,members}=useLive();const {account}=useSession();const {lobby}=useLobby();const toast=useToast();
  const {resolutions}=useLiveTopic<WheelsSnapshot>('wheels',{wheels:[],resolutions:[]});
  const [current,setCurrent]=useState<WheelResolution|null>(null),[phase,setPhase]=useState<'spinning'|'stopped'>('spinning'),[rolling,setRolling]=useState(false);
+ const passives=usePassives();
+ const [passiveId,setPassiveId]=useState('');
  const [target,setTarget]=useState(''),[slot,setSlot]=useState(0),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false);
  const timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
  useEffect(()=>{
   if(!socket)return;
-  const onSpin=(r:WheelResolution)=>{clearTimeout(timer.current);setCurrent(r);setPhase('spinning');setRolling(false);setTarget(r.targetId??'');setSlot(0);setConfirm(false);
+  const onSpin=(r:WheelResolution)=>{clearTimeout(timer.current);setCurrent(r);setPhase('spinning');setRolling(false);setTarget(r.targetId??'');setSlot(0);setConfirm(false);setPassiveId('');
    // Start from the top of the strip, then slide to the drawn gage on the next frames.
    setTimeout(()=>setRolling(true),40);
    timer.current=setTimeout(()=>setPhase('stopped'),DURATION+150);};
   // The admin page reopens a pending gage directly on its result.
-  const onReopen=(e:Event)=>{const r=(e as CustomEvent<WheelResolution>).detail;setCurrent(r);setPhase('stopped');setRolling(true);setTarget(r.targetId??'');setSlot(0);setConfirm(false);};
+  const onReopen=(e:Event)=>{const r=(e as CustomEvent<WheelResolution>).detail;setCurrent(r);setPhase('stopped');setRolling(true);setTarget(r.targetId??'');setSlot(0);setConfirm(false);setPassiveId('');};
   socket.on('wheel-spin',onSpin);document.addEventListener('wheel-reopen',onReopen);
   return()=>{socket.off('wheel-spin',onSpin);document.removeEventListener('wheel-reopen',onReopen);clearTimeout(timer.current);};
  },[socket]);
@@ -35,7 +38,7 @@ export function WheelOverlay(){
  const live=current?resolutions.find(r=>r.id===current.id)??current:null;
  const apply=async()=>{
   if(!live)return;setBusy(true);
-  try{await api(`/api/lobbies/${lobby.id}/wheel-resolutions/${live.id}/apply`,{method:'POST',body:{...(target?{targetId:target}:{}),...(slot?{slot}:{}),...(confirm?{confirmOutOfBattle:true}:{})}});}
+  try{await api(`/api/lobbies/${lobby.id}/wheel-resolutions/${live.id}/apply`,{method:'POST',body:{...(target?{targetId:target}:{}),...(slot?{slot}:{}),...(confirm?{confirmOutOfBattle:true}:{}),...(steal&&passiveId?{passiveId}:{})}});}
   catch(e){toast.error(e);}finally{setBusy(false);}
  };
  useEffect(()=>{if(phase==='stopped'&&live?.status==='DRAWN'&&account.admin&&launchedHere.has(live.id)){launchedHere.delete(live.id);void apply();}},[phase,live?.status]);
@@ -43,6 +46,10 @@ export function WheelOverlay(){
  if(!live)return null;
  const winner=26;
  const party=live.gage.handler==='REMOVE_POKEMON'&&live.gage.params.selector==='choice';
+ // Steal: the target's passives that the beneficiary does not own and that are not used up.
+ const steal=live.gage.handler==='PASSIVE_STEAL';
+ const owned=(id:string)=>passives.owned.filter(o=>o.accountId===id);
+ const stealable=steal&&target?owned(target).filter(o=>!owned(live.ownerId).some(m=>m.passiveId===o.passiveId)&&o.progress.consumed!==true):[];
  const needsConfirm=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON'].includes(live.gage.handler);
  const done=['SUCCESS','FAILED','REVIEW','BLOCKED'].includes(live.status);
  const translate=rolling?-(winner-Math.floor(VISIBLE/2))*ROW:0;
@@ -61,10 +68,12 @@ export function WheelOverlay(){
     {live.status==='BLOCKED'&&<p className="notice">{live.result}</p>}
     {live.result&&live.status!=='BLOCKED'&&<p className={`outcome ${live.status.toLowerCase()}`}>{live.status==='SUCCESS'?'✔':live.status==='REVIEW'?'⚠':'✖'} {live.result}</p>}
     {account.admin&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
-     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>setTarget(e.target.value)}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||live.gage.handler!=='STEAL_MONEY').map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+     {steal&&target&&(stealable.length?<label>Passif à voler<select className="field" value={passiveId} onChange={e=>setPassiveId(e.target.value)}><option value="">Choisir…</option>{stealable.map(o=>{const d=definition(o.passiveId);return <option key={o.id} value={o.passiveId}>{d?.name??o.passiveId}</option>;})}</select></label>
+      :<p className="muted">{name(target)} n’a aucun passif volable.</p>)}
      {party&&<label>Emplacement<select className="field" value={slot} onChange={e=>setSlot(Number(e.target.value))}><option value={0}>Choisir…</option>{[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}</select></label>}
      {needsConfirm&&<label className="check"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)}/>Le joueur n’est pas en combat</label>}
-     <button className="btn primary" disabled={busy||(live.gage.requiresTarget&&!target)||(party&&!slot)||(needsConfirm&&!confirm)}>Appliquer</button>
+     <button className="btn primary" disabled={busy||(live.gage.requiresTarget&&!target)||(party&&!slot)||(needsConfirm&&!confirm)||(steal&&!passiveId)}>Appliquer</button>
     </form>}
     {!account.admin&&!done&&<p className="muted">En attente de l’administrateur…</p>}
     {/* A refused gage stays pending: the admin may close and reopen or abandon it from the Roues page. */}
