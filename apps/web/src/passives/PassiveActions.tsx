@@ -17,7 +17,8 @@ export function PassiveActions({owned}:{owned:OwnedPassive}){
  const act=async(body:Omit<PassiveActInput,'accountId'>,confirm?:string)=>{
   if(confirm&&!window.confirm(confirm))return;
   setBusy(true);
-  try{const r=await api<{message:string}>(`/api/lobbies/${lobby.id}/passives/${owned.passiveId}/act`,{method:'POST',body:{...body,...(mine?{}:{accountId:owned.accountId})}});toast.success(r.message);}
+  // The result is announced to the whole lobby by the server: no second local toast.
+  try{await api(`/api/lobbies/${lobby.id}/passives/${owned.passiveId}/act`,{method:'POST',body:{...body,...(mine?{}:{accountId:owned.accountId})}});}
   catch(e){toast.error(e);}finally{setBusy(false);}
  };
  const playerSelect=<select className="field" aria-label="Joueur" value={target} onChange={e=>{setTarget(e.target.value);setPick('');}}><option value="">Joueur…</option>{others.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select>;
