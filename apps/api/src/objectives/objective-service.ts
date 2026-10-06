@@ -19,7 +19,9 @@ const MAX_REWARD_ATTEMPTS=5;
  */
 export class ObjectiveService{
  private readonly inFlight=new Set<string>();
- constructor(private readonly deps:{db:Database.Database;runs:RunService;audit:AuditService;transactions:()=>TransactionService;changed:(lobbyId:string)=>void}){}
+ constructor(private readonly deps:{db:Database.Database;runs:RunService;audit:AuditService;transactions:()=>TransactionService;changed:(lobbyId:string)=>void;
+  // Domain event for the passives: initial = first completions recorded for this player (catch-up of an existing save).
+  completed?:(lobbyId:string,accountId:string,objective:Objective,initial:boolean)=>void}){}
 
  // New lobbies start with the Emerald story objectives in game order, without reward.
  seed(lobbyId:string){
@@ -54,12 +56,15 @@ export class ObjectiveService{
   const objectives=this.list(lobbyId).filter(o=>o.enabled&&completed.includes(o.gameCondition.objectiveId));
   const run=this.deps.runs.running(lobbyId,accountId);
   let changed=false;
+  const initial=!db.prepare('SELECT 1 FROM objective_completions WHERE lobby_id=? AND account_id=? LIMIT 1').get(lobbyId,accountId);
+  const reached:Objective[]=[];
   for(const objective of objectives){
    const inserted=db.prepare(`INSERT OR IGNORE INTO objective_completions(lobby_id,objective_id,account_id,run_id,completed_at,reward_status) VALUES(?,?,?,?,?,?)`)
     .run(lobbyId,objective.id,accountId,run?.id??null,nowIso(),objective.rewardMoney>0?'PENDING':'NONE').changes;
-   if(inserted){changed=true;this.deps.audit.record({lobbyId,targetAccountId:accountId,runId:run?.id??null,category:'RUN',action:'objective.completed',status:'SUCCESS',message:`Objectif atteint : ${objective.name}`});}
+   if(inserted){changed=true;reached.push(objective);this.deps.audit.record({lobbyId,targetAccountId:accountId,runId:run?.id??null,category:'RUN',action:'objective.completed',status:'SUCCESS',message:`Objectif atteint : ${objective.name}`});}
   }
   if(changed)this.deps.changed(lobbyId);
+  for(const objective of reached)this.deps.completed?.(lobbyId,accountId,objective,initial);
   await this.payPending(lobbyId,accountId);
  }
 

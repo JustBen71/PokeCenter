@@ -82,6 +82,22 @@ export class ShopService{
   await this.pay(lobbyId,buyer,wheel.price,`shop:ticket:${requestId}`,{table:'wheel_tickets',id:requestId,label:`un ticket « ${wheel.name} »`},()=>this.queue(requestId));
   return this.tickets('t.id=?',requestId)[0];
  }
+ /**
+  * Free ticket given by a passive: a random active wheel of the tone, queued at once like a paid one.
+  * A hostile ticket waits in the target's queue and its gage benefits the owner. Null when no wheel matches.
+  */
+ grantTicket(lobbyId:string,input:{tone:'GOOD'|'BAD';ownerId:string;targetId:string|null;reason:string}):WheelTicket|null{
+  const wheels=this.services.wheels.list(lobbyId,false).filter(w=>w.tone===input.tone);
+  if(!wheels.length||(input.tone==='BAD'&&!input.targetId))return null;
+  const wheel=wheels[this.services.passives.random(wheels.length)],id=randomUUID(),now=nowIso();
+  this.deps.db.prepare(`INSERT INTO wheel_tickets(id,lobby_id,wheel_type_id,buyer_account_id,recipient_account_id,target_account_id,price,status,created_at,queued_at) VALUES(?,?,?,?,?,?,0,'QUEUED',?,?)`)
+   .run(id,lobbyId,wheel.id,input.ownerId,input.tone==='BAD'?input.targetId:input.ownerId,input.targetId,now,now);
+  const owner=this.services.domain.accounts.get(input.ownerId)?.name??input.ownerId;
+  this.services.domain.audit.record({lobbyId,actorAccountId:null,targetAccountId:input.targetId??input.ownerId,category:'TICKET',action:'ticket.grant',status:'SUCCESS',
+   message:`${input.reason} : ticket « ${wheel.name} » offert à ${owner}`,metadata:{ticketId:id,wheelId:wheel.id}});
+  this.deps.changed(lobbyId);
+  return this.tickets('t.id=?',id)[0];
+ }
  private queue(ticketId:string){this.deps.db.prepare("UPDATE wheel_tickets SET status='QUEUED',queued_at=? WHERE id=?").run(nowIso(),ticketId);}
 
  async buyProtection(lobbyId:string,buyer:Account,body:unknown):Promise<Protection>{

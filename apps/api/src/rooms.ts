@@ -32,12 +32,15 @@ export function createPortal(store:Store,config:Config){
  const running=new Map<string,ReturnType<typeof createApp>>();
  const members=(lobbyId:string)=>new Set(lobbies.members(lobbyId).map(m=>m.accountId));
  const events=new LobbyEvents();
-// Each new game observation may complete objectives and pay their rewards; a Run change retries pending rewards.
+ // Each new game observation may complete objectives, move passive progressions and pay pending rewards;
+ // a Run change retries them.
  const observe=(lobbyId:string,clients=running.get(lobbyId)?.nativeClients.publicSnapshot()??[])=>{
-  for(const c of clients)if(c.gameState&&c.adapter.status==='ready'&&lobbies.isMember(lobbyId,c.accountId))
+  for(const c of clients)if(c.gameState&&c.adapter.status==='ready'&&lobbies.isMember(lobbyId,c.accountId)){
    void services.objectives.observe(lobbyId,c.accountId,c.gameState.progression.completed).catch(error=>console.error('Objectives:',error));
+   void services.passiveEngine.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Passives:',error));
+  }
  };
- const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,random:config.passives?.random,
+ const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,passiveHandlers:config.passives?.handlers,random:config.passives?.random,
   emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),emitTo:(lobbyId,accountId,event,payload)=>events.emitTo(lobbyId,accountId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');if(topic==='passives')void events.refresh(lobbyId,'lobby');}});
  events.provide('objectives',lobbyId=>services.objectives.snapshot(lobbyId));
  // Money topics: each viewer receives their own bank; jackpot and settings are shared by the lobby.
@@ -77,7 +80,12 @@ export function createPortal(store:Store,config:Config){
   for(const account of store.accounts())lobbies.addMember(LEGACY,account.id);
  }
  registerLobbyRoutes(app,domain,{created:start,changed:lobbyId=>void events.refresh(lobbyId,'lobby')});
- registerRunRoutes(app,domain,lobbyId=>{void events.refresh(lobbyId,'runs');observe(lobbyId);});
+ registerRunRoutes(app,domain,lobbyId=>{void events.refresh(lobbyId,'runs');observe(lobbyId);},(lobbyId,run)=>{
+  // Run events for the passives; a new Run right after a lost one is flagged for « Deuxième souffle ».
+  if(run.status==='LOST')services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-lost:${run.id}`,type:'RUN_LOST',data:{runId:run.id}});
+  if(run.status==='RUNNING'){const previous=domain.runs.history(lobbyId,run.accountId).find(r=>r.number<run.number);
+   services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-started:${run.id}`,type:'RUN_STARTED',data:{runId:run.id,number:run.number,afterLoss:previous?.status==='LOST'}});}
+ });
  registerGameRoutes(app,services,(lobbyId,topic)=>topic==='money'?refreshMoney(lobbyId):void events.refresh(lobbyId,topic));
  registerBankRoutes(app,services,refreshMoney);
  registerAuctionRoutes(app,services);
