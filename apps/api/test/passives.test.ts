@@ -86,6 +86,8 @@ test('passive service: weighted pick by rarity, exclusions and no candidate',()=
  passives.grant(lobbyId,'ben','usurper','ADMIN');
  assert.equal(passives.pick(lobbyId,'ben',{rarities:['LEGENDARY']}),null,'owned passives are excluded');
  assert.equal(passives.pick(lobbyId,'ben',{rarities:['COMMON'],exclude:['scout']})!.id,'collector');
+ passives.updateSettings(lobbyId,{disabled:['collector']},'adm');
+ assert.equal(passives.pick(lobbyId,'ben',{rarities:['COMMON'],exclude:['scout']}),null,'disabled passives are excluded');
  // A zero weight still allows a rarity explicitly requested.
  passives.updateSettings(lobbyId,{weights:{COMMON:1,UNCOMMON:0,RARE:0,LEGENDARY:0}},'adm');
  assert.equal(passives.pick(lobbyId,'tim',{rarities:['LEGENDARY']})!.id,'usurper');

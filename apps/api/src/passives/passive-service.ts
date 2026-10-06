@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import {randomInt,randomUUID} from 'node:crypto';
-import {defaultRarityWeights,passiveById,passiveCatalog,passiveRarities,passiveRarityLabels,passiveSettingsSchema,
- type LobbyNotification,type OwnedPassive,type PassiveCatalogEntry,type PassiveDefinition,type PassivePhase,type PassiveRarity,type PassiveSource} from '@pokerace/shared';
+import {defaultRarityWeights,passiveById,passiveCatalog,passiveRarities,passiveRarityLabels,passiveSettingsSchema,PASSIVE_CATALOG_VERSION,
+ type LobbyNotification,type OwnedPassive,type PassiveCatalogEntry,type PassiveDefinition,type PassivePhase,type PassiveRarity,type PassiveReward,type PassiveRewardStatus,type PassiveSelectionState,type PassiveSource,type PassivesSnapshot} from '@pokerace/shared';
 import {nowIso} from '../db/database.js';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
@@ -179,4 +179,131 @@ export class PassiveService{
   return ofRarity[this.random(ofRarity.length)];
  }
 
+ // ---- Initial selection: three private cards per player, one choice, persisted. ----
+
+ private generation(lobbyId:string,accountId:string):number{
+  return (this.db.prepare('SELECT COALESCE(MAX(generation),0) AS g FROM passive_offers WHERE lobby_id=? AND account_id=?').get(lobbyId,accountId) as {g:number}).g;
+ }
+ private offerRows(lobbyId:string,accountId:string){
+  return this.db.prepare("SELECT passive_id,status FROM passive_offers WHERE lobby_id=? AND account_id=? AND generation=? ORDER BY offer_index").all(lobbyId,accountId,this.generation(lobbyId,accountId)) as {passive_id:string;status:string}[];
+ }
+ selectionState(lobbyId:string,accountId:string):PassiveSelectionState['status']{
+  const rows=this.offerRows(lobbyId,accountId);
+  if(rows.some(r=>r.status==='CHOSEN'))return 'CHOSEN';
+  return rows.some(r=>r.status==='OFFERED')?'WAITING':'NO_OFFER';
+ }
+ // The viewer's own pending cards; a reconnection returns the same offer.
+ pendingOffer(lobbyId:string,accountId:string):string[]|null{
+  const rows=this.offerRows(lobbyId,accountId);
+  return rows.length&&rows.every(r=>r.status==='OFFERED')?rows.map(r=>r.passive_id):null;
+ }
+ private requirePhase(lobbyId:string,phase:PassivePhase,message:string){
+  if(this.settings(lobbyId).phase!==phase)throw new DomainError('CONFLICT',message);
+ }
+
+ /** Draws up to three different compatible passives for a player and stores them as a new generation. */
+ private generateOffer(lobbyId:string,accountId:string):string[]{
+  const picked:string[]=[];
+  for(let i=0;i<3;i++){const p=this.pick(lobbyId,accountId,{exclude:picked});if(!p)break;picked.push(p.id);}
+  if(!picked.length)throw new DomainError('NO_PASSIVE_AVAILABLE','Aucun passif compatible à proposer');
+  const generation=this.generation(lobbyId,accountId)+1,at=nowIso();
+  const insert=this.db.prepare("INSERT INTO passive_offers(id,lobby_id,account_id,generation,passive_id,offer_index,status,generated_at) VALUES(?,?,?,?,?,?,'OFFERED',?)");
+  picked.forEach((id,i)=>insert.run(randomUUID(),lobbyId,accountId,generation,id,i,at));
+  return picked;
+ }
+
+ /** Admin launches the race: every member receives a private offer, then the lobby waits for the choices. */
+ startSelection(lobbyId:string,actorId:string){
+  this.deps.domain.lobbies.require(lobbyId);
+  this.requirePhase(lobbyId,'NONE','La sélection des passifs a déjà été lancée');
+  const members=this.deps.domain.lobbies.members(lobbyId);
+  if(!members.length)throw new DomainError('CONFLICT','Aucun participant dans ce lobby');
+  this.db.transaction(()=>{
+   for(const m of members)if(this.selectionState(lobbyId,m.accountId)==='NO_OFFER')this.generateOffer(lobbyId,m.accountId);
+   this.saveSettings(lobbyId,{...this.settings(lobbyId),phase:'SELECTION'});
+   this.audit(lobbyId,{actorAccountId:actorId,action:'passive.selection.start',message:`Sélection des passifs lancée pour ${members.length} joueur${members.length>1?'s':''}`});
+  })();
+  this.deps.notify(lobbyId,{kind:'info',message:'🃏 La course commence : choisis ton passif parmi trois cartes'});
+  this.deps.changed(lobbyId);
+ }
+
+ /** The player picks one of their own cards: the passive is granted, the two others are rejected. */
+ choose(lobbyId:string,accountId:string,passiveId:string){
+  this.requirePhase(lobbyId,'SELECTION','La sélection des passifs n’est pas ouverte');
+  const passive=this.definition(passiveId);
+  this.db.transaction(()=>{
+   const generation=this.generation(lobbyId,accountId);
+   const claimed=this.db.prepare("UPDATE passive_offers SET status='CHOSEN',chosen_at=? WHERE lobby_id=? AND account_id=? AND generation=? AND passive_id=? AND status='OFFERED' AND NOT EXISTS(SELECT 1 FROM passive_offers o WHERE o.lobby_id=? AND o.account_id=? AND o.generation=? AND o.status='CHOSEN')")
+    .run(nowIso(),lobbyId,accountId,generation,passiveId,lobbyId,accountId,generation).changes;
+   if(!claimed)throw new DomainError('CONFLICT',this.selectionState(lobbyId,accountId)==='CHOSEN'?'Ton passif est déjà choisi':'Ce passif ne fait pas partie de ton offre');
+   this.db.prepare("UPDATE passive_offers SET status='REJECTED' WHERE lobby_id=? AND account_id=? AND generation=? AND status='OFFERED'").run(lobbyId,accountId,generation);
+   this.grant(lobbyId,accountId,passiveId,'INITIAL_CHOICE',{actorId:accountId,announce:`✨ ${this.deps.domain.accounts.get(accountId)!.name} choisit « ${passive.name} » (${passiveRarityLabels[passive.rarity]})`});
+  })();
+  return this.owned(lobbyId,accountId).find(p=>p.passiveId===passiveId)!;
+ }
+
+ // Removes the initial choice of the current generation, if any (reset or cancel before the start).
+ private dropInitialChoice(lobbyId:string,accountId:string,actorId:string){
+  const chosen=this.offerRows(lobbyId,accountId).find(r=>r.status==='CHOSEN');
+  if(chosen&&this.has(lobbyId,accountId,chosen.passive_id))this.revoke(lobbyId,accountId,chosen.passive_id,{actorId,reason:'choix initial annulé'});
+ }
+
+ /** Admin, before the start: cancels the current offer (and its choice) and draws a new one. */
+ resetOffer(lobbyId:string,accountId:string,actorId:string):string[]{
+  this.requirePhase(lobbyId,'SELECTION','Les offres ne se modifient qu’avant le départ de la course');
+  const account=this.member(lobbyId,accountId);
+  const offer=this.db.transaction(()=>{
+   this.dropInitialChoice(lobbyId,accountId,actorId);
+   this.db.prepare("UPDATE passive_offers SET status='CANCELLED' WHERE lobby_id=? AND account_id=? AND generation=?").run(lobbyId,accountId,this.generation(lobbyId,accountId));
+   const cards=this.generateOffer(lobbyId,accountId);
+   this.audit(lobbyId,{actorAccountId:actorId,targetAccountId:accountId,action:'passive.offer.reset',message:`Nouvelle offre de passifs pour ${account.name}`});
+   return cards;
+  })();
+  this.deps.notify(lobbyId,{kind:'info',message:'🃏 Une nouvelle offre de passifs t’attend'},accountId);
+  this.deps.changed(lobbyId);
+  return offer;
+ }
+
+ /** Admin, before the start: the player chooses again among the same three cards. */
+ cancelChoice(lobbyId:string,accountId:string,actorId:string){
+  this.requirePhase(lobbyId,'SELECTION','Un choix ne s’annule qu’avant le départ de la course');
+  const account=this.member(lobbyId,accountId);
+  if(this.selectionState(lobbyId,accountId)!=='CHOSEN')throw new DomainError('CONFLICT',`${account.name} n’a pas encore choisi`);
+  this.db.transaction(()=>{
+   this.dropInitialChoice(lobbyId,accountId,actorId);
+   this.db.prepare("UPDATE passive_offers SET status='OFFERED',chosen_at=NULL WHERE lobby_id=? AND account_id=? AND generation=?").run(lobbyId,accountId,this.generation(lobbyId,accountId));
+   this.audit(lobbyId,{actorAccountId:actorId,targetAccountId:accountId,action:'passive.choice.cancel',message:`Choix de passif de ${account.name} annulé`});
+  })();
+  this.deps.changed(lobbyId);
+ }
+
+ /** Ends the selection and starts the race. Without force, every member must have chosen. */
+ startRace(lobbyId:string,actorId:string,force=false){
+  this.requirePhase(lobbyId,'SELECTION','Lancez d’abord la sélection des passifs');
+  const {accounts,lobbies}=this.deps.domain;
+  const waiting=lobbies.members(lobbyId).filter(m=>this.selectionState(lobbyId,m.accountId)!=='CHOSEN').map(m=>accounts.get(m.accountId)?.name??m.accountId);
+  if(waiting.length&&!force)throw new DomainError('CONFLICT',`En attente du choix de : ${waiting.join(', ')}`,{waiting});
+  this.db.transaction(()=>{
+   this.saveSettings(lobbyId,{...this.settings(lobbyId),phase:'DONE'});
+   if(lobbies.require(lobbyId).status==='OPEN')lobbies.setStatus(lobbyId,'RUNNING');
+   this.audit(lobbyId,{actorAccountId:actorId,action:'passive.race.start',message:`Course lancée${waiting.length?` (sans choix : ${waiting.join(', ')})`:''}`});
+  })();
+  this.deps.notify(lobbyId,{kind:'success',message:'🏁 Les passifs sont choisis : la course est lancée !'});
+  this.deps.changed(lobbyId);
+ }
+
+ private rewards(lobbyId:string):PassiveReward[]{
+  return (this.db.prepare('SELECT * FROM passive_rewards WHERE lobby_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100').all(lobbyId) as {id:string;account_id:string;passive_id:string;event_id:string;type:string;payload_json:string;status:PassiveRewardStatus;command_id:string|null;created_at:string;resolved_at:string|null}[])
+   .map(r=>({id:r.id,accountId:r.account_id,passiveId:r.passive_id,eventId:r.event_id,type:r.type,payload:JSON.parse(r.payload_json),status:r.status,commandId:r.command_id,createdAt:r.created_at,resolvedAt:r.resolved_at}));
+ }
+
+ /** What a viewer may see: owned passives are public, offers only reach their own player, rewards only admins. */
+ snapshot(lobbyId:string,viewerId:string):PassivesSnapshot{
+  const {phase,weights}=this.settings(lobbyId);
+  const viewer=this.deps.domain.accounts.get(viewerId);
+  return {phase,catalogVersion:PASSIVE_CATALOG_VERSION,weights,catalog:this.catalog(lobbyId),owned:this.owned(lobbyId),
+   selection:this.deps.domain.lobbies.members(lobbyId).map(m=>({accountId:m.accountId,status:this.selectionState(lobbyId,m.accountId)})),
+   myOffer:phase==='SELECTION'?this.pendingOffer(lobbyId,viewerId):null,
+   ...(viewer?.admin?{rewards:this.rewards(lobbyId)}:{})};
+ }
 }

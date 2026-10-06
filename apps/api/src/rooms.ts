@@ -17,6 +17,7 @@ import {registerAuditRoutes} from './audit/audit-routes.js';
 import {setErrorAuditor} from './errors.js';
 import {registerLobbyRoutes,lobbySummary} from './lobbies/lobby-routes.js';
 import {registerRunRoutes} from './runs/run-routes.js';
+import {registerPassiveRoutes} from './passives/passive-routes.js';
 import {LobbyEvents} from './realtime/lobby-events.js';
 
 const LEGACY='legacy';
@@ -37,7 +38,7 @@ export function createPortal(store:Store,config:Config){
    void services.objectives.observe(lobbyId,c.accountId,c.gameState.progression.completed).catch(error=>console.error('Objectives:',error));
  };
  const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,random:config.passives?.random,
-  emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),emitTo:(lobbyId,accountId,event,payload)=>events.emitTo(lobbyId,accountId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');}});
+  emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),emitTo:(lobbyId,accountId,event,payload)=>events.emitTo(lobbyId,accountId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');if(topic==='passives')void events.refresh(lobbyId,'lobby');}});
  events.provide('objectives',lobbyId=>services.objectives.snapshot(lobbyId));
  // Money topics: each viewer receives their own bank; jackpot and settings are shared by the lobby.
  events.provide('bank',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)?services.bank.snapshot(lobbyId,accountId):null);
@@ -45,6 +46,8 @@ export function createPortal(store:Store,config:Config){
  events.provide('settings',lobbyId=>lobbies.settings(lobbyId));
  events.provide('auctions',lobbyId=>services.auctions.snapshot(lobbyId));
  events.provide('wheels',lobbyId=>services.wheels.snapshot(lobbyId));
+ // Owned passives are public; each viewer only receives their own pending offer.
+ events.provide('passives',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)||store.portal!.accounts.get(accountId)?.admin?services.passives.snapshot(lobbyId,accountId):null);
  events.provide('shop',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)?services.shop.snapshot(lobbyId,accountId):null);
  const refreshMoney=(lobbyId:string)=>{for(const topic of ['bank','jackpot','settings'])void events.refresh(lobbyId,topic);};
  const domain=store.portal;
@@ -80,6 +83,7 @@ export function createPortal(store:Store,config:Config){
  registerAuctionRoutes(app,services);
  registerWheelRoutes(app,services);
  registerShopRoutes(app,services);
+ registerPassiveRoutes(app,services);
  registerAuditRoutes(app,services);
  setErrorAuditor((error,context)=>{
   const lobbyId=context.path.match(/^\/api\/lobbies\/([^/?]+)/)?.[1];
