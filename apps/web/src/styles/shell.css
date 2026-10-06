@@ -282,3 +282,41 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 .log-message{min-width:0}.log-message strong{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.log-message small{color:var(--muted);font-size:11px}
 .metadata{background:#0a0d18;border-radius:10px;padding:12px;font-size:12px;overflow:auto;max-height:300px;color:#c9cde0}
 @media(max-width:700px){.log-list button{grid-template-columns:1fr auto}.log-time{grid-column:1/-1}}
+
+/* Passifs de course */
+.passive-badge{display:inline-flex;align-items:center;gap:4px;border:1px solid #3b4158;border-radius:999px;padding:4px 10px;font:inherit;font-size:11px;font-weight:700;background:#1f2333;color:#c9cee0;cursor:pointer;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.passive-badge.common{background:#23283a;border-color:#4a5168;color:#d4d8e6}
+.passive-badge.uncommon{background:#16332a;border-color:#2f6b55;color:#8ce9bb}
+.passive-badge.rare{background:#16273f;border-color:#2f5a8f;color:#9fcbff}
+.passive-badge.legendary{background:#3a2c12;border-color:#a8822f;color:#ffd77a;box-shadow:0 0 10px #f2c14e33}
+.passive-badge.more{background:transparent;border-style:dashed}
+.passive-badge:hover{filter:brightness(1.15)}
+.passive-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.passive-facts{border:1px solid #3b4158;border-left:3px solid #4a5168;border-radius:12px;padding:12px 14px;background:#0f1322}
+.passive-facts.uncommon{border-left-color:#5de1a8}.passive-facts.rare{border-left-color:#6aa8ff}.passive-facts.legendary{border-left-color:#f2c14e}
+.passive-facts strong{display:block;font-size:16px;margin:2px 0 6px}.passive-facts p{margin:0 0 8px;font-size:13px;color:#d0d4e4}
+.passive-facts small{color:var(--muted);font-size:11px}.passive-facts ul{margin:8px 0 0;padding-left:18px;font-size:12px;color:#c5bcda}
+.passive-rarity{margin:0;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#a6acc2;font-weight:800}
+.passive-facts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:10px}
+.passive-dialog .passive-facts{margin-top:8px}
+.passive-selection{position:fixed;inset:0;z-index:45;background:#05060ce6;display:grid;place-items:center;padding:16px;overflow:auto}
+.passive-selection>div{width:min(980px,100%);text-align:center}.passive-selection h2{font-size:34px;margin:6px 0}
+.passive-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px;margin-top:20px;text-align:left}
+.passive-cards.catalogue{margin:10px 0 22px}
+.passive-card{display:flex;flex-direction:column;gap:6px;border:1px solid #3b4158;border-top:4px solid #4a5168;border-radius:16px;padding:18px;background:linear-gradient(160deg,#1a1e2f,#0f1322)}
+.passive-card.uncommon{border-top-color:#5de1a8}.passive-card.rare{border-top-color:#6aa8ff}.passive-card.legendary{border-top-color:#f2c14e;box-shadow:0 0 24px #f2c14e22}
+.passive-card h3{margin:0;font-size:19px}.passive-card>small{color:var(--muted);font-size:12px}.passive-card>p{flex:1;margin:4px 0 8px;font-size:13px;color:#d0d4e4}
+.passive-card .btn{align-self:stretch}.passive-card.muted-card{opacity:.55}.passive-availability{color:#f2d68a;font-size:11px}
+.passive-players{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+.passive-player{display:flex;align-items:center;gap:10px}.passive-player img{width:36px;height:36px;image-rendering:pixelated}
+.rarity-title{display:flex;align-items:center;gap:8px;font-size:16px;margin:18px 0 4px}
+.badge.phase-selection{background:#3b331a;color:#f2d68a}.badge.phase-done{background:#17352e;color:#7fe8bb}
+.badge.selection-chosen{background:#17352e;color:#7fe8bb}.badge.selection-waiting{background:#3b331a;color:#f2d68a}
+.passives-admin h3{margin:20px 0 8px;font-size:15px}
+.passive-admin-players,.passive-owned-admin,.passive-catalog-admin,.passive-rewards{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.passive-admin-players>li{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:8px}
+.passive-admin-players>li>div:first-child{display:flex;align-items:center;gap:10px}
+.passive-owned-admin li,.passive-catalog-admin li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.passive-owned-admin small,.passive-catalog-admin small{color:var(--muted);font-size:11px;flex:1;min-width:160px}
+.passive-catalog-admin li.unavailable .passive-badge{opacity:.55}
+.passive-rewards li{display:flex;align-items:center;gap:8px;font-size:13px}

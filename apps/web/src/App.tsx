@@ -27,6 +27,8 @@ import {BankPage} from './bank/BankPage';
 import {ShopPage} from './shop/ShopPage';
 import {JackpotPage} from './jackpot/JackpotPage';
 import {LogsPage} from './audit/LogsPage';
+import {PassivesPage} from './passives/PassivesPage';
+import {PassiveSelection} from './passives/PassiveSelection';
 import {nativeActionUnavailable} from './native-clients';
 
 export function App(){
@@ -60,6 +62,7 @@ function Portal(){
  return <Shell route={route}>
   {route==='course'&&<CoursePage onPokemon={(row,p)=>setSheet({row,slot:p.slot})}/>}
   {route==='map'&&<MapRoute/>}
+  {route==='passives'&&<PassivesPage/>}
   {route==='auctions'&&<AuctionsPage/>}
   {route==='wheels'&&<WheelsAdminPage/>}
   {route==='shop'&&<ShopPage/>}
@@ -69,6 +72,7 @@ function Portal(){
   {route==='logs'&&<LogsPage/>}
   {route==='library'&&<PokemonLibrary capture={capture} clearCapture={()=>setCapture(null)}/>}
   <WheelOverlay/>
+  <PassiveSelection/>
   {sheet&&pokemon&&<PokemonSheet pokemon={pokemon} owner={sheet.row.name} onClose={()=>setSheet(null)} actions={account.admin?[
    {label:'Sauvegarder dans la bibliothèque',icon:<Save size={15}/>,disabled:!pokemon.raw,title:pokemon.raw?undefined:nativeActionUnavailable,
     onClick:()=>{setCapture({pokemon:structuredClone(pokemon),source:sheet.row.name,capturedAt:sheetView?.display.state.observedAt??new Date().toISOString()});setSheet(null);window.location.hash='/bibliotheque';}},

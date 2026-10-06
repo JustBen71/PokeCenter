@@ -9,7 +9,7 @@ test('admin pages are hidden from players and old links still work',()=>{
  assert.equal(routeFromHash('#/logs',false),'course');assert.equal(routeFromHash('#/bibliotheque',false),'course');
  assert.equal(routeFromHash('#/equipes',false),'course');assert.equal(routeFromHash('#/progressions',false),'map');assert.equal(routeFromHash('#/roulette',true),'wheels');
  assert.equal(routeFromHash('#/nimporte',false),'course');
- assert.deepEqual(routes.filter(r=>!r.admin).map(r=>r.id),['course','map','auctions','shop','bank','jackpot']);
+ assert.deepEqual(routes.filter(r=>!r.admin).map(r=>r.id),['course','map','passives','auctions','shop','bank','jackpot']);
  assert.equal(new Set(routes.map(r=>r.hash)).size,routes.length);
 });
 

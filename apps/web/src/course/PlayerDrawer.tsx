@@ -10,11 +10,13 @@ import {PokeDollar} from '../components/PokeDollar';
 import {spriteUrl} from '../pokemon/PokemonSheet';
 import {clientStateLabels,runActions,type CourseRow} from './course-model';
 import {AdminMoneyForm} from './AdminMoneyForm';
+import type {OwnedPassive} from '@pokerace/shared';
+import {PassiveFacts} from '../passives/PassiveDetail';
 
 const date=(iso:string|null)=>iso?new Date(iso).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):'—';
 
 // Side panel with everything about one participant; admins manage the Runs from here.
-export function PlayerDrawer({row,onClose,onPokemon}:{row:CourseRow;onClose:()=>void;onPokemon:(p:CourseRow['party'][number])=>void}){
+export function PlayerDrawer({row,passives,onClose,onPokemon}:{row:CourseRow;passives:OwnedPassive[];onClose:()=>void;onPokemon:(p:CourseRow['party'][number])=>void}){
  const {account}=useSession();const {lobby}=useLobby();const toast=useToast();const [busy,setBusy]=useState(false);
  useEffect(()=>{const esc=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',esc);return()=>window.removeEventListener('keydown',esc);},[onClose]);
  const act=async(a:ReturnType<typeof runActions>[number])=>{
@@ -37,6 +39,7 @@ export function PlayerDrawer({row,onClose,onPokemon}:{row:CourseRow;onClose:()=>
     <div><dt>Dernière donnée</dt><dd>{date(row.view?.display.receivedAt??null)}</dd></div>
    </dl></section>
    {row.party.length>0&&<section><h3>Équipe</h3><ul className="drawer-party">{row.party.map(p=><li key={p.slot}><button onClick={()=>onPokemon(p)}><img src={spriteUrl(p)} alt=""/><span>{p.nickname||p.speciesName}<small>Niv. {p.level} · {p.currentHp}/{p.maxHp} PV</small></span></button></li>)}</ul></section>}
+   <section><h3>Passifs</h3>{passives.length===0?<p className="muted">Aucun passif.</p>:<div className="passive-facts-grid">{passives.map(p=><PassiveFacts key={p.id} owned={p}/>)}</div>}</section>
    <section><h3>Runs</h3>
     {row.runs.length===0?<p className="muted">Aucune Run pour l’instant.</p>:<ol className="run-history">{row.runs.map(r=><li key={r.id} className={r.status.toLowerCase()}><strong>Run #{r.number}</strong><span className={`badge run-${r.status.toLowerCase()}`}>{runStatusLabels[r.status]}</span><small>Début {date(r.startedAt)} · Fin {date(r.endedAt)}</small></li>)}</ol>}
     {account.admin&&<div className="run-actions">{runActions(row.run).map(a=><button key={a.label} className={a.danger?'danger':a.kind==='create'&&a.start||a.status==='RUNNING'?'primary':''} disabled={busy} onClick={()=>void act(a)}>{a.label}</button>)}</div>}

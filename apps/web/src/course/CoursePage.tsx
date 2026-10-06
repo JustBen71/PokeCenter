@@ -7,6 +7,8 @@ import {PokeDollar} from '../components/PokeDollar';
 import {spriteUrl} from '../pokemon/PokemonSheet';
 import {clientStateLabels,courseRows,type CourseRow} from './course-model';
 import {PlayerDrawer} from './PlayerDrawer';
+import {PassiveBadgeRow} from '../passives/PassiveBadge';
+import {ownedBy,usePassives} from '../passives/passives-data';
 
 type Pokemon=CourseRow['party'][number];
 
@@ -14,6 +16,7 @@ type Pokemon=CourseRow['party'][number];
 export function CoursePage({onPokemon}:{onPokemon:(row:CourseRow,pokemon:Pokemon)=>void}){
  const {members,views,runs}=useLive();
  const {objectives}=useLiveTopic<ObjectivesSnapshot>('objectives',{objectives:[],completions:[]});
+ const passives=usePassives();
  const rows=useMemo(()=>courseRows(members,views,runs,objectives),[members,views,runs,objectives]);
  const [selected,setSelected]=useState<string|null>(null);
  const active=rows.find(r=>r.accountId===selected)??null;
@@ -42,7 +45,8 @@ export function CoursePage({onPokemon}:{onPokemon:(row:CourseRow,pokemon:Pokemon
       <span className="mon"><strong>{p.nickname||p.speciesName}</strong>{p.nickname&&<small>{p.speciesName}</small>}<small>Niv. {p.level}</small>
        <span className="hp"><span style={{width:`${hp}%`}} className={hp<25?'low':hp<50?'mid':''}/></span><small>{p.currentHp}/{p.maxHp} PV</small></span>
      </button>;})}</div>
+    <PassiveBadgeRow owned={ownedBy(passives,row.accountId)} ownerName={row.name}/>
    </article>)}</div>}
-  {active&&<PlayerDrawer row={active} onClose={()=>setSelected(null)} onPokemon={p=>onPokemon(active,p)}/>}
+  {active&&<PlayerDrawer row={active} passives={ownedBy(passives,active.accountId)} onClose={()=>setSelected(null)} onPokemon={p=>onPokemon(active,p)}/>}
  </section>;
 }
