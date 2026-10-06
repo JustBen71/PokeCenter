@@ -416,15 +416,50 @@ export const migrations:readonly Migration[]=[
  {version:14,name:'wheel-choices',scopes:['portal'],up:db=>db.exec(`
   ALTER TABLE wheel_resolutions ADD COLUMN options_json TEXT CHECK(options_json IS NULL OR json_valid(options_json));
   ALTER TABLE wheel_resolutions ADD COLUMN chooser_account_id TEXT REFERENCES accounts(id);
- `)}
+ `)},
+ // Battle encounters: one row per commanded battle, its frozen spec and its whole lifecycle.
+ {version:15,name:'battle-encounters',scopes:['portal'],up:db=>{
+  widenCheck(db,'audit_logs',"'PASSIVE')","'PASSIVE','BATTLE')");
+  db.exec(`
+   CREATE TABLE battle_encounters(
+    id TEXT PRIMARY KEY,
+    lobby_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+    source_type TEXT NOT NULL CHECK(source_type IN ('CURRENT_PLAYER_PARTY','OTHER_PLAYER_CURRENT_PARTY','LEADER_PARTY','CUSTOM_PARTY')),
+    source_ref_id TEXT,
+    source_label TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('CREATED','WAITING_SAFE_STATE','SENDING','STARTING','RUNNING','WON','LOST','CANCELLED','FAILED','REVIEW')),
+    trainer_name TEXT NOT NULL,
+    trainer_sprite TEXT NOT NULL,
+    party_json TEXT NOT NULL CHECK(json_valid(party_json)),
+    options_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(options_json)),
+    scaling_json TEXT NOT NULL CHECK(json_valid(scaling_json)),
+    command_id TEXT,
+    created_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    ended_at TEXT,
+    result_json TEXT CHECK(result_json IS NULL OR json_valid(result_json)),
+    error_code TEXT,
+    FOREIGN KEY(lobby_id,account_id) REFERENCES lobby_members(lobby_id,account_id) ON DELETE CASCADE
+   );
+   CREATE INDEX battle_encounters_lobby ON battle_encounters(lobby_id,created_at);
+   -- At most one commanded battle queued, in progress or uncertain per player.
+   CREATE UNIQUE INDEX battle_encounters_active ON battle_encounters(lobby_id,account_id) WHERE status IN ('WAITING_SAFE_STATE','SENDING','STARTING','RUNNING','REVIEW');
+  `);
+ }}
 ];
 
 // Rebuilds a table nothing references, with one CHECK list widened; data, columns and indexes are kept.
 function widenCheck(db:Database.Database,table:string,from:string,to:string){
  const sql=(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table) as {sql:string}).sql;
  if(!sql.includes(from))throw new Error(`${table}: CHECK ${from} not found`);
+ // After a previous rebuild SQLite stores the renamed table as CREATE TABLE "name"(…).
+ const header=new RegExp(`^CREATE TABLE "?${table}"?\\s*\\(`);
+ if(!header.test(sql))throw new Error(`${table}: unexpected DDL`);
  const indexes=(db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND sql IS NOT NULL").all(table) as {sql:string}[]).map(r=>r.sql);
- db.exec(sql.replace(`CREATE TABLE ${table}(`,`CREATE TABLE ${table}_next(`).replace(from,to));
+ db.exec(sql.replace(header,`CREATE TABLE ${table}_next(`).replace(from,to));
  db.exec(`INSERT INTO ${table}_next SELECT * FROM ${table};DROP TABLE ${table};ALTER TABLE ${table}_next RENAME TO ${table};`);
  for(const index of indexes)db.exec(index);
 }

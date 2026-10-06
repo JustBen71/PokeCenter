@@ -3,25 +3,10 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {passiveCatalog,type LobbyNotification} from '@pokerace/shared';
-import {Store} from '../src/store.js';
-import {PassiveService} from '../src/passives/passive-service.js';
+import {passiveFixture,sequence} from './support/domain-fixture.js';
 import {DomainError} from '../src/errors.js';
 
-// Deterministic RNG: replays the given values (modulo n), then 0.
-export const sequence=(...values:number[])=>(n:number)=>(values.length?values.shift()!:0)%n;
 const code=(fn:()=>unknown)=>{try{fn();}catch(e){return e instanceof DomainError?e.code:String(e);}return 'OK';};
-
-export function passiveFixture(path=':memory:',implemented:ReadonlySet<string>=new Set(passiveCatalog.map(p=>p.id)),random=sequence()){
- const store=new Store(path);const domain=store.portal!;
- for(const [id,name] of [['ben','Ben'],['tim','Tim'],['adm','Admin'],['out','Dehors']])domain.accounts.save({id,name,sprite:'may',admin:id==='adm'});
- const lobby=domain.lobbies.get('lobby')??domain.lobbies.create({id:'lobby',name:'Course',createdBy:'adm'});
- for(const id of ['ben','tim'])domain.lobbies.addMember(lobby.id,id);
- const notes:{n:LobbyNotification;to?:string}[]=[],changes:string[]=[];
- const passives=new PassiveService({domain,implemented,random,changed:l=>changes.push(l),notify:(_l,n,to)=>notes.push({n,to})});
- return {store,domain,passives,notes,changes,lobbyId:lobby.id};
-}
-
 test('migration 13: PASSIVE audit category and PASSIVE_REWARD ledger type are accepted, data kept',()=>{
  const {domain,lobbyId}=passiveFixture();
  domain.audit.record({lobbyId,category:'PASSIVE',action:'x',status:'INFO',message:'ok'});

@@ -16,6 +16,8 @@ export * from './lobby-auction.js';
 export * from './wheels.js';
 export * from './shop.js';
 export * from './passives.js';
+export * from './battles.js';
+export {speciesInternal} from './species-internal.js';
 import { z } from "zod";
 export * from './roulette.js';
 import {progressionData} from './progression-data.js';

@@ -15,6 +15,7 @@ import {ShopService} from './shop/shop-service.js';
 import {JackpotService} from './money/jackpot-service.js';
 import {PassiveService,type Random} from './passives/passive-service.js';
 import {PassiveEngine} from './passives/passive-engine.js';
+import {BattleEncounterService} from './battles/battle-encounter-service.js';
 import {passiveHandlers} from './passives/passive-handlers.js';
 import type {PassiveHandler} from './passives/passive-events.js';
 
@@ -43,7 +44,9 @@ export function createServices(domain:PortalDomain,courses:Map<string,Course>,op
  const shop=new ShopService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'shop')});
  const passives=new PassiveService({domain,implemented:options.implementedPassives??new Set(Object.keys(handlers)),random:options.random,changed:lobbyId=>options.changed(lobbyId,'passives'),
   notify:(lobbyId,n,accountId)=>accountId?options.emitTo?.(lobbyId,accountId,'notification',n):options.emit(lobbyId,'notification',n)});
- const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop,passives,passiveEngine};
+ const battles=new BattleEncounterService({domain,changed:lobbyId=>options.changed(lobbyId,'battles'),
+  notify:(lobbyId,n,accountId)=>accountId?options.emitTo?.(lobbyId,accountId,'notification',n):options.emit(lobbyId,'notification',n)});
+ const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop,passives,passiveEngine,battles};
  wheels.attach(services);shop.attach(services);passiveEngine.attach(services);
  return services;
 }

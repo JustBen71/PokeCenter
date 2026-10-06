@@ -5,7 +5,7 @@ import {progressionData} from './progression-data.js';
 export const adapterStatusSchema=z.enum(['no_game','unsupported_system','unknown_rom','rom_identity_unavailable','profile_not_validated','memory_domain_unavailable','ready','read_error']);
 export const readCapabilitySchema=z.enum(['trainer.read','money.read','party.read','location.read','progression.read']);
 // Write capabilities are announced by clients whose adapter, profile and local settings allow verified writes.
-export const writeCapabilitySchema=z.enum(['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace']);
+export const writeCapabilitySchema=z.enum(['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace','battle.trainer.start']);
 // Game events (GAME_EVENT). No adapter announces them until its memory sources are validated.
 export const eventCapabilitySchema=z.enum(['events.trainer_victory','events.pokemon_fainted','events.battle_ended','steps.read']);
 const capabilities=z.array(z.union([readCapabilitySchema,writeCapabilitySchema,eventCapabilitySchema])).max(20).refine(v=>new Set(v).size===v.length);

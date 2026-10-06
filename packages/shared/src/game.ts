@@ -5,7 +5,8 @@ import type {Run} from './run.js';
 // Business capabilities of a GameAdapter. Features test these, never the emulated system.
 export const gameCapabilitySchema=z.enum([
  'trainer.read','money.read','money.write','party.read','party.write',
- 'pokemon.insert','pokemon.remove','pokemon.replace','location.read','progression.read'
+ 'pokemon.insert','pokemon.remove','pokemon.replace','location.read','progression.read',
+ 'battle.trainer.start'
 ]);
 export type GameCapability=z.infer<typeof gameCapabilitySchema>;
 
