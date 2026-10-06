@@ -18,6 +18,7 @@ import {setErrorAuditor} from './errors.js';
 import {registerLobbyRoutes,lobbySummary} from './lobbies/lobby-routes.js';
 import {registerRunRoutes} from './runs/run-routes.js';
 import {registerPassiveRoutes} from './passives/passive-routes.js';
+import {registerBattleRoutes} from './battles/battle-routes.js';
 import {LobbyEvents} from './realtime/lobby-events.js';
 import type {DomainEvent} from './passives/passive-events.js';
 
@@ -96,6 +97,7 @@ export function createPortal(store:Store,config:Config){
  registerWheelRoutes(app,services);
  registerShopRoutes(app,services);
  registerPassiveRoutes(app,services);
+ registerBattleRoutes(app,services);
  registerAuditRoutes(app,services);
  setErrorAuditor((error,context)=>{
   const lobbyId=context.path.match(/^\/api\/lobbies\/([^/?]+)/)?.[1];
