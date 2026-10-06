@@ -15,7 +15,9 @@ import {encodePokemon,agentEnvelopeSchema,libraryInputSchema,restorePokemonSchem
 import {Store} from "./store.js";
 import type {PublicNativeClient} from "@pokerace/shared";
 
-export type Config={auctionGenerator?:typeof import('./auction-generator.js').generateLot;commandTimeoutMs?:number;accountsRequired?:boolean;corsOrigin:string;offlineAfterMs:number;tokens?:Record<string,string>;roomCode?:string;adminToken:string};
+export type Config={auctionGenerator?:typeof import('./auction-generator.js').generateLot;commandTimeoutMs?:number;accountsRequired?:boolean;corsOrigin:string;offlineAfterMs:number;tokens?:Record<string,string>;roomCode?:string;adminToken:string;
+ // Tests only: deterministic passive draws and a chosen set of implemented passives.
+ passives?:{implemented?:ReadonlySet<string>;random?:(n:number)=>number}};
 const hash=(s:string)=>createHash("sha256").update(s).digest();
 const safeEqual=(a:string,b:string)=>{const aa=hash(a),bb=hash(b);return timingSafeEqual(aa,bb)};
 // hooks.nativeClientsChanged lets the portal react to game observations (objectives, rankings) without polling.

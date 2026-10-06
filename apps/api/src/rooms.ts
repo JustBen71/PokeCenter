@@ -36,7 +36,8 @@ export function createPortal(store:Store,config:Config){
   for(const c of clients)if(c.gameState&&c.adapter.status==='ready'&&lobbies.isMember(lobbyId,c.accountId))
    void services.objectives.observe(lobbyId,c.accountId,c.gameState.progression.completed).catch(error=>console.error('Objectives:',error));
  };
- const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');}});
+ const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,random:config.passives?.random,
+  emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),emitTo:(lobbyId,accountId,event,payload)=>events.emitTo(lobbyId,accountId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');}});
  events.provide('objectives',lobbyId=>services.objectives.snapshot(lobbyId));
  // Money topics: each viewer receives their own bank; jackpot and settings are shared by the lobby.
  events.provide('bank',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)?services.bank.snapshot(lobbyId,accountId):null);

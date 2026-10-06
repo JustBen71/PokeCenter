@@ -15,6 +15,7 @@ export * from './bank.js';
 export * from './lobby-auction.js';
 export * from './wheels.js';
 export * from './shop.js';
+export * from './passives.js';
 import { z } from "zod";
 export * from './roulette.js';
 import {progressionData} from './progression-data.js';

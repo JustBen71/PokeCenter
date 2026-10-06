@@ -328,8 +328,101 @@ export const migrations:readonly Migration[]=[
    created_at TEXT NOT NULL
   );
   CREATE INDEX protections_account ON protections(lobby_id,account_id,status);
- `)}
+ `)},
+ {version:13,name:'race-passives',scopes:['portal'],up:db=>{
+  // New audit category and ledger type: both tables are rebuilt from their own DDL (nothing references them).
+  widenCheck(db,'audit_logs',"'ADMIN','ERROR')","'ADMIN','ERROR','PASSIVE')");
+  widenCheck(db,'money_transactions',"'ADMIN_ADJUSTMENT','OBJECTIVE_REWARD')","'ADMIN_ADJUSTMENT','OBJECTIVE_REWARD','PASSIVE_REWARD')");
+  db.exec(`
+   -- The lobby status cannot be widened safely (every lobby table cascades from it): the selection phase lives here.
+   CREATE TABLE passive_settings(
+    lobby_id TEXT PRIMARY KEY REFERENCES lobbies(id) ON DELETE CASCADE,
+    phase TEXT NOT NULL DEFAULT 'NONE' CHECK(phase IN ('NONE','SELECTION','DONE')),
+    weights_json TEXT NOT NULL CHECK(json_valid(weights_json)),
+    disabled_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(disabled_json)),
+    updated_at TEXT NOT NULL
+   );
+   -- Three private cards per player and generation; a reset cancels the generation and creates the next one.
+   CREATE TABLE passive_offers(
+    id TEXT PRIMARY KEY,
+    lobby_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    generation INTEGER NOT NULL,
+    passive_id TEXT NOT NULL,
+    offer_index INTEGER NOT NULL CHECK(offer_index BETWEEN 0 AND 2),
+    status TEXT NOT NULL CHECK(status IN ('OFFERED','CHOSEN','REJECTED','CANCELLED')),
+    generated_at TEXT NOT NULL,
+    chosen_at TEXT,
+    FOREIGN KEY(lobby_id,account_id) REFERENCES lobby_members(lobby_id,account_id) ON DELETE CASCADE,
+    UNIQUE(lobby_id,account_id,generation,offer_index),
+    UNIQUE(lobby_id,account_id,generation,passive_id)
+   );
+   -- Possession for the whole race. stackableCopies=false: the same passive is owned at most once.
+   CREATE TABLE race_passives(
+    id TEXT PRIMARY KEY,
+    lobby_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    passive_id TEXT NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('INITIAL_CHOICE','ADMIN','WHEEL','JACKPOT','SHOP','EVENT')),
+    acquired_at TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata_json)),
+    FOREIGN KEY(lobby_id,account_id) REFERENCES lobby_members(lobby_id,account_id) ON DELETE CASCADE,
+    UNIQUE(lobby_id,account_id,passive_id)
+   );
+   -- Counters (places, species, activations…) follow the passive, including when it is stolen.
+   CREATE TABLE passive_progress(
+    lobby_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    passive_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value_json TEXT NOT NULL CHECK(json_valid(value_json)),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(lobby_id,account_id,passive_id,key),
+    FOREIGN KEY(lobby_id,account_id) REFERENCES lobby_members(lobby_id,account_id) ON DELETE CASCADE
+   );
+   -- An event is processed at most once per player: replays after a reconnection change nothing.
+   CREATE TABLE passive_events(
+    id TEXT PRIMARY KEY,
+    lobby_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    processed_at TEXT NOT NULL,
+    result_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(result_json)),
+    FOREIGN KEY(lobby_id,account_id) REFERENCES lobby_members(lobby_id,account_id) ON DELETE CASCADE,
+    UNIQUE(lobby_id,account_id,event_id)
+   );
+   -- Deferred or uncertain rewards: PENDING until the game can receive them, REVIEW when the outcome is unknown.
+   CREATE TABLE passive_rewards(
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    passive_id TEXT NOT NULL,
+    lobby_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
+    status TEXT NOT NULL CHECK(status IN ('PENDING','APPLYING','CONFIRMED','FAILED','REVIEW')),
+    command_id TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    resolved_at TEXT,
+    FOREIGN KEY(lobby_id,account_id) REFERENCES lobby_members(lobby_id,account_id) ON DELETE CASCADE,
+    UNIQUE(lobby_id,account_id,event_id,passive_id)
+   );
+   CREATE INDEX passive_rewards_status ON passive_rewards(lobby_id,status);
+  `);
+ }}
 ];
+
+// Rebuilds a table nothing references, with one CHECK list widened; data, columns and indexes are kept.
+function widenCheck(db:Database.Database,table:string,from:string,to:string){
+ const sql=(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table) as {sql:string}).sql;
+ if(!sql.includes(from))throw new Error(`${table}: CHECK ${from} not found`);
+ const indexes=(db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND sql IS NOT NULL").all(table) as {sql:string}[]).map(r=>r.sql);
+ db.exec(sql.replace(`CREATE TABLE ${table}(`,`CREATE TABLE ${table}_next(`).replace(from,to));
+ db.exec(`INSERT INTO ${table}_next SELECT * FROM ${table};DROP TABLE ${table};ALTER TABLE ${table}_next RENAME TO ${table};`);
+ for(const index of indexes)db.exec(index);
+}
 
 // Each migration runs in its own transaction and is recorded once; a failure leaves the previous version intact.
 export function migrate(db:Database.Database,scope:DatabaseScope){

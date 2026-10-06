@@ -13,12 +13,13 @@ import type {generateLot} from './auction-generator.js';
 import {WheelService} from './wheels/wheel-service.js';
 import {ShopService} from './shop/shop-service.js';
 import {JackpotService} from './money/jackpot-service.js';
+import {PassiveService,type Random} from './passives/passive-service.js';
 
 export type Services=ReturnType<typeof createServices>;
 type Course=ReturnType<typeof createApp>;
 
 // Composition of the portal services; each lobby's course app provides its native clients and action locks.
-export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot}){
+export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;emitTo?:(lobbyId:string,accountId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot;implementedPassives?:ReadonlySet<string>;random?:Random}){
  const course=(lobbyId:string)=>{const c=courses.get(lobbyId);if(!c)throw new Error(`Lobby ${lobbyId} is not running`);return c;};
  const currentGame=new CurrentGameService({lobbies:domain.lobbies,runs:domain.runs,clients:(lobbyId):PublicNativeClient[]=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],staleAfterMs:options.staleAfterMs});
  const commands=new GameCommandService({db:domain.db,audit:domain.audit,timeoutMs:options.commandTimeoutMs,
@@ -35,7 +36,9 @@ export function createServices(domain:PortalDomain,courses:Map<string,Course>,op
  const wheels=new WheelService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'wheels'),
   notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n),spun:(lobbyId,r)=>options.emit(lobbyId,'wheel-spin',r)});
  const shop=new ShopService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'shop')});
- const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop};
+ const passives=new PassiveService({domain,implemented:options.implementedPassives??new Set(),random:options.random,changed:lobbyId=>options.changed(lobbyId,'passives'),
+  notify:(lobbyId,n,accountId)=>accountId?options.emitTo?.(lobbyId,accountId,'notification',n):options.emit(lobbyId,'notification',n)});
+ const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop,passives};
  wheels.attach(services);shop.attach(services);
  return services;
 }

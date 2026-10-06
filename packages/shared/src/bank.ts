@@ -15,5 +15,5 @@ export const depositSplit=(amount:number,taxPercent:number)=>{const tax=Math.flo
 export const moneyTypeLabels:Record<MoneyTransaction['type'],string>={
  BANK_DEPOSIT:'Dépôt en banque',BANK_WITHDRAW:'Retrait de la banque',AUCTION_PAYMENT:'Paiement d’enchère',SHOP_PURCHASE:'Achat en boutique',
  WHEEL_TRANSFER:'Transfert de roue',WHEEL_REWARD:'Gain de roue',JACKPOT_CONTRIBUTION:'Contribution au jackpot',JACKPOT_REWARD:'Gain du jackpot',
- ADMIN_ADJUSTMENT:'Correction admin',OBJECTIVE_REWARD:'Récompense d’objectif'
+ ADMIN_ADJUSTMENT:'Correction admin',PASSIVE_REWARD:'Récompense de passif',OBJECTIVE_REWARD:'Récompense d’objectif'
 };
