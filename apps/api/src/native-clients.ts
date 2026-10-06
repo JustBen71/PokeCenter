@@ -1,4 +1,4 @@
-import {SYSTEMS_BY_GENERATION,gameStateEventSchema,type PublicNativeClient} from '@pokerace/shared';
+import {SYSTEMS_BY_GENERATION,gameEventKinds,gameEventSchema,gameStateEventSchema,type GameEvent,type PublicNativeClient} from '@pokerace/shared';
 import {createHash, timingSafeEqual} from 'node:crypto';
 import type {Server} from 'socket.io';
 import {z} from 'zod';
@@ -26,7 +26,8 @@ type Account = {id:string; name:string};
 type ClientState = {playerId:string; accountId:string; playerName:string; socketId:string; ready:boolean; lastSeenAt:string; hello?:z.infer<typeof hello>; bridge?:z.infer<typeof bridgeStatus>; status?:z.infer<typeof status>; game?:z.infer<typeof gameStateEventSchema>};
 
 // Native observations are additive; business commands still belong to /agent.
-export function registerNativeClients(io:Server, config:Config, findAccount:(name:string)=>Account|undefined, onChange:(clients:PublicNativeClient[])=>void=()=>{}) {
+export function registerNativeClients(io:Server, config:Config, findAccount:(name:string)=>Account|undefined, onChange:(clients:PublicNativeClient[])=>void=()=>{},
+ onGameEvent:(accountId:string,event:GameEvent)=>Promise<void>=async()=>{}) {
  const namespace=io.of('/client');
  const clients=new Map<string,ClientState>();
  const publicSnapshot=():PublicNativeClient[]=>[...clients.values()].map(s=>({
@@ -81,6 +82,19 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
    const current=state.bridge??state.hello;
    if(parsed.data.state&&(!current?.bridge.connected||!current.bridge.gameLoaded||!SYSTEMS_BY_GENERATION[parsed.data.state.game.generation]?.includes(current.system??''))){socket.disconnect(true);return;}
    state.game=parsed.data;state.lastSeenAt=new Date().toISOString();changed();
+  });
+  // A game event is acknowledged once processed (or permanently refused); without an ACK the client re-sends the
+  // same eventId after reconnecting, and the server deduplicates it.
+  socket.on('GAME_EVENT',async(value:unknown)=>{
+   if(!state.ready||Buffer.byteLength(JSON.stringify(value)??'')>4096){socket.disconnect(true);return;}
+   const parsed=gameEventSchema.safeParse(value);
+   if(!parsed.success){socket.disconnect(true);return;}
+   const event=parsed.data as GameEvent;
+   const reply=(ok:boolean,code?:string)=>socket.emit('GAME_EVENT_ACK',{type:'GAME_EVENT_ACK',protocolVersion:VERSION,eventId:event.eventId,ok,...(code?{error:{code}}:{})});
+   // Only an adapter that announces the matching validated capability may report this kind of event.
+   if(!state.game?.adapter.capabilities.includes(gameEventKinds[event.kind].capability)){reply(false,'capability_missing');return;}
+   try{await onGameEvent(state.accountId,event);reply(true);}
+   catch{/* not acknowledged: the client keeps it and re-sends it later */}
   });
   socket.on('COMMAND_ACK',(value:unknown)=>{
    const parsed=ack.safeParse(value);if(!state.ready||!parsed.success)return;

@@ -21,13 +21,13 @@ export type Config={auctionGenerator?:typeof import('./auction-generator.js').ge
 const hash=(s:string)=>createHash("sha256").update(s).digest();
 const safeEqual=(a:string,b:string)=>{const aa=hash(a),bb=hash(b);return timingSafeEqual(aa,bb)};
 // hooks.nativeClientsChanged lets the portal react to game observations (objectives, rankings) without polling.
-export function createApp(store:Store,config:Config,transport?:{server:HttpServer;path:string},hooks:{nativeClientsChanged?:(clients:PublicNativeClient[])=>void}={}){
+export function createApp(store:Store,config:Config,transport?:{server:HttpServer;path:string},hooks:{nativeClientsChanged?:(clients:PublicNativeClient[])=>void;gameEvent?:(accountId:string,event:import('@pokerace/shared').GameEvent)=>Promise<void>}={}){
  const app=express();app.disable("x-powered-by");app.use(helmet({contentSecurityPolicy:false}));app.use(cors({origin:config.corsOrigin}));app.use(express.json({limit:MAX_MESSAGE_BYTES}));
  const server=transport?.server??new HttpServer(app);const io=new SocketServer(server,{path:transport?.path??"/socket.io",destroyUpgrade:false,cors:{origin:config.corsOrigin},maxHttpBufferSize:MAX_MESSAGE_BYTES,transports:["websocket","polling"]});
  const agent=io.of("/agent"), dashboard=io.of("/dashboard");const connected=new Map<string,number>();const agentSockets=new Map<string,Set<string>>();
  const actionLocks=new Set<string>();
  const accountsRequired=config.accountsRequired!==false;registerAccounts(app,store,accountsRequired);
- const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)),clients=>{dashboard.emit("native-clients",clients);hooks.nativeClientsChanged?.(clients);});
+ const nativeClients=registerNativeClients(io,config,name=>store.accounts().find(a=>accountKey(a.name)===accountKey(name)),clients=>{dashboard.emit("native-clients",clients);hooks.nativeClientsChanged?.(clients);},hooks.gameEvent);
  const publicPlayers=()=>store.all().map(row=>{const account=store.accounts().find(a=>a.id===row.playerId);return {...toPublicPlayer({...row,state:{...row.state,...(account?{playerName:account.name}:{})},connected:(connected.get(row.playerId)??0)>0 && Date.now()-Date.parse(row.lastSeenAt)<config.offlineAfterMs}),account};});
  const broadcast=()=>dashboard.emit("players",publicPlayers());
  const auctionPlayers=()=>auctionParticipants(publicPlayers(),nativeClients.publicSnapshot());

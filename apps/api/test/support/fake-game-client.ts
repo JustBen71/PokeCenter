@@ -1,9 +1,12 @@
+import {randomUUID} from 'node:crypto';
 import {io as connect,type Socket} from 'socket.io-client';
-import {decodePokemonCopy,encodePokemon,type NativeGameState,type PokemonInjection} from '@pokerace/shared';
+import {decodePokemonCopy,encodePokemon,type GameEventKind,type NativeGameState,type PokemonInjection} from '@pokerace/shared';
 
 export type FakeMode='apply'|'timeout'|'ack-lost'|{refuse:string};
 type Command={commandId:string;command:string;payload:Record<string,any>};
-type ConnectOptions={base:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number};
+type ConnectOptions={base:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number;
+ // Game-event capabilities announced by this fake adapter (none by default, like the real Gen III adapter).
+ events?:string[]};
 
 export const template=(speciesId=1,level=5,nickname='TEST'):PokemonInjection=>({playerId:'fake',slot:1,speciesId,nickname,level,experience:135,currentHp:20,
  stats:{maxHp:20,attack:10,defense:10,speed:10,spAttack:10,spDefense:10},moves:[{id:33,pp:35},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:3,friendship:70,
@@ -44,7 +47,7 @@ export class FakeGameClient{
  }
 
  state():NativeGameState{
-  const capabilities=[...READ,...(this.writes?WRITE:[])];
+  const capabilities=[...READ,...(this.writes?WRITE:[]),...(this.options.events??[])];
   const adapter={id:'pokemon.emerald.gen3',status:'ready' as const,profileId:'emerald-fr-bpef-v0',capabilities};
   return {gameStateVersion:2,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
    trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{...this.location},
@@ -54,6 +57,19 @@ export class FakeGameClient{
  }
  publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});}
  close(){this.socket.close();}
+ /** Sends one GAME_EVENT and resolves with the server ACK (or null after the timeout, like a lost ACK). */
+ gameEvent(kind:GameEventKind,data:Record<string,unknown>,eventId:string=randomUUID(),timeoutMs=1500):Promise<{eventId:string;ok:boolean;error?:{code:string}}|null>{
+  return new Promise(resolve=>{
+   const timer=setTimeout(()=>{this.socket.off('GAME_EVENT_ACK',on);resolve(null);},timeoutMs);
+   const on=(ack:{eventId:string;ok:boolean;error?:{code:string}})=>{if(ack.eventId!==eventId)return;clearTimeout(timer);this.socket.off('GAME_EVENT_ACK',on);resolve(ack);};
+   this.socket.on('GAME_EVENT_ACK',on);
+   this.socket.emit('GAME_EVENT',{type:'GAME_EVENT',protocolVersion:1,eventVersion:1,eventId,kind,observedAt:new Date().toISOString(),data});
+  });
+ }
+ trainerVictory(baseReward:number,eventId?:string){const before=this.money;this.money+=baseReward;this.publish();return this.gameEvent('TRAINER_VICTORY',{moneyBefore:before,moneyAfter:this.money,baseReward},eventId);}
+ setSteps(absolute:number,eventId?:string){return this.gameEvent('STEPS_CHANGED',{absolute},eventId);}
+ pokemonFainted(slot:number,speciesId:number,eventId?:string){return this.gameEvent('POKEMON_FAINTED',{slot,speciesId},eventId);}
+ battleEnded(outcome:'WIN'|'LOSS'|'FLEE'|'OTHER',conscious:number,eventId?:string){return this.gameEvent('BATTLE_ENDED',{outcome,conscious},eventId);}
  /** Disconnects, then connects again as the same installation with the same game (money, party). */
  async reconnect(){this.close();return FakeGameClient.connect({...this.options,money:this.money,party:[...this.party],location:this.location});}
 

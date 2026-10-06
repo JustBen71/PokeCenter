@@ -6,7 +6,9 @@ export const adapterStatusSchema=z.enum(['no_game','unsupported_system','unknown
 export const readCapabilitySchema=z.enum(['trainer.read','money.read','party.read','location.read','progression.read']);
 // Write capabilities are announced by clients whose adapter, profile and local settings allow verified writes.
 export const writeCapabilitySchema=z.enum(['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace']);
-const capabilities=z.array(z.union([readCapabilitySchema,writeCapabilitySchema])).max(10).refine(v=>new Set(v).size===v.length);
+// Game events (GAME_EVENT). No adapter announces them until its memory sources are validated.
+export const eventCapabilitySchema=z.enum(['events.trainer_victory','events.pokemon_fainted','events.battle_ended','steps.read']);
+const capabilities=z.array(z.union([readCapabilitySchema,writeCapabilitySchema,eventCapabilitySchema])).max(20).refine(v=>new Set(v).size===v.length);
 export const adapterSchema=z.object({id:z.string().max(80).nullable(),status:adapterStatusSchema,profileId:z.string().max(80).nullable(),capabilities}).strict();
 const integer=(max:number)=>z.number().int().min(0).max(max);
 const slug=z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/);
@@ -100,3 +102,21 @@ export type PublicNativeClient={
  bridge:{type:'bizhawk';connected:boolean;gameLoaded:boolean;protocolVersion:1|null};
  system:string|null;allowMemoryWrites:boolean;canPurchase?:boolean;adapter:GameAdapterState;gameState:NativeGameState|null;
 };
+
+/**
+ * GAME_EVENT: something that happened in the game and may give a reward. Separate from GAME_STATE, never a memory
+ * address. The client keeps it in a local outbox and re-sends the same eventId until the server answers GAME_EVENT_ACK.
+ */
+const count=(max:number)=>z.number().int().min(0).max(max);
+export const gameEventKinds={
+ TRAINER_VICTORY:{capability:'events.trainer_victory',data:z.object({moneyBefore:count(999999),moneyAfter:count(999999),baseReward:count(999999)}).strict()},
+ POKEMON_FAINTED:{capability:'events.pokemon_fainted',data:z.object({slot:z.number().int().min(1).max(6),speciesId:z.number().int().min(1).max(1025)}).strict()},
+ BATTLE_ENDED:{capability:'events.battle_ended',data:z.object({outcome:z.enum(['WIN','LOSS','FLEE','OTHER']),conscious:count(6)}).strict()},
+ // Absolute counter read from the game; the server computes the deltas (a reset is a new baseline).
+ STEPS_CHANGED:{capability:'steps.read',data:z.object({absolute:count(99999999)}).strict()}
+} as const;
+export type GameEventKind=keyof typeof gameEventKinds;
+const gameEventBase={protocolVersion:z.literal(1),eventVersion:z.literal(1),eventId:z.string().uuid(),observedAt:z.string().datetime()};
+export const gameEventSchema=z.discriminatedUnion('kind',(Object.keys(gameEventKinds) as GameEventKind[]).map(kind=>
+ z.object({type:z.literal('GAME_EVENT'),...gameEventBase,kind:z.literal(kind),data:gameEventKinds[kind].data}).strict()) as unknown as [z.ZodDiscriminatedUnionOption<'kind'>,...z.ZodDiscriminatedUnionOption<'kind'>[]]);
+export type GameEvent={type:'GAME_EVENT';protocolVersion:1;eventVersion:1;eventId:string;observedAt:string}&{[K in GameEventKind]:{kind:K;data:z.infer<typeof gameEventKinds[K]['data']>}}[GameEventKind];

@@ -19,6 +19,7 @@ import {registerLobbyRoutes,lobbySummary} from './lobbies/lobby-routes.js';
 import {registerRunRoutes} from './runs/run-routes.js';
 import {registerPassiveRoutes} from './passives/passive-routes.js';
 import {LobbyEvents} from './realtime/lobby-events.js';
+import type {DomainEvent} from './passives/passive-events.js';
 
 const LEGACY='legacy';
 const socketPath=(lobby:Lobby)=>lobby.id===LEGACY?'/socket.io':`/rooms/${lobby.id}/socket.io`;
@@ -65,7 +66,8 @@ export function createPortal(store:Store,config:Config){
  if(legacy)data.putAccount=(account,key)=>{const same=store.portal!.accounts.findByName(account.name);if(!same||same.id===account.id)store.putAccount(account,key);};
   services.objectives.seed(lobby.id);services.wheels.seed(lobby.id);
   // Each new game observation may complete objectives (and pay their rewards).
-  const course=createApp(data,{...config,roomCode:lobby.inviteCode,tokens:legacy?config.tokens:undefined},{server,path:socketPath(lobby)},{nativeClientsChanged:clients=>observe(lobby.id,clients)});
+  const course=createApp(data,{...config,roomCode:lobby.inviteCode,tokens:legacy?config.tokens:undefined},{server,path:socketPath(lobby)},{nativeClientsChanged:clients=>observe(lobby.id,clients),
+   gameEvent:async(accountId,event)=>{await services.passiveEngine.publish({lobbyId:lobby.id,accountId,id:`game:${event.eventId}`,type:event.kind,data:event.data} as DomainEvent);}});
   running.set(lobby.id,course);events.attach(lobby.id,course.io.of('/dashboard'));
   // The Pokémon library is global now: former lobby libraries are copied once.
   services.library.importOnce(lobby.id,data.library());

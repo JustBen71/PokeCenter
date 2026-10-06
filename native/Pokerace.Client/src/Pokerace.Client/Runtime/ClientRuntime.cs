@@ -12,7 +12,8 @@ namespace Pokerace.Client.Runtime;
 public sealed record ClientStatus(bool ServerConnected, string? LastError, BridgeStatus Bridge, GameObservation Game);
 
 public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClient bridge, IServerConnection server, ClientLog log,
-    TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null, TextWriter? notices = null)
+    TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null, TextWriter? notices = null,
+    GameEventOutbox? outbox = null)
 {
     private readonly TextWriter notices = notices ?? Console.Error;
     private readonly BridgeConnectionManager manager = new(bridge, log, pollInterval, retryInterval);
@@ -21,6 +22,9 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
     private readonly Channel<(ServerMessage Message, long Session)> commands = Channel.CreateBounded<(ServerMessage, long)>(64);
     private long session;
     private volatile string? lastError;
+    // Events sent on the current connection; the others (new or not acknowledged) are (re)sent on the next tick.
+    private readonly HashSet<string> sentEvents = [];
+    public GameEventOutbox Outbox { get; } = outbox ?? new GameEventOutbox(null);
     public ClientStatus Status => new(server.IsConnected, lastError, manager.Snapshot, games.Snapshot);
     public async Task RunAsync(CancellationToken cancellation)
     {
@@ -59,6 +63,8 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 await server.SendAsync("CLIENT_STATUS", clientStatus, connection.Token);
                 await server.SendAsync("BRIDGE_STATUS", ServerProtocol.BridgeStatusMessage(initialSnapshot), connection.Token);
                 await server.SendAsync("HEARTBEAT", ServerProtocol.Heartbeat(initialSnapshot), connection.Token);
+                lock (sentEvents) sentEvents.Clear();
+                await SendPendingEventsAsync(connection.Token);
                 receive = ReceiveCommandsAsync(connection.Token);
                 heartbeat = HeartbeatAsync(initialSnapshot, connection.Token);
                 await await Task.WhenAny(receive, heartbeat);
@@ -92,6 +98,13 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 if (!BridgeProtocol.Boolean(message.Payload, "connected")) throw new ClientException("server_disconnected", "Server reported disconnection.");
                 continue;
             }
+            if (message.Type == "GAME_EVENT_ACK")
+            {
+                // ok=false is a permanent refusal (e.g. capability not announced): the event is dropped, never retried.
+                if (Outbox.Acknowledge((string?)message.Payload["eventId"] ?? "") && !BridgeProtocol.Boolean(message.Payload, "ok"))
+                    log.Write("WARN", "game_event_refused", (string?)message.Payload["error"]?["code"]);
+                continue;
+            }
             if (message.Type != "COMMAND") throw new ClientException("invalid_protocol", "Unknown server event.");
             if (!commands.Writer.TryWrite((message, Interlocked.Read(ref session))))
             {
@@ -123,11 +136,21 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 await server.SendAsync("GAME_STATE", game.ToMessage(), cancellation);
                 gameKey = nextKey;
             }
+            await SendPendingEventsAsync(cancellation);
             if (DateTimeOffset.UtcNow >= heartbeatAt)
             {
                 await server.SendAsync("HEARTBEAT", ServerProtocol.Heartbeat(current), cancellation);
                 heartbeatAt = DateTimeOffset.UtcNow.AddSeconds(configuration.HeartbeatSeconds);
             }
+        }
+    }
+    private async Task SendPendingEventsAsync(CancellationToken cancellation)
+    {
+        foreach (var item in Outbox.Pending())
+        {
+            var id = (string)item["eventId"]!;
+            lock (sentEvents) if (!sentEvents.Add(id)) continue;
+            await server.SendAsync("GAME_EVENT", item, cancellation);
         }
     }
     private async Task ProcessCommandsAsync(CancellationToken lifetime)

@@ -1,4 +1,4 @@
-import type {Gage,NativeGameState,PassiveDefinition} from '@pokerace/shared';
+import type {Gage,GameEvent,NativeGameState,PassiveDefinition} from '@pokerace/shared';
 import type {Services} from '../services.js';
 
 /**
@@ -15,6 +15,11 @@ export type DomainEvent={lobbyId:string;accountId:string;id:string}&(
  |{type:'AUCTION_LOST';data:{auctionId:string}}
  |{type:'AUCTION_WON';data:{auctionId:string}}
  |{type:'WHEEL_RESOLVED';data:{resolutionId:string;tone:string;gageId:string;gageName:string;role:'owner'|'target'}}
+ // Game events (GAME_EVENT). STEPS_CHANGED also carries the delta and the race total computed by the engine.
+ |{type:'TRAINER_VICTORY';data:Extract<GameEvent,{kind:'TRAINER_VICTORY'}>['data']}
+ |{type:'POKEMON_FAINTED';data:Extract<GameEvent,{kind:'POKEMON_FAINTED'}>['data']}
+ |{type:'BATTLE_ENDED';data:Extract<GameEvent,{kind:'BATTLE_ENDED'}>['data']}
+ |{type:'STEPS_CHANGED';data:{absolute:number;delta?:number;total?:number}}
 );
 export type DomainEventType=DomainEvent['type'];
 export type EventOf<T extends DomainEventType>=Extract<DomainEvent,{type:T}>;

@@ -47,6 +47,7 @@ export class PassiveEngine{
   const inserted=this.db.prepare('INSERT OR IGNORE INTO passive_events(id,lobby_id,account_id,event_id,event_type,processed_at) VALUES(?,?,?,?,?,?)')
    .run(randomUUID(),lobbyId,accountId,event.id,event.type,nowIso()).changes;
   if(!inserted)return false;
+  if(event.type==='STEPS_CHANGED')Object.assign(event.data,this.steps(lobbyId,accountId,event.data.absolute));
   const results:Record<string,unknown>={};
   for(const owned of this.active(lobbyId,accountId)){
    const handler=this.handlers[owned.passiveId].on?.[event.type] as ((ctx:PassiveContext,e:DomainEvent)=>unknown)|undefined;
@@ -58,6 +59,18 @@ export class PassiveEngine{
   if(Object.keys(results).length)this.services.passives.deps.changed(lobbyId);
   return true;
  }
+ /**
+  * Race step counter from the game's absolute counter: deltas only, a lower value (new Run, new save) is a new
+  * baseline and never a negative delta; the total spans every Run of the race.
+  */
+ private steps(lobbyId:string,accountId:string,absolute:number){
+  const {passives}=this.services,key='_race';
+  const last=passives.progress<number|null>(lobbyId,accountId,key,'stepsLast',null),total=passives.progress(lobbyId,accountId,key,'stepsTotal',0);
+  const delta=last===null?0:absolute>=last?absolute-last:absolute;
+  passives.setProgress(lobbyId,accountId,key,'stepsLast',absolute);passives.setProgress(lobbyId,accountId,key,'stepsTotal',total+delta);
+  return {delta,total:total+delta};
+ }
+ raceSteps(lobbyId:string,accountId:string){return this.services.passives.progress(lobbyId,accountId,'_race','stepsTotal',0);}
  // Publishing never breaks the business action that triggered it.
  emit(event:DomainEvent){void this.publish(event).catch(error=>console.error('Passives:',error));}
 

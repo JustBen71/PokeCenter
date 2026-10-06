@@ -76,7 +76,8 @@ public sealed class EmulatorSession : IAsyncDisposable
             step.Report("Connexion du client au serveur");
             var bridge = new BridgeClient(configuration, () => token);
             var server = new ServerConnection(configuration);
-            var runtime = new ClientRuntime(configuration, bridge, server, new ClientLog(sync), romIdentity: identity, notices: sync);
+            var runtime = new ClientRuntime(configuration, bridge, server, new ClientLog(sync), romIdentity: identity, notices: sync,
+                outbox: new GameEventOutbox(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(directory))!, "game-events.json")));
             var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             return new EmulatorSession(emulator, runtime, lifetime, runtime.RunAsync(lifetime.Token), log, bridge, server, logPath);
         }
