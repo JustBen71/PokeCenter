@@ -98,5 +98,15 @@ export const wheelHandlers:Record<GageHandler,Handler>={
   const {passives}=ctx.services;
   passives.transfer(ctx.lobbyId,target.id,ctx.owner.id,ctx.choice.passiveId,{actorId:ctx.actorId,source:'WHEEL',metadata:{resolutionId:ctx.resolutionId,wheel:ctx.gage.name}});
   return `${ctx.owner.name} vole « ${passiveById.get(ctx.choice.passiveId)?.name} » à ${target.name}`;
+ },
+ // A real trainer battle in the fighter's game. The gage succeeds once the battle is created and queued; its
+ // start and result are followed by the battle itself (it may wait for a safe moment in the game).
+ START_BATTLE:async ctx=>{
+  const p=params(ctx,'START_BATTLE');
+  const fighter=p.fighter==='TARGET'?needTarget(ctx):ctx.owner;
+  const other=p.fighter==='TARGET'?ctx.owner:ctx.target;
+  const builder=p.builder==='OTHER_PLAYER'?{type:'OTHER_PLAYER' as const,opponentId:(other??needTarget(ctx)).id}:{type:p.builder as 'MIRROR'|'LEADER'};
+  const battle=ctx.services.battles.createFrom(ctx.lobbyId,{accountId:fighter.id,builder,scaling:p.scaling,trainer:p.spriteId?{spriteId:p.spriteId}:{}},ctx.actorId);
+  return `Combat lancé : ${fighter.name} VS ${battle.trainer.name} (${battle.party.length} Pokémon, niv. ${battle.party.map(m=>m.level).join(' / ')}) — il démarre dès que ${fighter.name} est libre sur la carte`;
  }
 };

@@ -7,6 +7,8 @@ import {useLive,useLiveTopic} from '../realtime/live-context';
 import {useToast} from '../components/toast-context';
 import {TicketIcon} from './TicketIcon';
 import {definition,usePassives} from '../passives/passives-data';
+import {useBattles} from '../battles/battles-data';
+import {battleStatusLabels} from '@pokerace/shared';
 
 const ROW=56,VISIBLE=5,DURATION=3000;
 import {launchedHere} from './launched';
@@ -19,7 +21,7 @@ export function WheelOverlay(){
  const {socket,members}=useLive();const {account}=useSession();const {lobby}=useLobby();const toast=useToast();
  const {resolutions}=useLiveTopic<WheelsSnapshot>('wheels',{wheels:[],resolutions:[]});
  const [current,setCurrent]=useState<WheelResolution|null>(null),[phase,setPhase]=useState<'spinning'|'stopped'>('spinning'),[rolling,setRolling]=useState(false);
- const passives=usePassives();
+ const passives=usePassives();const battles=useBattles();
  const [passiveId,setPassiveId]=useState('');
  const [target,setTarget]=useState(''),[slot,setSlot]=useState(0),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false);
  const timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -70,11 +72,16 @@ export function WheelOverlay(){
     {!choosing&&<><h3>{live.gage.name}</h3>
     <p>{live.gage.description||gageHandlerInfo[live.gage.handler].help}</p></>}
     {live.status==='BLOCKED'&&<p className="notice">{live.result}</p>}
+    {live.gage.handler==='START_BATTLE'&&live.status==='SUCCESS'&&(()=>{
+     // The battle created by this gage (latest one of the fighter since the draw): followed live until its result.
+     const fighter=live.gage.params.fighter==='TARGET'?live.targetId:live.ownerId;
+     const battle=battles.encounters.find(b=>b.accountId===fighter&&b.createdAt>=live.createdAt);
+     return battle&&<p className={`battle-banner ${battle.status.toLowerCase()}`}>{battle.status==='WON'?`✅ Victoire contre ${battle.trainer.name}`:battle.status==='LOST'?`❌ Défaite contre ${battle.trainer.name}`:`⚔ Combat contre ${battle.trainer.name} · ${battleStatusLabels[battle.status]}`}</p>;})()}
     {live.result&&live.status!=='BLOCKED'&&<p className={`outcome ${live.status.toLowerCase()}`}>{live.status==='SUCCESS'?'✔':live.status==='REVIEW'?'⚠':'✖'} {live.result}</p>}
     {choosing&&<div className="gage-choice"><p>{canChoose?'Choisis le gage qui s’applique :':`En attente du choix de ${name(live.chooserId)}…`}</p>
      {live.options!.map(g=><button key={g.id} className="btn" disabled={!canChoose||busy} onClick={()=>void choose(g.id)}><strong>{g.name}</strong><small>{g.description||gageHandlerInfo[g.handler].help}</small></button>)}</div>}
     {!choosing&&account.admin&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
-     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL','START_BATTLE'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
      {steal&&target&&(stealable.length?<label>Passif à voler<select className="field" value={passiveId} onChange={e=>setPassiveId(e.target.value)}><option value="">Choisir…</option>{stealable.map(o=>{const d=definition(o.passiveId);return <option key={o.id} value={o.passiveId}>{d?.name??o.passiveId}</option>;})}</select></label>
       :<p className="muted">{name(target)} n’a aucun passif volable.</p>)}
      {party&&<label>Emplacement<select className="field" value={slot} onChange={e=>setSlot(Number(e.target.value))}><option value={0}>Choisir…</option>{[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}</select></label>}

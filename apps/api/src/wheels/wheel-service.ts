@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import {randomInt,randomUUID} from 'node:crypto';
-import {applySchema,chooseGageSchema,gageHandlerInfo,spinSchema,wheelInputSchema,type Account,type Gage,type GageHandler,type LobbyNotification,type ResolutionStatus,type WheelInput,type WheelResolution,type WheelTone,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
+import {applySchema,chooseGageSchema,gageHandlerInfo,gageNeedsTarget,spinSchema,wheelInputSchema,type Account,type Gage,type GageHandler,type LobbyNotification,type ResolutionStatus,type WheelInput,type WheelResolution,type WheelTone,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
 import {nowIso} from '../db/database.js';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
@@ -47,7 +47,7 @@ export class WheelService{
 
  private gages(wheelId:string):Gage[]{
   return (this.deps.db.prepare('SELECT * FROM wheel_gages WHERE wheel_type_id=? ORDER BY sort_order').all(wheelId) as GageRow[])
-   .map(g=>({id:g.id,name:g.name,description:g.description,handler:g.handler,params:JSON.parse(g.params_json),weight:g.weight,requiresTarget:gageHandlerInfo[g.handler].target==='required'}));
+   .map(g=>({id:g.id,name:g.name,description:g.description,handler:g.handler,params:JSON.parse(g.params_json),weight:g.weight,requiresTarget:gageNeedsTarget(g.handler,JSON.parse(g.params_json))}));
  }
  list(lobbyId:string,includeDisabled=true):WheelType[]{
   return (this.deps.db.prepare(`SELECT * FROM wheel_types WHERE lobby_id=? AND deleted=0 ${includeDisabled?'':'AND enabled=1'} ORDER BY created_at,rowid`).all(lobbyId) as WheelRow[])

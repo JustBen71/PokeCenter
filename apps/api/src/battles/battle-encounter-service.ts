@@ -75,6 +75,8 @@ export class BattleEncounterService{
  /** Admin (or a gage): prepares, persists and, unless asked otherwise, queues the battle at once. */
  createFrom(lobbyId:string,body:unknown,actorId:string|null,options:{queue?:boolean}={}){
   const preview=this.prepare(lobbyId,body);
+  // Refused before anything is created when the player already has a battle queued, running or uncertain.
+  if(options.queue!==false&&this.repository.active(lobbyId,preview.accountId))throw new DomainError('BATTLE_ALREADY_PENDING','Un combat commandité est déjà en attente ou en cours pour ce joueur');
   const created=this.create(lobbyId,preview.accountId,{trainer:preview.spec.trainer,party:preview.spec.party},{type:preview.sourceType,refId:preview.sourceRefId,label:preview.sourceLabel,scaling:preview.scaling},actorId);
   return options.queue===false?created:this.queue(lobbyId,created.id,actorId);
  }
