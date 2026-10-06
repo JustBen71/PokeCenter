@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {passiveById,passiveCatalog,type Gage,type NativeGameState,type PassiveRewardStatus} from '@pokerace/shared';
+import {passiveById,passiveCatalog,type Account,type Gage,type NativeGameState,type PassiveActInput,type PassiveRewardStatus} from '@pokerace/shared';
 import {nowIso} from '../db/database.js';
 import {DomainError} from '../errors.js';
 import type {Services} from '../services.js';
@@ -35,7 +35,7 @@ export class PassiveEngine{
   return {lobbyId,accountId,passive,services:this.services,
    get:(key,fallback)=>passives.progress(lobbyId,accountId,passiveId,key,fallback),
    set:(key,value)=>passives.setProgress(lobbyId,accountId,passiveId,key,value),
-   reward:(eventId,request)=>this.reward(lobbyId,accountId,passiveId,eventId,request),
+   reward:(eventId,request,to)=>this.reward(lobbyId,to??accountId,passiveId,eventId,request),
    notify:(message,options={})=>passives.deps.notify(lobbyId,{kind:options.kind??'info',message:`${message}`},options.private?accountId:undefined),
    audit:(action,message,metadata={})=>domain.audit.record({lobbyId,targetAccountId:accountId,category:'PASSIVE',action,status:'SUCCESS',message,metadata:{passiveId,...metadata}})};
  }
@@ -54,6 +54,16 @@ export class PassiveEngine{
    if(!handler)continue;
    try{results[owned.passiveId]=await handler(this.context(lobbyId,accountId,owned.passiveId),event)??true;}
    catch(error){results[owned.passiveId]={error:error instanceof DomainError?error.code:'INTERNAL_ERROR'};this.failed(lobbyId,accountId,owned.passiveId,event.type,error);}
+  }
+  // Holders elsewhere in the lobby watching this player (deterministic: catalogue order, then acquisition order).
+  for(const passiveId of Object.keys(this.handlers).sort((a,b)=>(catalogOrder.get(a)??0)-(catalogOrder.get(b)??0))){
+   const watcher=this.handlers[passiveId].others?.[event.type] as ((ctx:PassiveContext,e:DomainEvent)=>unknown)|undefined;
+   if(!watcher)continue;
+   for(const holder of this.services.passives.holders(lobbyId,passiveId)){
+    if(holder===accountId)continue;
+    try{results[`${passiveId}@${holder}`]=await watcher(this.context(lobbyId,holder,passiveId),event)??true;}
+    catch(error){this.failed(lobbyId,holder,passiveId,event.type,error);}
+   }
   }
   this.db.prepare('UPDATE passive_events SET result_json=? WHERE lobby_id=? AND account_id=? AND event_id=?').run(JSON.stringify(results),lobbyId,accountId,event.id);
   if(Object.keys(results).length)this.services.passives.deps.changed(lobbyId);
@@ -93,6 +103,31 @@ export class PassiveEngine{
    if(filter)result=filter(this.context(lobbyId,targetId,owned.passiveId),result);
   }
   return result.length?result:gages;
+ }
+
+ /** Explicit use of an owned passive by its holder, or by an admin for them. Audited, pushed live. */
+ async act(lobbyId:string,accountId:string,passiveId:string,input:PassiveActInput,actor:Account):Promise<{message:string}>{
+  const handler=this.handlers[passiveId]?.act;
+  if(!this.services.passives.has(lobbyId,accountId,passiveId))throw new DomainError('PASSIVE_NOT_OWNED','Ce joueur ne possède pas ce passif');
+  if(!handler)throw new DomainError('VALIDATION_FAILED','Ce passif ne s’utilise pas manuellement');
+  const message=await handler(this.context(lobbyId,accountId,passiveId),input,actor);
+  this.services.domain.audit.record({lobbyId,actorAccountId:actor.id,targetAccountId:accountId,category:'PASSIVE',action:`passive.act.${input.action}`,status:'SUCCESS',message,metadata:{passiveId,input:{...input}}});
+  this.services.passives.deps.notify(lobbyId,{kind:'success',message:`✨ ${message}`});
+  this.services.passives.deps.changed(lobbyId);
+  return {message};
+ }
+
+ /** A passive turning a wheel draw into a choice among N gages: who chooses and among how many. */
+ wheelChoice(lobbyId:string,draw:{tone:string;ownerId:string;targetId:string|null;gageCount:number}):{chooserId:string;count:number;passiveId:string}|null{
+  for(const [role,accountId] of [['target',draw.targetId],['owner',draw.ownerId]] as const){
+   if(!accountId)continue;
+   for(const owned of this.active(lobbyId,accountId)){
+    const choice=this.handlers[owned.passiveId].wheelChoice;
+    const count=choice?.(this.context(lobbyId,accountId,owned.passiveId),{tone:draw.tone,role,gageCount:draw.gageCount});
+    if(count)return {chooserId:accountId,count,passiveId:owned.passiveId};
+   }
+  }
+  return null;
  }
 
  private failed(lobbyId:string,accountId:string,passiveId:string,trigger:string,error:unknown){

@@ -22,6 +22,8 @@ export function registerWheelRoutes(app:Express,s:Services){
  app.delete('/api/lobbies/:id/wheels/:wheelId',route((req,res)=>{const v=admin(res);s.wheels.delete(lobby(String(req.params.id),v),String(req.params.wheelId),v);return {ok:true};}));
  app.post('/api/lobbies/:id/wheels/:wheelId/spin',route((req,res)=>{const v=admin(res);res.status(201);return s.wheels.spin(lobby(String(req.params.id),v),String(req.params.wheelId),req.body,v);}));
  app.post('/api/lobbies/:id/wheel-resolutions/:resolutionId/apply',route(async(req,res)=>{const v=admin(res);return s.wheels.apply(lobby(String(req.params.id),v),String(req.params.resolutionId),req.body,v);}));
+ // The player the draw belongs to (Sixième sens, Maître du chaos) picks the gage; admins may pick for them.
+ app.post('/api/lobbies/:id/wheel-resolutions/:resolutionId/choose',route((req,res)=>{const v=currentAccount(res);return s.wheels.choose(lobby(String(req.params.id),v),String(req.params.resolutionId),req.body,v);}));
  app.post('/api/lobbies/:id/wheel-resolutions/:resolutionId/close',route((req,res)=>{
   const v=admin(res),{status,note}=parseBody(closeSchema,req.body);
   return s.wheels.close(lobby(String(req.params.id),v),String(req.params.resolutionId),status,v,note);

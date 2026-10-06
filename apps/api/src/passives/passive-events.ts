@@ -1,4 +1,4 @@
-import type {Gage,GameEvent,NativeGameState,PassiveDefinition} from '@pokerace/shared';
+import type {Account,Gage,GameEvent,NativeGameState,PassiveActInput,PassiveDefinition} from '@pokerace/shared';
 import type {Services} from '../services.js';
 
 /**
@@ -33,7 +33,8 @@ export type PassiveContext={
  lobbyId:string;accountId:string;passive:PassiveDefinition;services:Services;
  get:<T>(key:string,fallback:T)=>T;
  set:(key:string,value:unknown)=>void;
- reward:(eventId:string,request:RewardRequest)=>Promise<void>;
+ // `to`: another player receives the reward (Lien du destin); by default the holder.
+ reward:(eventId:string,request:RewardRequest,to?:string)=>Promise<void>;
  notify:(message:string,options?:{private?:boolean;kind?:'success'|'info'|'warning'})=>void;
  audit:(action:string,message:string,metadata?:Record<string,unknown>)=>void;
 };
@@ -41,6 +42,13 @@ export type PassiveContext={
 /** One server-side behaviour per catalogue entry: triggers, game observation and modifiers. */
 export type PassiveHandler={
  on?:{[K in DomainEventType]?:(ctx:PassiveContext,event:EventOf<K>)=>unknown};
+ // Same, for events of the other players of the lobby (the holder watches them).
+ others?:{[K in DomainEventType]?:(ctx:PassiveContext,event:EventOf<K>)=>unknown};
+ // An explicit use by the holder (or an admin for them); returns the message shown to the lobby.
+ act?:(ctx:PassiveContext,input:PassiveActInput,actor:Account)=>Promise<string>|string;
+ // Wheel draw with a choice: how many gages the chooser picks from (null = ordinary draw). `role` is the
+ // holder's place in the draw; returning a number consumes nothing, the handler records its own use.
+ wheelChoice?:(ctx:PassiveContext,draw:{tone:string;role:'owner'|'target';gageCount:number})=>number|null;
  // Periodic game observation (positions, team…): must be idempotent, rewards use deterministic event ids.
  observe?:(ctx:PassiveContext,state:NativeGameState)=>unknown;
  // Modifier: removes gages from a hostile wheel before its weighted draw (the holder is the target).

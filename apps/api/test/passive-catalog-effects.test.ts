@@ -10,8 +10,8 @@ import {areaOf,implementedPassives} from '../src/passives/passive-handlers.js';
 const state=(o:{label?:string;species?:number[];completed?:string[]}={})=>({location:{mapGroup:0,mapNumber:0,label:o.label??'Bourg-en-Vol'},
  party:(o.species??[1]).map((speciesId,i)=>({slot:i+1,speciesId})),progression:{version:1,completed:o.completed??[]}}) as unknown as NativeGameState;
 
-test('implemented passives: only those without new memory offsets',()=>{
- assert.deepEqual([...implementedPassives].sort(),['bargain-hunter','cartographer','collector','counterspell','rivalry','scout','second-wind','sixth-man']);
+test('implemented passives: only those without new memory offsets (Héritier des légendes needs steps)',()=>{
+ assert.deepEqual([...implementedPassives].sort(),['bargain-hunter','bound-soul','cartographer','champion-crown','chaos-master','collector','counterspell','fate-link','paradox','rivalry','scout','second-wind','sixth-man','sixth-sense','usurper']);
  assert.equal(areaOf('Myokara — Centre Pokémon — 1F'),'Myokara');assert.equal(areaOf('Route 101'),'Route 101');assert.equal(areaOf('Zone inconnue (9:9)'),null);
 });
 

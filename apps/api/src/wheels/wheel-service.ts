@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import {randomInt,randomUUID} from 'node:crypto';
-import {applySchema,gageHandlerInfo,spinSchema,wheelInputSchema,type Account,type Gage,type GageHandler,type LobbyNotification,type ResolutionStatus,type WheelInput,type WheelResolution,type WheelTone,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
+import {applySchema,chooseGageSchema,gageHandlerInfo,spinSchema,wheelInputSchema,type Account,type Gage,type GageHandler,type LobbyNotification,type ResolutionStatus,type WheelInput,type WheelResolution,type WheelTone,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
 import {nowIso} from '../db/database.js';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
@@ -9,7 +9,7 @@ import {wheelHandlers} from './wheel-handlers.js';
 
 type WheelRow={id:string;name:string;description:string;price:number;icon:WheelType['icon'];tone:WheelTone;enabled:number};
 type GageRow={id:string;name:string;description:string;handler:GageHandler;params_json:string;weight:number};
-type ResolutionRow={id:string;lobby_id:string;wheel_type_id:string;gage_json:string;owner_account_id:string;target_account_id:string|null;ticket_id:string|null;status:ResolutionStatus;strip_json:string;result:string|null;created_at:string;applied_at:string|null};
+type ResolutionRow={id:string;lobby_id:string;wheel_type_id:string;gage_json:string;owner_account_id:string;target_account_id:string|null;ticket_id:string|null;status:ResolutionStatus;strip_json:string;result:string|null;created_at:string;applied_at:string|null;options_json:string|null;chooser_account_id:string|null};
 
 // Party changes need an explicit "not in battle" confirmation and a steal needs the passive to take:
 // they always wait for the admin form.
@@ -80,7 +80,8 @@ export class WheelService{
  private toResolution(r:ResolutionRow):WheelResolution{
   const wheel=this.deps.db.prepare('SELECT name,tone FROM wheel_types WHERE id=?').get(r.wheel_type_id) as {name:string;tone:WheelTone};
   return {id:r.id,wheelId:r.wheel_type_id,wheelName:wheel.name,tone:wheel.tone,gage:JSON.parse(r.gage_json),ownerId:r.owner_account_id,targetId:r.target_account_id,ticketId:r.ticket_id,
-   status:r.status,strip:JSON.parse(r.strip_json),result:r.result,createdAt:r.created_at,appliedAt:r.applied_at};
+   status:r.status,strip:JSON.parse(r.strip_json),result:r.result,createdAt:r.created_at,appliedAt:r.applied_at,
+   options:r.options_json?JSON.parse(r.options_json):null,chooserId:r.options_json?r.chooser_account_id:null};
  }
  resolution(lobbyId:string,id:string){
   const row=this.deps.db.prepare('SELECT * FROM wheel_resolutions WHERE id=? AND lobby_id=?').get(id,lobbyId) as ResolutionRow|undefined;
@@ -108,16 +109,23 @@ export class WheelService{
   const blocked=this.beforeSpin({lobbyId,wheel,owner,target,ticketId,ticketReceivedAt});
   // The target's passives may remove gages before the weighted draw (Contre-sort); the animation keeps every name.
   const gages=wheel.tone==='BAD'&&target&&!blocked?this.services.passiveEngine.filterHostileGages(lobbyId,target.id,wheel.gages):wheel.gages;
-  const total=gages.reduce((n,g)=>n+g.weight,0);
-  let roll=randomInt(total);const gage=gages.find(g=>(roll-=g.weight)<0)!;
-  const strip=Array.from({length:STRIP_LENGTH},(_,i)=>i===WINNER_INDEX?gage.name:wheel.gages[randomInt(wheel.gages.length)].name);
-  const status:ResolutionStatus=blocked?'BLOCKED':(gage.requiresTarget&&!target)||PARTY_HANDLERS.includes(gage.handler)?'AWAITING_CHOICE':'DRAWN';
+  // A passive may turn the draw into a choice (Sixième sens for the owner of a kind wheel, Maître du chaos for the
+  // target of a hostile one): N different gages drawn by weight, the chooser picks one before anything applies.
+  const choice=blocked?null:this.services.passiveEngine.wheelChoice(lobbyId,{tone:wheel.tone,ownerId:owner.id,targetId:target?.id??null,gageCount:gages.length});
+  const pool=[...gages],drawn:Gage[]=[],count=choice?Math.min(choice.count,pool.length):1;
+  for(let i=0;i<count;i++){
+   let roll=randomInt(pool.reduce((n,g)=>n+g.weight,0));const picked=pool.find(g=>(roll-=g.weight)<0)!;
+   drawn.push(picked);pool.splice(pool.indexOf(picked),1);
+  }
+  const gage=drawn[0],options=choice?drawn:null;
+  const strip=Array.from({length:STRIP_LENGTH},(_,i)=>i===WINNER_INDEX?(options?options.map(g=>g.name).join(' / '):gage.name):wheel.gages[randomInt(wheel.gages.length)].name);
+  const status:ResolutionStatus=blocked?'BLOCKED':options||(gage.requiresTarget&&!target)||PARTY_HANDLERS.includes(gage.handler)?'AWAITING_CHOICE':'DRAWN';
   const id=randomUUID();
-  this.deps.db.prepare(`INSERT INTO wheel_resolutions(id,lobby_id,wheel_type_id,gage_json,owner_account_id,target_account_id,ticket_id,status,strip_json,result,created_by,created_at,applied_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-   .run(id,lobbyId,wheel.id,JSON.stringify(gage),owner.id,target?.id??null,ticketId,status,JSON.stringify(strip),blocked,actor?.id??null,nowIso(),blocked?nowIso():null);
+  this.deps.db.prepare(`INSERT INTO wheel_resolutions(id,lobby_id,wheel_type_id,gage_json,owner_account_id,target_account_id,ticket_id,status,strip_json,result,created_by,created_at,applied_at,options_json,chooser_account_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+   .run(id,lobbyId,wheel.id,JSON.stringify(gage),owner.id,target?.id??null,ticketId,status,JSON.stringify(strip),blocked,actor?.id??null,nowIso(),blocked?nowIso():null,options?JSON.stringify(options):null,choice?.chooserId??null);
   this.services.domain.audit.record({lobbyId,actorAccountId:actor?.id??null,targetAccountId:target?.id??owner.id,category:'WHEEL',action:'wheel.spin',status:blocked?'INFO':'SUCCESS',
    message:blocked??`${wheel.name} : « ${gage.name} » tiré pour ${owner.name}${target?` (cible ${target.name})`:''}`,metadata:{resolutionId:id,gage:gage.name,handler:gage.handler}});
-  if(target&&!blocked)this.suffered(lobbyId,id,wheel.tone,gage,target.id);
+  if(target&&!blocked&&!options)this.suffered(lobbyId,id,wheel.tone,gage,target.id);
   const resolution=this.resolution(lobbyId,id);
   this.deps.spun(lobbyId,resolution);this.deps.changed(lobbyId);
   return resolution;
@@ -131,6 +139,7 @@ export class WheelService{
  async apply(lobbyId:string,id:string,body:unknown,actor:Account):Promise<WheelResolution>{
   const choice=parseBody(applySchema,body);
   const before=this.resolution(lobbyId,id);
+  if(before.options)throw new DomainError('CONFLICT',`En attente du choix de ${this.services.domain.accounts.get(before.chooserId??'')?.name??'joueur'} parmi ${before.options.length} gages`);
   const target=choice.targetId?this.member(lobbyId,choice.targetId,'La cible'):before.targetId?this.services.domain.accounts.get(before.targetId)!:null;
   if(before.gage.requiresTarget&&!target)throw new DomainError('VALIDATION_FAILED','Choisissez la cible du gage');
   const claimed=this.deps.db.prepare("UPDATE wheel_resolutions SET status='APPLYING',target_account_id=? WHERE id=? AND status IN ('DRAWN','AWAITING_CHOICE')").run(target?.id??null,id).changes;
@@ -155,6 +164,25 @@ export class WheelService{
    this.deps.notify(lobbyId,{kind:'error',message:`✖ ${before.gage.name} — ${domain.message}`});
    throw domain;
   }
+  return this.resolution(lobbyId,id);
+ }
+
+ /** The chooser (or an admin) picks the gage that will really apply; the draw then follows its normal course. */
+ choose(lobbyId:string,id:string,body:unknown,actor:Account):WheelResolution{
+  const {gageId}=parseBody(chooseGageSchema,body);
+  const r=this.resolution(lobbyId,id);
+  if(!r.options)throw new DomainError('CONFLICT','Ce tirage n’attend aucun choix');
+  if(actor.id!==r.chooserId&&!actor.admin)throw new DomainError('FORBIDDEN','Ce choix revient à un autre joueur');
+  const gage=r.options.find(g=>g.id===gageId);
+  if(!gage)throw new DomainError('VALIDATION_FAILED','Ce gage ne fait pas partie du choix');
+  const status:ResolutionStatus=(gage.requiresTarget&&!r.targetId)||PARTY_HANDLERS.includes(gage.handler)?'AWAITING_CHOICE':'DRAWN';
+  const changed=this.deps.db.prepare("UPDATE wheel_resolutions SET gage_json=?,options_json=NULL,status=? WHERE id=? AND options_json IS NOT NULL AND status='AWAITING_CHOICE'").run(JSON.stringify(gage),status,id).changes;
+  if(!changed)throw new DomainError('CONFLICT','Le choix a déjà été fait');
+  this.services.domain.audit.record({lobbyId,actorAccountId:actor.id,targetAccountId:r.chooserId,category:'WHEEL',action:'wheel.choose',status:'SUCCESS',
+   message:`${actor.name} choisit « ${gage.name} » parmi ${r.options.map(g=>`« ${g.name} »`).join(', ')}`,metadata:{resolutionId:id}});
+  if(r.targetId)this.suffered(lobbyId,id,r.tone,gage,r.targetId);
+  this.deps.notify(lobbyId,{kind:'info',message:`🎲 ${this.services.domain.accounts.get(r.chooserId??'')?.name??actor.name} choisit « ${gage.name} »`});
+  this.deps.changed(lobbyId);
   return this.resolution(lobbyId,id);
  }
 

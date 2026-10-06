@@ -1,5 +1,5 @@
 import type {Express,Response} from 'express';
-import {passiveAccountSchema,passiveChoiceSchema,passiveGrantSchema,passiveStartSchema} from '@pokerace/shared';
+import {passiveAccountSchema,passiveActSchema,passiveChoiceSchema,passiveGrantSchema,passiveStartSchema} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import {currentAccount,parseBody,requireAccount,requireAdmin,route} from '../http.js';
 import type {Services} from '../services.js';
@@ -20,6 +20,13 @@ export function registerPassiveRoutes(app:Express,s:Services){
   const v=currentAccount(res),id=lobby(String(req.params.id),v);
   if(!lobbies.isMember(id,v.id))throw new DomainError('NOT_LOBBY_MEMBER','Seul un participant choisit son passif');
   return s.passives.choose(id,v.id,parseBody(passiveChoiceSchema,req.body).passiveId);
+ }));
+ // Using a passive: its holder, or an admin acting for them (e.g. Âme liée reinjection, out of battle).
+ app.post(`${base}/:passiveId/act`,route(async(req,res)=>{
+  const v=currentAccount(res),id=lobby(String(req.params.id),v),input=parseBody(passiveActSchema,req.body);
+  const accountId=input.accountId??v.id;
+  if(accountId!==v.id&&!v.admin)throw new DomainError('FORBIDDEN','Seul le titulaire utilise ce passif');
+  return s.passiveEngine.act(id,accountId,String(req.params.passiveId),input,v);
  }));
  app.post(`${base}/selection/start`,route((req,res)=>{const v=admin(res),id=lobby(String(req.params.id),v);s.passives.startSelection(id,v.id);return s.passives.snapshot(id,v.id);}));
  app.post(`${base}/race/start`,route((req,res)=>{const v=admin(res),id=lobby(String(req.params.id),v);s.passives.startRace(id,v.id,parseBody(passiveStartSchema,req.body).force);return s.passives.snapshot(id,v.id);}));

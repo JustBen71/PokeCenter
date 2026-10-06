@@ -50,6 +50,10 @@ export function WheelOverlay(){
  const steal=live.gage.handler==='PASSIVE_STEAL';
  const owned=(id:string)=>passives.owned.filter(o=>o.accountId===id);
  const stealable=steal&&target?owned(target).filter(o=>!owned(live.ownerId).some(m=>m.passiveId===o.passiveId)&&o.progress.consumed!==true):[];
+ // A passive lets one player pick the gage among several (Sixième sens, Maître du chaos).
+ const choosing=!!live.options;
+ const canChoose=choosing&&(account.id===live.chooserId||account.admin);
+ const choose=async(gageId:string)=>{setBusy(true);try{await api(`/api/lobbies/${lobby.id}/wheel-resolutions/${live.id}/choose`,{method:'POST',body:{gageId}});}catch(e){toast.error(e);}finally{setBusy(false);}};
  const needsConfirm=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON'].includes(live.gage.handler);
  const done=['SUCCESS','FAILED','REVIEW','BLOCKED'].includes(live.status);
  const translate=rolling?-(winner-Math.floor(VISIBLE/2))*ROW:0;
@@ -63,11 +67,13 @@ export function WheelOverlay(){
     </ul>
    </div>
    {phase==='stopped'&&<section className="wheel-result">
-    <h3>{live.gage.name}</h3>
-    <p>{live.gage.description||gageHandlerInfo[live.gage.handler].help}</p>
+    {!choosing&&<><h3>{live.gage.name}</h3>
+    <p>{live.gage.description||gageHandlerInfo[live.gage.handler].help}</p></>}
     {live.status==='BLOCKED'&&<p className="notice">{live.result}</p>}
     {live.result&&live.status!=='BLOCKED'&&<p className={`outcome ${live.status.toLowerCase()}`}>{live.status==='SUCCESS'?'✔':live.status==='REVIEW'?'⚠':'✖'} {live.result}</p>}
-    {account.admin&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
+    {choosing&&<div className="gage-choice"><p>{canChoose?'Choisis le gage qui s’applique :':`En attente du choix de ${name(live.chooserId)}…`}</p>
+     {live.options!.map(g=><button key={g.id} className="btn" disabled={!canChoose||busy} onClick={()=>void choose(g.id)}><strong>{g.name}</strong><small>{g.description||gageHandlerInfo[g.handler].help}</small></button>)}</div>}
+    {!choosing&&account.admin&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
      {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
      {steal&&target&&(stealable.length?<label>Passif à voler<select className="field" value={passiveId} onChange={e=>setPassiveId(e.target.value)}><option value="">Choisir…</option>{stealable.map(o=>{const d=definition(o.passiveId);return <option key={o.id} value={o.passiveId}>{d?.name??o.passiveId}</option>;})}</select></label>
       :<p className="muted">{name(target)} n’a aucun passif volable.</p>)}

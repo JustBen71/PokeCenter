@@ -101,4 +101,11 @@ export const passiveSettingsSchema=z.object({
 export const passiveChoiceSchema=z.object({passiveId:z.string().min(1).max(40)}).strict();
 export const passiveGrantSchema=z.object({accountId:z.string().min(1).max(64),passiveId:z.string().min(1).max(40)}).strict();
 export const passiveAccountSchema=z.object({accountId:z.string().min(1).max(64)}).strict();
+// A player uses one of their passives (copy, link, choose, undo, bind…); an admin may act for them.
+export const passiveActSchema=z.object({
+ action:z.enum(['copy','link','choose','undo','bind','reinject']),accountId:z.string().min(1).max(64).optional(),
+ targetId:z.string().min(1).max(64).optional(),passiveId:z.string().min(1).max(40).optional(),slot:z.number().int().min(1).max(6).optional(),
+ confirmOutOfBattle:z.boolean().optional()
+}).strict();
+export type PassiveActInput=z.infer<typeof passiveActSchema>;
 export const passiveStartSchema=z.object({force:z.boolean().default(false)}).strict();

@@ -1,6 +1,7 @@
 import {useEffect} from 'react';
 import {passiveRarityLabels,passiveSourceLabels,type OwnedPassive} from '@pokerace/shared';
 import {definition,isConsumed,progressLines} from './passives-data';
+import {PassiveActions} from './PassiveActions';
 
 const date=(iso:string)=>new Date(iso).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
 
@@ -14,6 +15,7 @@ export function PassiveFacts({owned}:{owned:OwnedPassive}){
   <p>{def.description}</p>
   <small>{passiveSourceLabels[owned.source]} · {date(owned.acquiredAt)} · {isConsumed(owned)?'Consommé':'Disponible'}</small>
   {lines.length>0&&<ul>{lines.map(l=><li key={l}>{l}</li>)}</ul>}
+  <PassiveActions owned={owned}/>
  </div>;
 }
 

@@ -98,6 +98,9 @@ export class ShopService{
   this.deps.changed(lobbyId);
   return this.tickets('t.id=?',id)[0];
  }
+ // Paradoxe: a hostile ticket still waiting is cancelled, a consumed protection becomes usable again.
+ cancelQueuedTicket(lobbyId:string,ticketId:string){const ok=this.deps.db.prepare("UPDATE wheel_tickets SET status='CANCELLED' WHERE id=? AND lobby_id=? AND status='QUEUED'").run(ticketId,lobbyId).changes>0;this.deps.changed(lobbyId);return ok;}
+ restoreProtection(lobbyId:string,protectionId:string){const ok=this.deps.db.prepare("UPDATE protections SET status='ACTIVE',used_at=NULL,used_on_ticket_id=NULL WHERE id=? AND lobby_id=? AND status='USED'").run(protectionId,lobbyId).changes>0;this.deps.changed(lobbyId);return ok;}
  private queue(ticketId:string){this.deps.db.prepare("UPDATE wheel_tickets SET status='QUEUED',queued_at=? WHERE id=?").run(nowIso(),ticketId);}
 
  async buyProtection(lobbyId:string,buyer:Account,body:unknown):Promise<Protection>{

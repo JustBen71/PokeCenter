@@ -68,7 +68,10 @@ export type ResolutionStatus=z.infer<typeof resolutionStatusSchema>;
 export type WheelResolution={
  id:string;wheelId:string;wheelName:string;tone:WheelTone;gage:Gage;ownerId:string;targetId:string|null;ticketId:string|null;
  status:ResolutionStatus;strip:string[];result:string|null;createdAt:string;appliedAt:string|null;
+ // A passive lets a player pick the gage among these (null once chosen or for an ordinary draw).
+ options:Gage[]|null;chooserId:string|null;
 };
+export const chooseGageSchema=z.object({gageId:z.string().min(1).max(64)}).strict();
 export type WheelsSnapshot={wheels:WheelType[];resolutions:WheelResolution[]};
 
 export const spinSchema=z.object({ownerId:z.string().min(1).max(64),targetId:z.string().min(1).max(64).optional()}).strict();

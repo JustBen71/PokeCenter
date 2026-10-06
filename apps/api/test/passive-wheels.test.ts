@@ -9,8 +9,8 @@ import {implementedPassives} from '../src/passives/passive-handlers.js';
 const wheelBody=(name:string,handler:string,params:object,tone='GOOD')=>({name,price:0,icon:tone==='BAD'?'purple-3':'green-3',tone,gages:[{name,handler,params}]});
 
 test('wheel gages: random passive by rarities, legendary rarity, no fake success',async()=>{
- // « Usurpateur » stands in for an implemented legendary (none is implemented in this sprint).
- const p=await passivePortal({implemented:new Set([...implementedPassives,'usurper'])});
+ // Only one legendary (Usurpateur) is offerable here, so the legendary draw is predictable.
+ const p=await passivePortal({implemented:new Set([...implementedPassives].filter(id=>passiveById.get(id)!.rarity!=='LEGENDARY').concat('usurper'))});
  try{
   const {as,admin,ben,lobby,portal}=p;
   const make=async(name:string,handler:string,params:object)=>(await as(admin.id).post(`/api/lobbies/${lobby.id}/wheels`,wheelBody(name,handler,params))).body as WheelType;
@@ -37,10 +37,11 @@ test('wheel gages: random passive by rarities, legendary rarity, no fake success
   assert.ok(owned().includes('usurper'));
   assert.equal((await spinApply(divine)).error?.code,'NO_PASSIVE_AVAILABLE');
  }finally{await p.close();}
- // With the real catalogue, no legendary is available yet: the gage refuses instead of pretending.
+ // Every legendary disabled in the lobby: the gage refuses instead of pretending.
  const real=await passivePortal({implemented:implementedPassives});
  try{
   const {as,admin,ben,lobby}=real;
+  await as(admin.id).patch(`/api/lobbies/${lobby.id}/passives/settings`,{disabled:['legend-heir','bound-soul','usurper','chaos-master','paradox','champion-crown','sixth-sense','fate-link']});
   const w=(await as(admin.id).post(`/api/lobbies/${lobby.id}/wheels`,wheelBody('Divine','PASSIVE_GRANT_RARITY',{rarity:'LEGENDARY'}))).body as WheelType;
   const r=(await as(admin.id).post(`/api/lobbies/${lobby.id}/wheels/${w.id}/spin`,{ownerId:ben.id})).body as WheelResolution;
   assert.equal((await as(admin.id).post(`/api/lobbies/${lobby.id}/wheel-resolutions/${r.id}/apply`)).body.error.code,'NO_PASSIVE_AVAILABLE');

@@ -22,6 +22,12 @@ export function progressLines(owned:OwnedPassive):string[]{
   case 'counterspell':return [p.lastBadGage?`Dernier gage hostile : « ${(p.lastBadGage as {name?:string}).name??'?'} » (exclu du prochain tirage)`:'Aucune roue hostile subie'];
   case 'sixth-man':return [`Badges récompensés : ${count(p.rewarded)}`];
   case 'scout':return p.next?[`Prochain objectif : ${String(p.next)}`]:[];
+  case 'usurper':return [p.copied?`A copié « ${String(p.copied)} »`:'Pas encore utilisé'];
+  case 'fate-link':return p.partner?[`Lié à ${String(p.partnerName)}`,`Objectifs : ${count(p.mine)} (toi) · ${count(p.theirs)} (partenaire), ticket tous les ${def?.params.objectives??3}`]:['Choisis un partenaire'];
+  case 'champion-crown':return [Array.isArray(p.offer)?'Offre de passifs en attente de ton choix':`Charges : ${count(p.charges)} / ${def?.params.charges??3} (seulement en étant #1)`];
+  case 'chaos-master':return [p.consumed?'Utilisé':'Prêt : s’active à la prochaine roue hostile contre toi'];
+  case 'paradox':return [p.consumed?'Utilisé':'Prêt'];
+  case 'bound-soul':{const b=p.bound as {name?:string;level?:number}|undefined;return b?[`Lié : ${b.name} (niv. ${b.level})`,p.ready?'Prêt à rejoindre la Run en cours (réinjection par un admin)':'Disponible après une Run perdue']:['Aucun Pokémon lié'];}
   default:return [];
  }
 }

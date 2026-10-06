@@ -17,6 +17,11 @@ test('passive progression is worded from the server counters',()=>{
  assert.deepEqual(progressLines(owned('sixth-man',{badges:['badge1','badge2'],rewarded:['badge2']})),['Badges récompensés : 1']);
  assert.deepEqual(progressLines(owned('rivalry')),[]);
  assert.equal(isConsumed(owned('usurper',{consumed:true})),true);
+ assert.deepEqual(progressLines(owned('usurper',{consumed:true,copied:'Rivalité'})),['A copié « Rivalité »']);
+ assert.deepEqual(progressLines(owned('fate-link',{partner:'tim',partnerName:'Tim',mine:4,theirs:1})),['Lié à Tim','Objectifs : 4 (toi) · 1 (partenaire), ticket tous les 3']);
+ assert.deepEqual(progressLines(owned('champion-crown',{charges:2})),['Charges : 2 / 3 (seulement en étant #1)']);
+ assert.deepEqual(progressLines(owned('champion-crown',{charges:0,offer:['scout']})),['Offre de passifs en attente de ton choix']);
+ assert.deepEqual(progressLines(owned('bound-soul',{bound:{name:'PIKA',level:12},ready:true})),['Lié : PIKA (niv. 12)','Prêt à rejoindre la Run en cours (réinjection par un admin)']);
 });
 
 test('passives are grouped by player and the page is public',()=>{

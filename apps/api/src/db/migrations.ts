@@ -411,7 +411,12 @@ export const migrations:readonly Migration[]=[
    );
    CREATE INDEX passive_rewards_status ON passive_rewards(lobby_id,status);
   `);
- }}
+ }},
+ // Wheel draws with a choice (Sixième sens, Maître du chaos): the candidate gages and who picks one.
+ {version:14,name:'wheel-choices',scopes:['portal'],up:db=>db.exec(`
+  ALTER TABLE wheel_resolutions ADD COLUMN options_json TEXT CHECK(options_json IS NULL OR json_valid(options_json));
+  ALTER TABLE wheel_resolutions ADD COLUMN chooser_account_id TEXT REFERENCES accounts(id);
+ `)}
 ];
 
 // Rebuilds a table nothing references, with one CHECK list widened; data, columns and indexes are kept.

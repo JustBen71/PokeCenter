@@ -70,7 +70,8 @@ export class PassiveService{
  }
 
  progressOf(lobbyId:string,accountId:string,passiveId:string):Record<string,unknown>{
-  const rows=this.db.prepare('SELECT key,value_json FROM passive_progress WHERE lobby_id=? AND account_id=? AND passive_id=?').all(lobbyId,accountId,passiveId) as {key:string;value_json:string}[];
+  // Keys starting with « _ » are server-only (e.g. the exact copy of a bound Pokémon) and never published.
+  const rows=this.db.prepare("SELECT key,value_json FROM passive_progress WHERE lobby_id=? AND account_id=? AND passive_id=? AND key NOT LIKE '\\_%' ESCAPE '\\'").all(lobbyId,accountId,passiveId) as {key:string;value_json:string}[];
   return Object.fromEntries(rows.map(r=>[r.key,JSON.parse(r.value_json)]));
  }
  progress<T>(lobbyId:string,accountId:string,passiveId:string,key:string,fallback:T):T{
@@ -112,7 +113,7 @@ export class PassiveService{
  }
 
  /** Gives a passive (initial choice, admin, wheel…). Refused if already owned or not available. */
- grant(lobbyId:string,accountId:string,passiveId:string,source:PassiveSource,options:{actorId?:string|null;metadata?:Record<string,unknown>;announce?:string}={}):OwnedPassive{
+ grant(lobbyId:string,accountId:string,passiveId:string,source:PassiveSource,options:{actorId?:string|null;metadata?:Record<string,unknown>;announce?:string;quiet?:boolean}={}):OwnedPassive{
   const account=this.member(lobbyId,accountId),passive=this.definition(passiveId);
   this.requireOfferable(lobbyId,passive);
   this.db.transaction(()=>{
@@ -120,7 +121,7 @@ export class PassiveService{
    this.insert(lobbyId,accountId,passiveId,source,options.metadata??{});
    this.audit(lobbyId,{actorAccountId:options.actorId??null,targetAccountId:accountId,action:'passive.grant',message:`${account.name} obtient « ${passive.name} » (${passiveRarityLabels[passive.rarity]})`,metadata:{passiveId,source,...options.metadata}});
   })();
-  this.deps.notify(lobbyId,{kind:'success',message:options.announce??`✨ ${passive.rarity==='LEGENDARY'?'Passif légendaire':'Nouveau passif'} — ${account.name} obtient « ${passive.name} »`});
+  if(!options.quiet)this.deps.notify(lobbyId,{kind:'success',message:options.announce??`✨ ${passive.rarity==='LEGENDARY'?'Passif légendaire':'Nouveau passif'} — ${account.name} obtient « ${passive.name} »`});
   this.deps.changed(lobbyId);
   return this.owned(lobbyId,accountId).find(p=>p.passiveId===passiveId)!;
  }
