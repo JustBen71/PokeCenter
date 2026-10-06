@@ -3,7 +3,7 @@ import type {PlayerViewModel} from '../native-clients';
 import {raceScore} from '../map/objective-score';
 
 export type ClientState='playing'|'no-game'|'offline'|'never';
-export const clientStateLabels:Record<ClientState,string>={playing:'En jeu',['no-game']:'Client connecté · jeu non lu',offline:'Hors ligne',never:'Jamais connecté'};
+export const clientStateLabels:Record<ClientState,string>={playing:'En jeu',['no-game']:'Client connecté · jeu non lu',offline:'Hors ligne',never:'Client non connecté'};
 
 export type CourseRow={
  accountId:string;name:string;sprite:string;admin:boolean;

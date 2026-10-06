@@ -18,11 +18,10 @@ public static class Program
                 return await Launcher.PlayerLauncher.RunAsync(args.Skip(args.Length == 0 ? 0 : 1).ToArray(), cancellation.Token);
             if (args.Length == 0 || args[0] is "--help" or "help")
             {
-                Console.WriteLine("Pokerace.Client play [--rom <path>] [--config <path>] [--configure]\nWindows: no arguments launches BizHawk and the client with a ROM picker.\nPokerace.Client configure|doctor|run [--config <path>]\nBridge token for doctor/run: POKERACE_BRIDGE_TOKEN environment variable.");
+                Console.WriteLine("Pokerace.Client play [--rom <path>] [--config <path>] [--configure]\nWindows: no arguments launches BizHawk and the client with a ROM picker.\nPokerace.Client configure|doctor [--config <path>]\nPokerace.Client run [--config <path>] [--rom <path>]   (--rom: the ROM loaded in BizHawk, required to read the game outside play)\nBridge token for doctor/run: POKERACE_BRIDGE_TOKEN environment variable.");
                 return 0;
             }
-            if (args.Length != 1 && (args.Length != 3 || args[1] != "--config")) throw new ClientException("invalid_arguments", "Expected [--config <path>].");
-            var path = args.Length == 3 ? args[2] : ConfigurationStore.DefaultPath;
+            var (path, rom) = ParseOptions(args);
             if (args[0] == "configure")
             {
                 if (File.Exists(path)) throw new ClientException("configuration_exists", "Configuration exists; edit it explicitly to preserve identity.");
@@ -37,12 +36,33 @@ public static class Program
             await using var bridge = new BridgeClient(configuration, () => Environment.GetEnvironmentVariable("POKERACE_BRIDGE_TOKEN"));
             await using var server = new ServerConnection(configuration);
             if (args[0] == "doctor") return await DoctorCommand.RunAsync(configuration, bridge, server, Console.Out, cancellation.Token);
-            await new ClientRuntime(configuration, bridge, server, new ClientLog(Console.Out)).RunAsync(cancellation.Token);
+            // Outside play (Linux, macOS, manual setups) the ROM identity comes from --rom; without it the game is never read.
+            Games.LocalRomIdentity? identity = null;
+            if (rom != null)
+            {
+                if (!File.Exists(rom)) throw new ClientException("rom_missing", "Le fichier ROM indiqué par --rom est introuvable.");
+                await using var romFile = File.OpenRead(rom);
+                identity = await Games.LocalRomIdentity.FromStreamAsync(romFile, cancellation.Token);
+            }
+            await new ClientRuntime(configuration, bridge, server, new ClientLog(Console.Out), romIdentity: identity).RunAsync(cancellation.Token);
             return 0;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return 0; }
         catch (ClientException e) { Console.Error.WriteLine("[FAIL] " + e.Code + ": " + e.Message); WaitBeforeClose(args); return 1; }
         catch (Exception) { Console.Error.WriteLine("[FAIL] Vérifiez la connexion, la configuration et les éventuels messages dans BizHawk."); WaitBeforeClose(args); return 1; }
+    }
+    /// <summary>configure|doctor|run [--config &lt;path&gt;], plus [--rom &lt;path&gt;] for run.</summary>
+    public static (string Config, string? Rom) ParseOptions(string[] args)
+    {
+        string? config = null, rom = null;
+        for (var i = 1; i < args.Length; i += 2)
+        {
+            if (i + 1 == args.Length) throw new ClientException("invalid_arguments", "Expected [--config <path>] [--rom <path>].");
+            if (args[i] == "--config" && config == null) config = args[i + 1];
+            else if (args[i] == "--rom" && rom == null && args[0] == "run") rom = Path.GetFullPath(args[i + 1]);
+            else throw new ClientException("invalid_arguments", "Expected [--config <path>] [--rom <path>].");
+        }
+        return (config ?? ConfigurationStore.DefaultPath, rom);
     }
     private static void WaitBeforeClose(string[] args)
     {

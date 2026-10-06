@@ -59,7 +59,7 @@ public static class PlayerLauncher
 {
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellation)
     {
-        if (!OperatingSystem.IsWindows()) throw new ClientException("unsupported_platform", "Le lanceur BizHawk fourni cible Windows x64.");
+        if (!OperatingSystem.IsWindows()) throw new ClientException("unsupported_platform", "Le lanceur BizHawk fourni cible Windows x64. Ailleurs : lancez BizHawk avec le bridge, puis Pokerace.Client run --rom <ROM>.");
         var options = LaunchOptions.Parse(args);
         var directory = Path.Combine(Path.GetDirectoryName(options.ConfigPath)!, "launcher");
         Directory.CreateDirectory(directory);

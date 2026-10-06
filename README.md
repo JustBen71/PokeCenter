@@ -218,7 +218,7 @@ Workflows : `pokerace-client.yml` (shared/API/Web + client sur Windows, Linux, m
 | `FAKE_GAME_VERIFIED` | Navigateur réel (Playwright) : compte, avatar, lobby, deux joueurs, Course, état du jeu, banque, boutique, roue, enchère, logs, double clics, ACK perdu → `REVIEW` résolue dans Gestion sans rejeu, reconnexion, portail sans client. API : équipe, argent, objectifs, roues, jackpot, `REVIEW` après écriture réelle à ACK perdu (banque, boutique, enchère, récompense d'objectif) |
 | `REAL_BIZHAWK_VERIFIED` | BizHawk 2.11.1 + bridge + ROM homebrew NES : lecture, écriture, relecture et restauration (confirmées par le dernier workflow) ; chaîne avec le client .NET confirmée le 3 octobre (run 37099201814), cassée ensuite par le timeout corrigé ici, **à reconfirmer** |
 | `MANUAL_VERIFIED` | Pages du portail et overlay des roues, vérifiés à la main lors des sprints précédents |
-| `NOT_YET_VERIFIED` | **Toute écriture sur une vraie partie Émeraude dans BizHawk** ; rendu mobile détaillé ; déploiement du serveur ; adaptateurs Gen IV+ (non implémentés) |
+| `NOT_YET_VERIFIED` | Écritures Émeraude via le lanceur Windows `play` (vérifiées le 6 octobre 2026 sous Linux avec `run --rom`, voir le README du client) ; rendu mobile détaillé ; déploiement du serveur ; adaptateurs Gen IV+ (non implémentés) |
 
 ### 9.4 Smoke-test manuel Émeraude (mainteneur)
 
@@ -247,7 +247,7 @@ Ces écritures ne deviennent `MANUAL_VERIFIED` qu'après cette exécution par le
 - Les anciennes enchères et la roulette Lua restent dans les bases de course et ne sont pas importées dans le nouveau système.
 - Profil anglais non validé ; écritures réservées aux profils `allowWrites: true` (BPEF v0).
 - Le manifeste, les profils et les sauvegardes ne sont pas des caches. Ne jamais fabriquer une validation de ROM.
-- Après une déconnexion du client natif, la carte Course affiche « Jamais connecté » (le serveur ne conserve pas le dernier état natif) ; elle repasse « En jeu » dès la reconnexion.
+- Le serveur ne conserve pas le dernier état natif : après une déconnexion, la carte Course affiche « Client non connecté » (comme pour un joueur qui ne s'est jamais connecté) ; elle repasse « En jeu » dès la reconnexion.
 - L'E2E navigateur couvre Chromium sur bureau ; le rendu mobile n'est pas testé automatiquement.
 
 ## 11. Documents

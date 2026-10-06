@@ -67,7 +67,8 @@ export function WheelOverlay(){
      <button className="btn primary" disabled={busy||(live.gage.requiresTarget&&!target)||(party&&!slot)||(needsConfirm&&!confirm)}>Appliquer</button>
     </form>}
     {!account.admin&&!done&&<p className="muted">En attente de l’administrateur…</p>}
-    {(done||!account.admin)&&<button className="btn" onClick={()=>setCurrent(null)}>Fermer</button>}
+    {/* A refused gage stays pending: the admin may close and reopen or abandon it from the Roues page. */}
+    <button className="btn" onClick={()=>setCurrent(null)}>{done||!account.admin?'Fermer':'Fermer (le gage reste en attente)'}</button>
    </section>}
   </div>
  </div>;

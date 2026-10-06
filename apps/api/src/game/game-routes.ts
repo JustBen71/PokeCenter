@@ -45,7 +45,9 @@ export function registerGameRoutes(app:Express,s:Services,changed:(lobbyId:strin
 
  app.get('/api/lobbies/:id/game-commands',route(req=>{
   const status=req.query.status==='REVIEW'?'REVIEW' as const:undefined;
-  return s.commands.list(lobbies.require(String(req.params.id)).id,status);
+  // moneyTypes names the business operation (bank deposit…) behind a game write, for the admin review list.
+  return s.commands.list(lobbies.require(String(req.params.id)).id,status)
+   .map(c=>({...c,moneyTypes:[...new Set(ledger.byCommand(c.id).map(t=>t.type))]}));
  }));
  // After checking the game, an admin states whether the uncertain command was applied; linked money rows follow.
  app.post('/api/lobbies/:id/game-commands/:commandId/resolve',route((req,res)=>{

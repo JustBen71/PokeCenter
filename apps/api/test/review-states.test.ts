@@ -31,7 +31,7 @@ test('lost ACK after a real write: REVIEW, no automatic retry, admin decides, fi
   await until(()=>portal.services.currentGame.resolve(lobby.id,ben.id).game.money===50000,'game state');
   await as(admin.id).post(`${path}/runs`,{accountId:ben.id,start:true});
   const synced=(money:number)=>until(()=>portal.services.currentGame.resolve(lobby.id,ben.id).game.money===money,`money ${money}`);
-  const reviews=async()=>(await as(admin.id).get(`${path}/game-commands?status=REVIEW`)).body as {id:string;command:string}[];
+  const reviews=async()=>(await as(admin.id).get(`${path}/game-commands?status=REVIEW`)).body as {id:string;command:string;moneyTypes:string[]}[];
   // Common checks for one lost acknowledgement, then the admin's decision.
   const expectReview=async(label:string,applied:boolean)=>{
    const [command]=await reviews();
@@ -51,6 +51,7 @@ test('lost ACK after a real write: REVIEW, no automatic retry, admin decides, fi
   // Bank: the deposit was written in the game; the admin confirms it, the bank is credited once.
   let response=await as(ben.id).post(`${path}/bank/deposit`,{amount:10000,requestId:randomUUID()});
   assert.equal(response.body.error.code,'COMMAND_OUTCOME_UNKNOWN');assert.equal(game.money,40000);
+  assert.deepEqual((await reviews())[0].moneyTypes,['BANK_DEPOSIT','JACKPOT_CONTRIBUTION'],'the review names the bank deposit, not only the game write');
   await expectReview('bank',true);
   assert.equal((await as(ben.id).get(`${path}/bank`)).body.balance,9000);
   await synced(40000);

@@ -94,7 +94,7 @@ test('3 · Fake Game Client : Pokédollars, position, équipe, PV, niveau, surno
  const bulbi=row.getByRole('button',{name:'Fiche de BULBI'});
  await expect(bulbi).toContainText('Bulbizarre');await expect(bulbi).toContainText('Niv. 12');await expect(bulbi).toContainText('20/20 PV');
  await expect(row.getByRole('button',{name:'Fiche de PIKA'})).toContainText('Niv. 20');
- await expect(card(admin.page,'Admin').locator('.client-pill')).toHaveText('Jamais connecté');
+ await expect(card(admin.page,'Admin').locator('.client-pill')).toHaveText('Client non connecté');
 });
 
 test('4 · banque : dépôt taxé, jackpot, retrait — confirmés par le jeu, double clic sans double débit',async()=>{
@@ -248,7 +248,8 @@ test('9 · ACK perdu puis reconnexion : REVIEW visible dans Gestion, jamais rejo
 
  await a.goto('/#/gestion');
  const panel=a.locator('.panel').filter({has:a.getByRole('heading',{name:'Opérations à vérifier'})});
- await expect(panel).toContainText('Retrait de Pokédollars');
+ await expect(panel.locator('strong').first()).toHaveText('Dépôt en banque');
+ await expect(panel).toContainText('Retrait de Pokédollars en jeu');
  await expect(panel).toContainText('Joueur');
  await panel.getByRole('button',{name:'Appliquée',exact:true}).click();
  await toast(a,'Opération résolue');

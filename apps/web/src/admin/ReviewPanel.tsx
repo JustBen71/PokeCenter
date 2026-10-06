@@ -1,10 +1,11 @@
 import {useEffect,useState} from 'react';
+import {moneyTypeLabels,type MoneyTransaction} from '@pokerace/shared';
 import {api} from '../api/client';
 import {useLobby} from '../lobby/lobby-context';
 import {useLive} from '../realtime/live-context';
 import {useToast} from '../components/toast-context';
 
-type Command={id:string;accountId:string;command:string;status:string;errorCode:string|null;createdAt:string};
+type Command={id:string;accountId:string;command:string;status:string;errorCode:string|null;createdAt:string;moneyTypes?:MoneyTransaction['type'][]};
 const commandLabels:Record<string,string>={'game.money.add':'Ajout de Pokédollars','game.money.remove':'Retrait de Pokédollars','game.money.set':'Réglage des Pokédollars',
  'game.pokemon.insert':'Ajout d’un Pokémon','game.pokemon.remove':'Retrait d’un Pokémon','game.pokemon.replace':'Remplacement d’un Pokémon'};
 
@@ -27,7 +28,7 @@ export function ReviewPanel(){
   <header className="panel-head"><h2>Opérations à vérifier</h2><button className="btn" disabled={busy} onClick={()=>void load()}>Actualiser</button></header>
   {commands===null?<p className="muted">Chargement…</p>:commands.length===0?<p className="muted">Aucune opération en attente de vérification.</p>:
    <ul className="review-list">{commands.map(c=><li key={c.id}>
-    <div><strong>{commandLabels[c.command]??c.command}</strong><small>{members.find(m=>m.id===c.accountId)?.name??c.accountId} · {new Date(c.createdAt).toLocaleString('fr-FR')} · {c.errorCode??'confirmation perdue'}</small><code>{c.id}</code></div>
+    <div><strong>{c.moneyTypes?.[0]?moneyTypeLabels[c.moneyTypes[0]]:commandLabels[c.command]??c.command}</strong><small>{c.moneyTypes?.[0]?`${commandLabels[c.command]??c.command} en jeu · `:''}{members.find(m=>m.id===c.accountId)?.name??c.accountId} · {new Date(c.createdAt).toLocaleString('fr-FR')} · {c.errorCode??'confirmation perdue'}</small><code>{c.id}</code></div>
     <div className="row-actions"><button className="btn primary" disabled={busy} onClick={()=>void resolve(c,true)}>Appliquée</button><button className="btn danger" disabled={busy} onClick={()=>void resolve(c,false)}>Non appliquée</button></div>
    </li>)}</ul>}
  </section>;

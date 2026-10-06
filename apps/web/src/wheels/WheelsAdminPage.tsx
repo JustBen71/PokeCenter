@@ -10,6 +10,8 @@ import {TicketIcon} from './TicketIcon';
 import {launchedHere} from './launched';
 
 type Draft=WheelInput&{id?:string};
+// Untouched default icon follows the tone (purple for hostile wheels); a chosen icon is kept.
+const toneIcon=(tone:Draft['tone'])=>tone==='BAD'?'purple-1' as const:'green-1' as const;
 const emptyWheel=():Draft=>({name:'',description:'',price:1000,icon:'green-1',tone:'GOOD',enabled:true,gages:[{name:'',description:'',handler:'NOTICE',params:{},weight:1}]});
 const defaultParams:Record<GageHandler,Record<string,unknown>>={NOTICE:{},GIVE_MONEY:{amount:500},TAKE_MONEY:{amount:500},STEAL_MONEY:{amount:500},REMOVE_POKEMON:{selector:'random'},
  GIVE_LIBRARY_POKEMON:{artifactId:''},JACKPOT_FIXED:{amount:1000},JACKPOT_PERCENT:{percent:10},JACKPOT_SHARE:{},JACKPOT_EMPTY:{}};
@@ -72,7 +74,7 @@ export function WheelsAdminPage(){
    <div className="form-row"><label>Nom<input className="field" required maxLength={60} value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/></label>
     <label>Prix ₽<input className="field" inputMode="numeric" value={draft.price} onChange={e=>setDraft({...draft,price:Number(e.target.value.replace(/\D/g,''))})}/></label></div>
    <label>Description<input className="field" maxLength={300} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></label>
-   <div className="form-row"><label>Ton<select className="field" value={draft.tone} onChange={e=>setDraft({...draft,tone:e.target.value as Draft['tone']})}>{Object.entries(wheelToneLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+   <div className="form-row"><label>Ton<select className="field" value={draft.tone} onChange={e=>{const tone=e.target.value as Draft['tone'];setDraft({...draft,tone,icon:draft.icon===toneIcon(draft.tone)?toneIcon(tone):draft.icon});}}>{Object.entries(wheelToneLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
     <label className="check"><input type="checkbox" checked={draft.enabled} onChange={e=>setDraft({...draft,enabled:e.target.checked})}/>Active</label></div>
    <fieldset className="icon-picker"><legend>Icône</legend>{ticketIcons.map(i=><button type="button" key={i} aria-pressed={draft.icon===i} onClick={()=>setDraft({...draft,icon:i})}><TicketIcon icon={i} size={34}/></button>)}</fieldset>
    <h3>Gages (même probabilité par défaut)</h3>

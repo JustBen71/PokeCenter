@@ -34,7 +34,9 @@ $env:POKERACE_BRIDGE_TOKEN = 'le-token-de-session-utilisé-par-le-bridge'
 
 Avec `run` ou `doctor`, le bridge doit déjà être lancé. Voir [son installation](../../bridges/bizhawk/README.md). La commande `play` (ou le double-clic sur la distribution avec lanceur) gère au contraire le choix de ROM et le lancement de BizHawk. `Ctrl+C` arrête proprement le client. Il reste actif si le bridge ou le serveur devient indisponible, puis tente de se reconnecter avec un délai progressif.
 
-Sur Linux/macOS, utiliser `./Pokerace.Client` et définir `POKERACE_BRIDGE_TOKEN` dans l'environnement. Le client est portable ; la disponibilité d'un bridge compatible sur ces OS est une condition séparée. Cette tâche ne revendique pas la compatibilité d'une installation BizHawk sur chaque OS.
+Sur Linux/macOS, `play` n'est pas disponible : lancer BizHawk avec le bridge (`--open-ext-tool-dll=Pokerace.BizHawkBridge`, variables `POKERACE_BRIDGE_TOKEN` et `POKERACE_BRIDGE_PORT`), puis `./Pokerace.Client run --rom <ROM>` avec le même token. **`--rom` est indispensable** : sans l'identité de la ROM, l'adaptateur Émeraude ne lit jamais le jeu (« Client connecté · jeu non lu »).
+
+Testé le 6 octobre 2026 sur Debian 13 (BizHawk 2.11.1 Linux, Mono 6.12, ROM BPEF v0) : lecture, écritures (argent, banque, boutique, roues, enchères, équipe), sauvegarde en jeu puis reset. Sous Linux, ne pas choisir l'affichage GDI+ (`DispMethod: 1`) avec un serveur X qui propose MIT-SHM : libgdiplus/cairo peut rester bloqué en attendant un événement X et BizHawk se fige (le bridge expire alors). Vérifié : avec un serveur X sans MIT-SHM, plus aucun gel. L'affichage OpenGL (par défaut sous Linux) n'utilise pas ce chemin, mais n'a pas été testé en endurance.
 
 ## Construire et tester
 
