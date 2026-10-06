@@ -111,7 +111,10 @@ Sujet temps réel `battles`.
 ## Validation
 
 - Synthétique : contrats (shared), service, scaling, builders, dispatch, roues, redémarrage serveur (API) ; spec, encodage de l'enregistrement, armement, suivi, restauration après déplacement des save blocks, abandon (client C#) ; Playwright (Gestion → victoire, roue → défaite).
-- **Réel** (6 octobre 2026, BizHawk 2.11.1 Linux, BPEF v0, sauvegardes de test) : prototype puis client complet : combat Miroir de Claude (3 Poussifeu niv. 3/2/2, « TOPDRESSEUR CLAUDE »), XP réelle (Poussifeu niv. 6 → 8), +60 ₽, retour normal sur la carte, WON enregistré, RAM restaurée. Voir la recette ci-dessous pour la défaite.
+- **Réel** (6 octobre 2026, BizHawk 2.11.1 Linux, BPEF v0, sauvegardes de test) : prototype puis client complet : combat Miroir de Claude (3 Poussifeu niv. 3/2/2, « TOPDRESSEUR CLAUDE »), XP réelle (Poussifeu niv. 6 → 8), +60 ₽, retour normal sur la carte, WON enregistré, RAM restaurée. Puis par l'interface :
+  - **file d'attente** : combat lancé pour Sacha pendant la cinématique d'introduction (script en cours) → « En attente d'un moment sûr », parti seul dès la fin de la cinématique ;
+  - **défaite** : équipe de Claude à « plus haut niveau du joueur + 10 » (15/12/12) contre un Poussifeu N5 → LOST, retour sur la carte sans blackout, Poussifeu K.O. (0/19 PV) non restauré, défaite visible dans l'historique du joueur et l'audit ;
+  - **roue** créée dans l'éditeur (« Combat commandité », Miroir −4 niveaux) lancée pour Claude → combat dans le jeu, suivi dans l'overlay, victoire, +80 ₽ (20 × niveau 4).
 
 ### Recette manuelle (copie de sauvegarde)
 

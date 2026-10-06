@@ -221,7 +221,7 @@ Workflows : `pokerace-client.yml` (shared/API/Web + client sur Windows, Linux, m
 | `REAL_BIZHAWK_VERIFIED` | BizHawk 2.11.1 + bridge + ROM homebrew NES : lecture, écriture, relecture et restauration (confirmées par le dernier workflow) ; chaîne avec le client .NET confirmée le 3 octobre (run 37099201814), cassée ensuite par le timeout corrigé ici, **à reconfirmer** |
 | `MANUAL_VERIFIED` | Pages du portail et overlay des roues, vérifiés à la main lors des sprints précédents |
 | `MANUAL_VERIFIED` (passifs) | Test utilisateur réel du 6 octobre 2026 (BizHawk Linux, 2 clients, ROM BPEF v0) : sélection, Deuxième souffle, Contre-sort, roues de passifs, vol, Cartographe, redémarrages sans double récompense. Rivalité, Éclaireur, Le sixième homme et les légendaires : tests automatisés seulement |
-| `MANUAL_VERIFIED` (combats commandités) | Émeraude réelle, BizHawk Linux, BPEF v0 : combat Miroir déclenché depuis la carte, joué et gagné, XP et argent réels, résultat WON enregistré, RAM temporaire restaurée (adresses de la section `battle` du profil, justifiées par le code de la ROM FR) |
+| `MANUAL_VERIFIED` (combats commandités) | Émeraude réelle, BizHawk Linux, BPEF v0 : combats Miroir et roue START_BATTLE gagnés (XP et argent réels), combat mis en file pendant une cinématique puis parti seul, défaite détectée (K.O. réels, historique), RAM temporaire restaurée (adresses de la section `battle` du profil, justifiées par le code de la ROM FR) |
 | `NOT_YET_VERIFIED` | Écritures Émeraude via le lanceur Windows `play` (vérifiées le 6 octobre 2026 sous Linux avec `run --rom`, voir le README du client) ; rendu mobile détaillé ; déploiement du serveur ; adaptateurs Gen IV+ (non implémentés) |
 
 ### 9.4 Smoke-test manuel Émeraude (mainteneur)
