@@ -34,7 +34,11 @@ export class PassiveEngine{
   const {passives,domain}=this.services,passive=passiveById.get(passiveId)!;
   return {lobbyId,accountId,passive,services:this.services,
    get:(key,fallback)=>passives.progress(lobbyId,accountId,passiveId,key,fallback),
-   set:(key,value)=>passives.setProgress(lobbyId,accountId,passiveId,key,value),
+   // A real change of progression is pushed live (badges, Passifs page); identical writes are skipped.
+   set:(key,value)=>{
+    if(JSON.stringify(passives.progress(lobbyId,accountId,passiveId,key,null))===JSON.stringify(value??null))return;
+    passives.setProgress(lobbyId,accountId,passiveId,key,value);passives.deps.changed(lobbyId);
+   },
    reward:(eventId,request,to)=>this.reward(lobbyId,to??accountId,passiveId,eventId,request),
    notify:(message,options={})=>passives.deps.notify(lobbyId,{kind:options.kind??'info',message:`${message}`},options.private?accountId:undefined),
    audit:(action,message,metadata={})=>domain.audit.record({lobbyId,targetAccountId:accountId,category:'PASSIVE',action,status:'SUCCESS',message,metadata:{passiveId,...metadata}})};
