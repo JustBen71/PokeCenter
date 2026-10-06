@@ -132,6 +132,13 @@ public sealed class BattleEncounterTests
         finally { File.Delete(path); }
     }
 
+    [Fact] public void TwoClientsConfiguredInTheSameFolderKeepSeparateFiles()
+    {
+        Assert.NotEqual(BattleEncounterStore.PathNextTo("/x/client1.json"), BattleEncounterStore.PathNextTo("/x/client2.json"));
+        Assert.Equal(Path.GetFullPath("/x/client1.battles.json"), BattleEncounterStore.PathNextTo("/x/client1.json"));
+        Assert.Equal(Path.GetFullPath("/x/client1.game-events.json"), Pokerace.Client.Runtime.GameEventOutbox.PathNextTo("/x/client1.json"));
+    }
+
     [Fact] public async Task AStartWithoutAnyBattleIsAbortedAndRestored()
     {
         await using var bridge = Overworld();

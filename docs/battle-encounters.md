@@ -57,7 +57,7 @@ CREATED → WAITING_SAFE_STATE → SENDING → STARTING → RUNNING → WON | LO
 - **Idempotence** : chaque tentative a un `commandId` neuf (un refus n'est jamais mis en cache pour la suivante) ; le client refuse de démarrer deux fois le même `encounterId` et renvoie l'état connu.
 - **REVIEW** : confirmation perdue → jamais renvoyé automatiquement. Le client publie son état (`activeEncounterId`, dernier résultat) à chaque observation : le serveur résout alors RUNNING, WON ou LOST. Un démarrage incertain que le client n'a jamais vu reste à un admin (annulation, ou « Opérations à vérifier » : non appliqué = FAILED).
 - **Défaite** : le combat passe LOST et reste dans l'historique du joueur (tiroir, audit `battle.lost`, notification). Le statut de la Run reste géré par les règles de course (pas de Run perdue automatique).
-- **Redémarrages** : client (fichier `battle-encounters.json` à côté de `client.json`) et serveur (base) — le résultat est rapporté une seule fois.
+- **Redémarrages** : client (fichier `<configuration>.battles.json` à côté de la configuration, ex. `client.battles.json`) et serveur (base) — le résultat est rapporté une seule fois.
 
 Audit `BATTLE` : `battle.created`, `battle.start_requested`, `battle.sent`, `battle.started`, `battle.won`, `battle.lost`, `battle.failed`, `battle.review`, `battle.cancelled`.
 

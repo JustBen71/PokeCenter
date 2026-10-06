@@ -39,7 +39,8 @@ public sealed class BattleEncounterStore(string? path)
     private Saved saved = path != null && File.Exists(path) ? JsonSerializer.Deserialize<Saved>(File.ReadAllText(path)) ?? new(null, null) : new(null, null);
     public Active? Current { get { lock (gate) return saved.Active; } }
     public Last? Previous { get { lock (gate) return saved.Last; } }
-    public static string PathNextTo(string configPath) => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(configPath))!, "battle-encounters.json");
+    // Named after the configuration file: two clients configured in the same folder never share their battles.
+    public static string PathNextTo(string configPath) => System.IO.Path.ChangeExtension(System.IO.Path.GetFullPath(configPath), null) + ".battles.json";
     public void Start(Active active) => Save(saved with { Active = active });
     public void Advance(string state) { lock (gate) if (saved.Active != null) Save(saved with { Active = saved.Active with { State = state } }); }
     public void Finish(string encounterId, string outcome) => Save(new(null, new(encounterId, outcome)));

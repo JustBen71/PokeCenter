@@ -114,7 +114,7 @@ Message séparé de `GAME_STATE`, sans adresse mémoire :
 
 Le serveur répond `GAME_EVENT_ACK {eventId, ok}`. Si l'adaptateur n'annonce pas la capability, la réponse est `ok:false` / `capability_missing` (refus définitif). Sinon l'événement est publié dans le moteur (`game:<eventId>`, dédupliqué) puis acquitté. Pour `STEPS_CHANGED`, le serveur calcule le delta depuis le compteur absolu ; une valeur plus basse (nouvelle Run) est une nouvelle base, jamais un delta négatif, et le total couvre toute la course. Un client ne doit pas envoyer un événement par pas : il envoie un compteur périodique.
 
-Le client C# garde les événements non acquittés dans `game-events.json`, à côté de `client.json` (écriture atomique, 200 au plus), et renvoie **le même `eventId`** à chaque connexion jusqu'à l'ACK.
+Le client C# garde les événements non acquittés dans `<configuration>.game-events.json`, à côté de la configuration (ex. `client.game-events.json`) (écriture atomique, 200 au plus), et renvoie **le même `eventId`** à chaque connexion jusqu'à l'ACK.
 
 **Aucun adaptateur n'émet encore d'événement** : victoire contre un dresseur, pas, K.O. et fin de combat n'ont pas de source mémoire validée (`pret/pokeemerald` + profil vérifié sur une vraie partie). Les passifs qui en dépendent restent `DISABLED_MISSING_CAPABILITY`. Pour en activer un : valider la lecture, faire annoncer la capability par l'adaptateur Gen III, l'ajouter à `validatedCapabilities` (`passive-catalog.ts`), écrire le handler et ses tests.
 

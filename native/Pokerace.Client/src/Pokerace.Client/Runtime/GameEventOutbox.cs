@@ -24,7 +24,8 @@ public sealed class GameEventOutbox
             : [];
     }
 
-    public static string PathNextTo(string configPath) => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(configPath))!, "game-events.json");
+    // Named after the configuration file: two clients configured in the same folder never share their outbox.
+    public static string PathNextTo(string configPath) => Path.ChangeExtension(Path.GetFullPath(configPath), null) + ".game-events.json";
 
     /// <summary>Records a new event; null when the outbox is full (the server has been unreachable for too long).</summary>
     public JsonObject? Enqueue(string kind, JsonObject data)
