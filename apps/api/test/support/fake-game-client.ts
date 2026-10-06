@@ -6,7 +6,9 @@ export type FakeMode='apply'|'timeout'|'ack-lost'|{refuse:string};
 type Command={commandId:string;command:string;payload:Record<string,any>};
 type ConnectOptions={base:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number;
  // Game-event capabilities announced by this fake adapter (none by default, like the real Gen III adapter).
- events?:string[]};
+ events?:string[];
+ // Commanded battles (battle.trainer.start), as the Gen III adapter with a battle profile.
+ battles?:boolean};
 
 export const template=(speciesId=1,level=5,nickname='TEST'):PokemonInjection=>({playerId:'fake',slot:1,speciesId,nickname,level,experience:135,currentHp:20,
  stats:{maxHp:20,attack:10,defense:10,speed:10,spAttack:10,spDefense:10},moves:[{id:33,pp:35},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:3,friendship:70,
@@ -24,6 +26,8 @@ export class FakeGameClient{
  mode:FakeMode='apply';
  readonly received:Command[]=[];
  money:number;party:string[];completed:string[]=['starter'];
+ // Commanded battle state published in GAME_STATE (Gen III: overworld, no script, controls free = safe).
+ safe=true;battle:{active:string|null;state:'STARTING'|'RUNNING'|null;last:{encounterId:string;outcome:string}|null;spec:Record<string,any>|null}={active:null,state:null,last:null,spec:null};
  location:{mapGroup:number;mapNumber:number;label:string};
  private constructor(private readonly socket:Socket,private readonly options:ConnectOptions,money:number,party:string[]){
   this.money=money;this.party=party;this.location=options.location??{mapGroup:0,mapNumber:9,label:'Bourg-en-Vol'};
@@ -47,13 +51,14 @@ export class FakeGameClient{
  }
 
  state():NativeGameState{
-  const capabilities=[...READ,...(this.writes?WRITE:[]),...(this.options.events??[])];
+  const capabilities=[...READ,...(this.writes?WRITE:[]),...(this.options.events??[]),...(this.options.battles&&this.writes?['battle.trainer.start']:[])];
   const adapter={id:'pokemon.emerald.gen3',status:'ready' as const,profileId:'emerald-fr-bpef-v0',capabilities};
   return {gameStateVersion:2,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
    trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{...this.location},
    party:this.party.map((raw,i)=>{const p=decodePokemonCopy(raw);
     return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
-   progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString()};
+   progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString(),
+   ...(this.options.battles&&this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
  }
  publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});}
  close(){this.socket.close();}
@@ -66,12 +71,22 @@ export class FakeGameClient{
    this.socket.emit('GAME_EVENT',{type:'GAME_EVENT',protocolVersion:1,eventVersion:1,eventId,kind,observedAt:new Date().toISOString(),data});
   });
  }
+ /** The battle screen appeared (the game took the script). */
+ battleStarted(){this.battle={...this.battle,state:'RUNNING'};this.publish();}
+ /** Back on the overworld: the result is published and the temporary data restored. */
+ endBattle(outcome:'WIN'|'LOSS'|'DRAW'|'ABORTED'|'UNKNOWN'){this.battle={active:null,state:null,last:{encounterId:this.battle.active!,outcome},spec:this.battle.spec};this.publish();}
+ setSafe(safe:boolean){this.safe=safe;this.publish();}
  trainerVictory(baseReward:number,eventId?:string){const before=this.money;this.money+=baseReward;this.publish();return this.gameEvent('TRAINER_VICTORY',{moneyBefore:before,moneyAfter:this.money,baseReward},eventId);}
  setSteps(absolute:number,eventId?:string){return this.gameEvent('STEPS_CHANGED',{absolute},eventId);}
  pokemonFainted(slot:number,speciesId:number,eventId?:string){return this.gameEvent('POKEMON_FAINTED',{slot,speciesId},eventId);}
  battleEnded(outcome:'WIN'|'LOSS'|'FLEE'|'OTHER',conscious:number,eventId?:string){return this.gameEvent('BATTLE_ENDED',{outcome,conscious},eventId);}
  /** Disconnects, then connects again as the same installation with the same game (money, party). */
- async reconnect(){this.close();return FakeGameClient.connect({...this.options,money:this.money,party:[...this.party],location:this.location});}
+ async reconnect(){
+  this.close();
+  const next=await FakeGameClient.connect({...this.options,money:this.money,party:[...this.party],location:this.location});
+  // The battle state survives like the client's battle-encounters.json.
+  next.battle=this.battle;next.safe=this.safe;next.publish();return next;
+ }
 
  private ack(command:Command,ok:boolean,body:Record<string,unknown>){this.socket.emit('COMMAND_ACK',{type:'COMMAND_ACK',protocolVersion:1,commandId:command.commandId,ok,...body});}
  private handle(command:Command){
@@ -88,6 +103,15 @@ export class FakeGameClient{
    case 'game.pokemon.insert':this.party.push(p.raw);break;
    case 'game.pokemon.remove':this.party.splice(p.slot-1,1);break;
    case 'game.pokemon.replace':this.party[p.slot-1]=p.raw;break;
+   case 'game.battle.start':{
+    // Same rules as Gen3BattleEncounter: an encounter is started once; unsafe or busy games refuse without writing.
+    if(this.battle.last?.encounterId===p.encounterId)return this.ack(command,true,{result:{state:'ENDED',outcome:this.battle.last.outcome}});
+    if(this.battle.active)return this.battle.active===p.encounterId?this.ack(command,true,{result:{state:this.battle.state}}):this.ack(command,false,{error:{code:'battle_busy'}});
+    if(!this.safe)return this.ack(command,false,{error:{code:'not_safe'}});
+    this.battle={active:p.encounterId,state:'STARTING',last:this.battle.last,spec:p};
+    if(this.mode==='ack-lost')return;
+    return this.ack(command,true,{result:{state:'STARTING'}});
+   }
    case 'pokemon.purchase':if(this.party.length>=6)return this.ack(command,false,{error:{code:'party_full'}});this.money-=p.price;this.party.push(p.raw);break;
   }
   this.publish();

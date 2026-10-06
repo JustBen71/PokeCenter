@@ -44,7 +44,8 @@ public static class Program
                 await using var romFile = File.OpenRead(rom);
                 identity = await Games.LocalRomIdentity.FromStreamAsync(romFile, cancellation.Token);
             }
-            await new ClientRuntime(configuration, bridge, server, new ClientLog(Console.Out), romIdentity: identity, outbox: new Runtime.GameEventOutbox(Runtime.GameEventOutbox.PathNextTo(path))).RunAsync(cancellation.Token);
+            await new ClientRuntime(configuration, bridge, server, new ClientLog(Console.Out), romIdentity: identity, outbox: new Runtime.GameEventOutbox(Runtime.GameEventOutbox.PathNextTo(path)),
+                battles: new Games.Pokemon.Gen3.BattleEncounterStore(Games.Pokemon.Gen3.BattleEncounterStore.PathNextTo(path))).RunAsync(cancellation.Token);
             return 0;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return 0; }

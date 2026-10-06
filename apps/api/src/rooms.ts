@@ -40,6 +40,7 @@ export function createPortal(store:Store,config:Config){
   for(const c of clients)if(c.gameState&&c.adapter.status==='ready'&&lobbies.isMember(lobbyId,c.accountId)){
    void services.objectives.observe(lobbyId,c.accountId,c.gameState.progression.completed).catch(error=>console.error('Objectives:',error));
    void services.passiveEngine.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Passives:',error));
+   void services.battles.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Battles:',error));
   }
  };
  const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,passiveHandlers:config.passives?.handlers,random:config.passives?.random,

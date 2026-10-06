@@ -61,6 +61,7 @@ export function registerGameRoutes(app:Express,s:Services,changed:(lobbyId:strin
    s.auctions.commandResolved(command.id,applied);
    s.shop.commandResolved(command.id,applied);
    s.passiveEngine.commandResolved(command.id,applied);
+   s.battles.commandResolved(command.id,applied);
    return record;
   });
   changed(lobbyId,'money');return resolved;

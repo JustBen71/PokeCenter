@@ -3,12 +3,13 @@ using static Pokerace.Client.Games.Pokemon.Gen3.Gen3PokemonDecoder;
 
 namespace Pokerace.Client.Games.Pokemon.Gen3;
 
-public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile profile, bool writesEnabled = false) : IGameAdapter
+public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile profile, bool writesEnabled = false, BattleEncounterStore? battles = null) : IGameAdapter
 {
     public static readonly string[] ReadCapabilities = ["trainer.read", "money.read", "party.read", "location.read", "progression.read"];
     public static readonly string[] WriteCapabilities = ["money.write", "party.write", "pokemon.insert", "pokemon.remove", "pokemon.replace"];
     // Writes are announced only for a write-validated profile, a transactional bridge and local consent.
-    private readonly string[] capabilities = writesEnabled && profile.AllowWrites && bridge is ITransactionalBridge ? ReadCapabilities.Concat(WriteCapabilities).ToArray() : ReadCapabilities;
+    private readonly string[] capabilities = writesEnabled && profile.AllowWrites && bridge is ITransactionalBridge
+        ? ReadCapabilities.Concat(WriteCapabilities).Concat(profile.Battle != null && battles != null ? [Gen3BattleEncounter.Capability] : []).ToArray() : ReadCapabilities;
     private readonly Gen3Memory memory = new(bridge);
     private readonly System.Text.Json.Nodes.JsonObject data = Gen3ProfileRegistry.Resource("game-data");
     private readonly System.Text.Json.Nodes.JsonObject progression = Gen3ProfileRegistry.Resource("progression");
@@ -42,10 +43,11 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
         if (!ptr1.SequenceEqual(await memory.ReadAsync(profile.SaveBlock1Pointer, 4, cancellation)) ||
             !ptr2.SequenceEqual(await memory.ReadAsync(profile.SaveBlock2Pointer, 4, cancellation)) ||
             count != (await memory.ReadAsync(profile.PartyCountAddress, 1, cancellation))[0]) throw new InvalidDataException("Game changed during observation.");
+        var battle = capabilities.Contains(Gen3BattleEncounter.Capability) ? await Gen3BattleEncounter.TrackAsync(bridge, profile, profile.Battle!, battles!, cancellation) : null;
         var adapter = new GameAdapterState("pokemon.emerald.gen3", "ready", profile.ProfileId, capabilities);
         return new(GameObservation.GameStateVersion, adapter, new("pokemon", 3, "emerald", profile.Language, profile.Revision),
             new(name, money, hours * 3600 + trainer[16] * 60 + trainer[17], count),
             new(location[0], location[1], data["maps"]![profile.Language]![$"{location[0]}:{location[1]}"]?.GetValue<string>() ?? $"Zone inconnue ({location[0]}:{location[1]})"),
-            party, new(1, completed), capabilities, DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"));
+            party, new(1, completed), capabilities, DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"), battle);
     }
 }

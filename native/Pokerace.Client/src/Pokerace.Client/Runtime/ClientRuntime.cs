@@ -13,12 +13,16 @@ public sealed record ClientStatus(bool ServerConnected, string? LastError, Bridg
 
 public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClient bridge, IServerConnection server, ClientLog log,
     TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null, TextWriter? notices = null,
-    GameEventOutbox? outbox = null)
+    GameEventOutbox? outbox = null, Games.Pokemon.Gen3.BattleEncounterStore? battles = null)
 {
     private readonly TextWriter notices = notices ?? Console.Error;
     private readonly BridgeConnectionManager manager = new(bridge, log, pollInterval, retryInterval);
-    private readonly GameAdapterManager games = new(bridge, romIdentity, configuration.AllowPokemonPurchases);
-    private readonly CommandRouter router = new(bridge, configuration, romIdentity: romIdentity);
+    // One battle store shared by the command (start) and the observation loop (follow, result, restore).
+    private readonly Games.Pokemon.Gen3.BattleEncounterStore battleStore = battles ?? new(null);
+    private GameAdapterManager games => gamesInstance ??= new(bridge, romIdentity, configuration.AllowPokemonPurchases, battleStore);
+    private GameAdapterManager? gamesInstance;
+    private CommandRouter router => routerInstance ??= new(bridge, configuration, romIdentity: romIdentity, battles: battleStore);
+    private CommandRouter? routerInstance;
     private readonly Channel<(ServerMessage Message, long Session)> commands = Channel.CreateBounded<(ServerMessage, long)>(64);
     private long session;
     private volatile string? lastError;

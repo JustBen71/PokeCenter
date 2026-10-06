@@ -17,6 +17,7 @@ export class BattleRepository{
  get(id:string):BattleEncounter|undefined{const row=this.db.prepare('SELECT * FROM battle_encounters WHERE id=?').get(id) as Row|undefined;return row&&toEncounter(row);}
  require(lobbyId:string,id:string){const e=this.get(id);if(!e||e.lobbyId!==lobbyId)throw new DomainError('NOT_FOUND','Combat introuvable');return e;}
  list(lobbyId:string):BattleEncounter[]{return (this.db.prepare('SELECT * FROM battle_encounters WHERE lobby_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100').all(lobbyId) as Row[]).map(toEncounter);}
+ byCommand(commandId:string):BattleEncounter|undefined{const row=this.db.prepare('SELECT * FROM battle_encounters WHERE command_id=?').get(commandId) as Row|undefined;return row&&toEncounter(row);}
  // The queued, in-progress or uncertain battle of a player (at most one, unique index).
  active(lobbyId:string,accountId:string):BattleEncounter|undefined{
   const row=this.db.prepare("SELECT * FROM battle_encounters WHERE lobby_id=? AND account_id=? AND status IN ('WAITING_SAFE_STATE','SENDING','STARTING','RUNNING','REVIEW')").get(lobbyId,accountId) as Row|undefined;

@@ -77,7 +77,8 @@ public sealed class EmulatorSession : IAsyncDisposable
             var bridge = new BridgeClient(configuration, () => token);
             var server = new ServerConnection(configuration);
             var runtime = new ClientRuntime(configuration, bridge, server, new ClientLog(sync), romIdentity: identity, notices: sync,
-                outbox: new GameEventOutbox(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(directory))!, "game-events.json")));
+                outbox: new GameEventOutbox(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(directory))!, "game-events.json")),
+                battles: new Games.Pokemon.Gen3.BattleEncounterStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(directory))!, "battle-encounters.json")));
             var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             return new EmulatorSession(emulator, runtime, lifetime, runtime.RunAsync(lifetime.Token), log, bridge, server, logPath);
         }

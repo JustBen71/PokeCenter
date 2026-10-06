@@ -17,7 +17,9 @@ public sealed record PokemonSnapshot(int Slot, int SpeciesId, string SpeciesName
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PokemonArtifactSnapshot? Artifact = null);
 public sealed record ProgressionSnapshot(int Version, string[] Completed);
 public sealed record GameSnapshot(int GameStateVersion, GameAdapterState Adapter, GameIdentity Game, TrainerSnapshot Trainer,
-    LocationSnapshot Location, PokemonSnapshot[] Party, ProgressionSnapshot Progression, string[] Capabilities, string ObservedAt);
+    LocationSnapshot Location, PokemonSnapshot[] Party, ProgressionSnapshot Progression, string[] Capabilities, string ObservedAt,
+    // Commanded-battle state, only for adapters announcing battle.trainer.start (reconciliation after a reconnection).
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Pokemon.Gen3.BattleStateSnapshot? Battle = null);
 public sealed record GameObservation(GameAdapterState Adapter, GameSnapshot? State)
 {
     // Version 2 = generic multi-generation contract (packages/shared/src/native-client.ts).

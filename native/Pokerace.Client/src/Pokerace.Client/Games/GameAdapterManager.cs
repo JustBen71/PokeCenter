@@ -3,7 +3,7 @@ using Pokerace.Client.Games.Pokemon.Gen3;
 
 namespace Pokerace.Client.Games;
 
-public sealed class GameAdapterManager(IBridgeClient bridge, LocalRomIdentity? identity, bool writesEnabled = false)
+public sealed class GameAdapterManager(IBridgeClient bridge, LocalRomIdentity? identity, bool writesEnabled = false, BattleEncounterStore? battles = null)
 {
     private GameObservation latest = GameObservation.Unavailable("no_game");
     private IGameAdapter? adapter;
@@ -17,7 +17,7 @@ public sealed class GameAdapterManager(IBridgeClient bridge, LocalRomIdentity? i
         if (profile == null) return GameObservation.Unavailable(result);
         if (!identity.MatchesLoadedGame(await bridge.GetGameInfoAsync(cancellation))) return GameObservation.Unavailable("rom_identity_unavailable");
         if (!Gen3Memory.HasDomains(await bridge.GetMemoryDomainsAsync(cancellation))) return GameObservation.Unavailable("memory_domain_unavailable", profile.ProfileId);
-        adapter ??= new Gen3GameAdapter(bridge, profile, writesEnabled);
+        adapter ??= new Gen3GameAdapter(bridge, profile, writesEnabled, battles);
         var snapshot = await adapter.ReadAsync(cancellation);
         // Do not publish a previous game's data if the user switched ROMs during reads.
         if (!identity.MatchesLoadedGame(await bridge.GetGameInfoAsync(cancellation))) return GameObservation.Unavailable("rom_identity_unavailable");

@@ -1,6 +1,7 @@
 import {decodePokemonCopy} from './pokemon-copy.js';
 import {z} from 'zod';
 import {progressionData} from './progression-data.js';
+import {battleStateSchema} from './battles.js';
 
 export const adapterStatusSchema=z.enum(['no_game','unsupported_system','unknown_rom','rom_identity_unavailable','profile_not_validated','memory_domain_unavailable','ready','read_error']);
 export const readCapabilitySchema=z.enum(['trainer.read','money.read','party.read','location.read','progression.read']);
@@ -50,7 +51,9 @@ export const nativeGameStateSchema=z.object({
  location:locationSchema,
  party:z.array(pokemonLiveStateSchema).max(6),
  progression:progressionSchema,
- capabilities,observedAt:z.string().datetime()
+ capabilities,observedAt:z.string().datetime(),
+ // Only from adapters announcing battle.trainer.start: commanded-battle state for the reconciliation.
+ battle:battleStateSchema.optional()
 }).strict().superRefine((s,ctx)=>{
  const fail=(message:string)=>ctx.addIssue({code:z.ZodIssueCode.custom,message});
  if(s.party.length!==s.trainer.partyCount||!s.party.every((p,i)=>p.slot===i+1))fail('party does not match partyCount/slots');

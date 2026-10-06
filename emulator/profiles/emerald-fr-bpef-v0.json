@@ -12,6 +12,36 @@
   "allowWrites": true,
   "sources": [
     "https://github.com/mgba-emu/mgba/blob/master/res/scripts/demos/pokemon.lua",
-    "https://github.com/pret/pokeemerald"
-  ]
+    "https://github.com/pret/pokeemerald",
+    "https://github.com/pret/pokeemerald/blob/master/src/battle_util2.c (AllocateBattleResources → CreateSecretBaseEnemyParty)"
+  ],
+  "battle": {
+    "status": "write-validated",
+    "validatedOn": "2026-10-06, BizHawk 2.11.1 Linux, BPEF v0: real secret-base trainer battle started from the overworld, won, money/XP applied, RAM restored",
+    "gMain": 50340544,
+    "callback2Overworld": 134766189,
+    "scriptContextStatus": 50335288,
+    "scriptContext": 50335296,
+    "lockFieldControls": 50335532,
+    "battleTypeFlags": 33697772,
+    "trainerBattleOpponentA": 33786826,
+    "specialVar8004": 33781216,
+    "battleOutcome": 33702714,
+    "romSpecialTrainerBattleReturn": 136685480,
+    "romReleaseAllEnd": 136315861,
+    "saveBlock1SecretBases": 6812,
+    "saveBlock1Vars": 5020,
+    "secretBaseSlot": 19,
+    "evidence": {
+      "gMain": "callbacks point into ROM, vblankCounter1 increments; callback2 on the overworld = CB2_Overworld",
+      "scriptContext": "two ScriptContext structs (global, immediate) whose cmdTable/cmdTableEnd = 0x081DB39C/0x081DB728 (227 commands, as in pokeemerald); status byte 8 bytes before, sLockFieldControls after the immediate context",
+      "specialsTable": "0x081DB784, 527 THUMB pointers (data/specials.inc)",
+      "battleTypeFlags/trainerBattleOpponentA": "literal pool of special 16 PrepSecretBaseBattleFlags (with constant 0x08000008 = BATTLE_TYPE_TRAINER|BATTLE_TYPE_SECRET_BASE)",
+      "specialVar8004": "special 239 DoSpecialTrainerBattle: ldr r2,=0x020375E0; ldrh r1,[r2]; switch on gSpecialVar_0x8004",
+      "battleOutcome": "special 183 GetBattleOutcome returns it",
+      "romSpecialTrainerBattleReturn": "bytes 25 EF 00 27 03 = special DoSpecialTrainerBattle; waitstate; return (BattleFrontier_BattlePyramidTop)",
+      "romReleaseAllEnd": "bytes 6B 02 = releaseall; end",
+      "saveBlock1": "struct SaveBlock1 offsets (vars 0x139C, secretBases 0x1A9C, 20 × 0xA0); flags offset 0x1270 of this profile matches"
+    }
+  }
 }
