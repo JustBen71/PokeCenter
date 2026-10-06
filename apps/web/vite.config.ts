@@ -1,2 +1,5 @@
 import {defineConfig} from "vite";import react from "@vitejs/plugin-react";
-export default defineConfig({plugins:[react()],server:{proxy:{"/rooms":{target:"http://localhost:3000",ws:true},"/api":"http://localhost:3000","/socket.io":"ws://localhost:3000"}},build:{outDir:"dist"}});
+// POKERACE_API_URL lets the browser E2E point the dev/preview proxy at its own API port.
+const api=process.env.POKERACE_API_URL??"http://localhost:3000";
+const proxy={"/rooms":{target:api,ws:true},"/api":api,"/socket.io":{target:api,ws:true}};
+export default defineConfig({plugins:[react()],server:{proxy},preview:{proxy},build:{outDir:"dist"}});

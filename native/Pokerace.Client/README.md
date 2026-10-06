@@ -10,7 +10,7 @@ BizHawk → Pokerace.BizHawkBridge → TCP 127.0.0.1 → Pokerace.Client
                                               Serveur Pokérace
 ```
 
-Le projet suit [le cahier des charges client](../../README_POKERACE_CLIENT_CODEX.md). Le bridge existant reste dans `bridges/bizhawk` : aucun déplacement n'est nécessaire et le client livré ne référence ni son projet ni les assemblies internes de BizHawk. Seuls les tests utilisent son cœur indépendant pour simuler un bridge fidèle au protocole réel.
+Le bridge existant reste dans `bridges/bizhawk` : aucun déplacement n'est nécessaire et le client livré ne référence ni son projet ni les assemblies internes de BizHawk. Seuls les tests utilisent son cœur indépendant pour simuler un bridge fidèle au protocole réel.
 
 ## Démarrage sous Windows
 
@@ -22,7 +22,7 @@ Utiliser la distribution `win-x64` ou la construire avec les commandes ci-dessou
 ./Pokerace.Client.exe configure
 ```
 
-Renseigner l'URL **HTTP ou HTTPS** du serveur, le nom du joueur et le code du salon. Si les comptes sont obligatoires sur le serveur, ce nom doit correspondre à un compte créé sur le portail. Un identifiant local est généré et conservé dans la configuration ; un fichier existant n'est pas écrasé par `configure`.
+Renseigner l'URL **HTTP ou HTTPS** du serveur, le nom du joueur et le code du salon. Si les comptes sont obligatoires sur le serveur, ce nom doit correspondre à un compte créé sur le portail. Un identifiant local est généré et conservé dans la configuration ; un fichier existant n'est pas écrasé par `configure`. Le lanceur `play` accepte aussi une adresse sans schéma (`88.184.14.248`, `hôte:port`) et la normalise (voir [docs/bizhawk-launcher.md](../../docs/bizhawk-launcher.md)).
 
 Le client et BizHawk doivent recevoir le **même token de session**, choisi lors du lancement du bridge :
 

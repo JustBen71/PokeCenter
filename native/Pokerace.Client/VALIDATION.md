@@ -66,12 +66,19 @@ La dernière commande a été exécutée pour les **quatre** RID : `win-x64`, `l
 - Le scénario utilise `play --rom` et une configuration de serveur locale explicite. La sélection graphique native et la saisie interactive ne sont pas automatisées dans ce test.
 - Le fichier `pokerace.cmd` prépare le même exécutable depuis les sources si nécessaire. La distribution de l'exécutable n'a besoin ni de Node, ni de Python, ni du SDK .NET.
 
+## Sprint de conformité — 6 octobre 2026
+
+- Cause du E2E BizHawk rouge : le serveur de test de `e2e-client.mjs` ne répondait pas à `POST /api/rooms/resolve` (voir `bridges/bizhawk/e2e/README.md`). Correctif : `tools/e2e-server.mjs`.
+- `gameStateVersion = 2` (contrat multi-génération, copie Gen III dans `artifact`) ; le serveur accepte encore la version 1.
+- Exécuté sous Linux x64 (.NET 8.0.425, Node 22) : `dotnet test native/Pokerace.Client/Pokerace.Client.sln --configuration Release` → **166 réussis**, dont `ServerAddressTests` (normalisation d'adresse, port, causes d'erreur, vrai client contre `e2e-server.mjs` sur port dynamique). `e2e-client.mjs` a aussi été exécuté de bout en bout contre un bridge simulé (cœur TCP réel, système `NES`) : `E2E_BIZHAWK_CLIENT_VERIFIED` ; l'ancienne version du script reproduit exactement `server_timeout` puis `Client readiness timeout`.
+- **Non vérifié ici** : le workflow GitHub Actions avec le vrai BizHawk (runner Windows) doit être relancé après le push pour confirmer le passage au vert.
+
 ## Limites connues
 
 - Le cache d'idempotence vit en mémoire jusqu'à la fin du processus, maximum 4 096 identifiants. Un redémarrage du client supprime ce cache ; le serveur doit réconcilier les écritures incertaines avant retransmission.
 - Les tests de transport utilisent WS local avec autorisation explicite dans la configuration du fixture. En production, HTTPS/WSS est obligatoire et la validation des certificats .NET est conservée. Aucun serveur public réel n'a été utilisé pour ces tests.
 - La version de BizHawk n'est pas disponible dans le protocole actuel du bridge et n'est donc pas annoncée par le client.
 - Le nouveau namespace `/client` doit être présent sur le serveur. Un ancien serveur sans ce namespace est refusé explicitement ; aucun basculement silencieux vers `/agent`.
-- L’adaptateur Émeraude alimente désormais les équipes et la progression du dashboard. Les enchères, la roulette et les écritures métier restent sur l’ancien agent ; aucune validation sur ROM commerciale réelle dans BizHawk n’est revendiquée.
+- L’adaptateur Émeraude alimente les équipes, la progression et l’argent du dashboard, et exécute les écritures métier vérifiées (argent, équipe, achat d’enchère) quand le profil l’autorise. Ces écritures sont `UNIT_VERIFIED` et `FAKE_GAME_VERIFIED`, pas `REAL_BIZHAWK_VERIFIED` : aucune validation sur une vraie ROM Émeraude n’a été faite dans BizHawk.
 - La compatibilité de l'émulateur/bridge sur Linux ou macOS est distincte de la portabilité du client.
 - Aucune ROM, sauvegarde, donnée mémoire privée ou installation personnelle de BizHawk n'a été utilisée.

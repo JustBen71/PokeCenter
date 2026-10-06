@@ -55,7 +55,7 @@ public sealed class GameWriteTests
         var copy = Hex(GameAdapterTests.MemoryBridge.Pokemon(7));
         var result = await router.RouteAsync(Command("game.pokemon.insert", new() { ["raw"] = copy, ["expectedCount"] = 2 }), default);
         Assert.True(result.Ok); Assert.Equal(3, result.Result!["partyCount"]!.GetValue<int>());
-        var state = await Observe(bridge); Assert.Equal(3, state.Party.Length); Assert.Equal(copy, state.Party[2].Raw);
+        var state = await Observe(bridge); Assert.Equal(3, state.Party.Length); Assert.Equal(copy, state.Party[2].Artifact!.Raw);
         Assert.Equal("state_changed", (await router.RouteAsync(Command("game.pokemon.insert", new() { ["raw"] = copy, ["expectedCount"] = 2 }), default)).ErrorCode);
         Assert.Equal("invalid_pokemon", (await router.RouteAsync(Command("game.pokemon.insert", new() { ["raw"] = new string('0', 200), ["expectedCount"] = 3 }), default)).ErrorCode);
         await using var full = Bridge(0, 1, 2, 3, 4, 5);
@@ -69,7 +69,7 @@ public sealed class GameWriteTests
         Assert.Equal("state_changed", (await router.RouteAsync(Command("game.pokemon.remove", new() { ["slot"] = 2, ["expectedRaw"] = Hex(GameAdapterTests.MemoryBridge.Pokemon(12)), ["expectedCount"] = 3 }), default)).ErrorCode);
         Assert.True((await router.RouteAsync(Command("game.pokemon.remove", new() { ["slot"] = 2, ["expectedRaw"] = middle, ["expectedCount"] = 3 }), default)).Ok);
         var state = await Observe(bridge);
-        Assert.Equal([Hex(GameAdapterTests.MemoryBridge.Pokemon(10)), Hex(GameAdapterTests.MemoryBridge.Pokemon(12))], state.Party.Select(p => p.Raw!).ToArray());
+        Assert.Equal([Hex(GameAdapterTests.MemoryBridge.Pokemon(10)), Hex(GameAdapterTests.MemoryBridge.Pokemon(12))], state.Party.Select(p => p.Artifact!.Raw).ToArray());
         var profile = new Gen3ProfileRegistry().Resolve(Identity.Sha256).Profile!;
         Assert.All(bridge.Ewram.AsSpan((int)profile.PartyAddress - 0x02000000 + 200, 100).ToArray(), b => Assert.Equal(0, b));
         await using var single = Bridge(3);
@@ -83,7 +83,7 @@ public sealed class GameWriteTests
         var copy = Hex(GameAdapterTests.MemoryBridge.Pokemon(99));
         Assert.True((await router.RouteAsync(Command("game.pokemon.replace", new() { ["slot"] = 2, ["expectedRaw"] = Hex(GameAdapterTests.MemoryBridge.Pokemon(21)), ["raw"] = copy, ["expectedCount"] = 2 }), default)).Ok);
         var state = await Observe(bridge);
-        Assert.Equal(Hex(GameAdapterTests.MemoryBridge.Pokemon(20)), state.Party[0].Raw); Assert.Equal(copy, state.Party[1].Raw); Assert.Equal(12500u, state.Trainer.Money);
+        Assert.Equal(Hex(GameAdapterTests.MemoryBridge.Pokemon(20)), state.Party[0].Artifact!.Raw); Assert.Equal(copy, state.Party[1].Artifact!.Raw); Assert.Equal(12500u, state.Trainer.Money);
     }
 
     [Fact] public async Task LocalSwitchBlocksWritesButNotSnapshots()

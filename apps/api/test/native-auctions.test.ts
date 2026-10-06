@@ -9,7 +9,7 @@ import {registerAuctions} from '../src/auction-routes.js';
 import {registerAccounts} from '../src/accounts.js';
 import {Store} from '../src/store.js';
 import type {BuiltPokemon,PokemonInjection} from '@pokerace/shared';
-import {encodePokemon} from '@pokerace/shared';
+import {encodePokemon,nativeDisplayState} from '@pokerace/shared';
 import {createApp} from '../src/app.js';
 import {io as connect} from 'socket.io-client';
 
@@ -23,10 +23,10 @@ test('one native player can bid, receive one purchase command, and save an exact
   await new Promise<void>((r,j)=>{socket.once('connect',r);socket.once('connect_error',j);});
   const native=nativeClient();native.lastSeenAt=new Date().toISOString();native.accountId='p-ben';
   const lot=await generateLot(auctionParticipants([],[native]),()=>0,build);
-  native.gameState!.party[0].raw=encodePokemon(lot.template);
+  native.gameState!.party[0].artifact={format:'gen3-party-v1',raw:encodePokemon(lot.template)};
   socket.emit('HELLO',{type:'HELLO',protocolVersion:1,clientVersion:'test',playerId:'installation-ben',platform:'windows',bridge:native.bridge,emulator:{name:'BizHawk'},system:'GBA'});
   socket.emit('CLIENT_STATUS',{type:'CLIENT_STATUS',protocolVersion:1,connected:true,allowMemoryWrites:false,canPurchase:true});
-  socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:1,adapter:native.adapter,state:native.gameState});
+  socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:native.adapter,state:native.gameState});
   for(let i=0;i<100&&!nativeClients.publicSnapshot()[0]?.gameState;i++)await new Promise(r=>setTimeout(r,5));
   assert.ok(nativeClients.publicSnapshot()[0]?.gameState);
   store.putAuction({...lot,id:'solo-auction',createdAt:new Date().toISOString(),status:'open',bids:[],log:[],uncertainty:25});
@@ -37,7 +37,7 @@ test('one native player can bid, receive one purchase command, and save an exact
   const accept=()=>post('/api/auctions/solo-auction/accept',{playerId:'p-ben',amount:100});
   assert.equal((await accept()).body.status,'sold');assert.equal((await accept()).body.status,'sold');assert.equal(received.length,1);
   assert.equal(received[0].command,'pokemon.purchase');assert.equal(received[0].payload.price,100);assert.equal(received[0].payload.expectedMoney,12500);
-  const pokemon=nativeClients.publicSnapshot()[0].gameState!.party[0];
+  const pokemon=nativeDisplayState(nativeClients.publicSnapshot()[0].gameState!).party[0];
   const saved=await post('/api/library',{label:'Mon Pokémon',pokemon,source:'Ben',capturedAt:native.gameState!.observedAt});
   assert.equal(saved.status,201);assert.equal(store.library()[0].pokemon!.raw,pokemon.raw);
  }finally{socket.close();await new Promise<void>(r=>io.close(()=>r()));store.close();}

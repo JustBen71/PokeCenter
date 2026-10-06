@@ -94,7 +94,10 @@ export type LibraryEntry=z.infer<typeof libraryInputSchema>&{id:string;createdAt
 
 export type PlayerState = z.infer<typeof playerStateSchema>;
 export type AgentEnvelope = z.infer<typeof agentEnvelopeSchema>;
-export type PublicPlayer = {account?:import('./accounts.js').Account;playerId:string; connected:boolean; receivedAt:string; lastSeenAt:string; state:Omit<PlayerState,"game"> & {game:Omit<PlayerState["game"],"romSha256">}};
+// Display shape shared by /agent players and native clients of any generation (see nativeDisplayState).
+export type PublicPlayer = {account?:import('./accounts.js').Account;playerId:string; connected:boolean; receivedAt:string; lastSeenAt:string; state:Omit<PlayerState,"game"|"location"> & {
+  game:Omit<PlayerState["game"],"romSha256"|"name"|"language"> & {name:string;language:string|null};
+  location:{label:string;mapGroup?:number;mapNumber?:number;region?:string;mapId?:string}|null}};
 
 export function toPublicPlayer(row:{playerId:string;connected:boolean;receivedAt:string;lastSeenAt:string;state:PlayerState}):PublicPlayer {
   const {romSha256: _secret, ...game} = row.state.game;

@@ -1,4 +1,4 @@
-import type {PublicNativeClient,PublicPlayer} from '@pokerace/shared';
+import {nativeDisplayState,type PublicNativeClient,type PublicPlayer} from '@pokerace/shared';
 
 export const nativeActionUnavailable="Cette action nécessite une version du client qui la prend en charge. Relancez le lanceur mis à jour pour activer les achats et la copie vers la bibliothèque.";
 export const adapterLabels:Record<PublicNativeClient['adapter']['status'],string>={no_game:'Aucun jeu chargé',unsupported_system:'Système non pris en charge',unknown_rom:'ROM non reconnue',rom_identity_unavailable:'Identité de la ROM indisponible — utilisez le lanceur',profile_not_validated:'Profil non validé',memory_domain_unavailable:'Mémoire du jeu indisponible',ready:'Lecture du jeu active',read_error:'Lecture interrompue — nouvelle tentative automatique'};
@@ -16,8 +16,7 @@ export function playerViews(players:PublicPlayer[],clients:PublicNativeClient[])
   const display:PublicPlayer=source==='legacy'?legacy!:{
    account:legacy?.account,playerId:accountId,connected:!!native?.ready,receivedAt:game?.observedAt??native!.lastSeenAt,lastSeenAt:native!.lastSeenAt,
    state:{protocolVersion:1,playerId:accountId,playerName:native!.playerName,
-    game:{name:'pokemon-emerald',language:game?.game.language??null,profileId:game?.adapter.profileId??null,romStatus:game?'recognized':native!.bridge.gameLoaded?'unknown':'missing',revision:game?.game.revision??null,header:null},
-    trainer:game?.trainer??null,location:game?.location??null,party:game?.party??[],progression:game?.progression??null,capabilities:[...(game?.capabilities??[]),...(native?.canPurchase?["auction-purchase-v1"]:[])],observedAt:game?.observedAt??native!.lastSeenAt,diagnostic:game?null:adapterLabels[native!.adapter.status]}
+    ...(game?nativeDisplayState(game):{game:{name:'pokemon',language:null,profileId:null,romStatus:native!.bridge.gameLoaded?'unknown' as const:'missing' as const,revision:null,header:null},trainer:null,location:null,party:[],progression:null}),capabilities:[...(game?.capabilities??[]),...(native?.canPurchase?["auction-purchase-v1"]:[])],observedAt:game?.observedAt??native!.lastSeenAt,diagnostic:game?null:adapterLabels[native!.adapter.status]}
   };
   return {accountId,legacy,native,display,source,legacyActionsAvailable:legacy?.connected===true};
  });

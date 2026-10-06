@@ -48,7 +48,9 @@ public sealed class SocketIoCompatibilityTests
                 {
                     Assert.Equal(12500, (int)game["trainer"]!["money"]!);
                     Assert.Single(game["party"]!.AsArray());
-                    Assert.Equal(200, game["party"]![0]!["raw"]!.GetValue<string>().Length);
+                    Assert.Equal(2, (int)game["gameStateVersion"]!);
+                    Assert.Equal("gen3-party-v1", game["party"]![0]!["artifact"]!["format"]!.GetValue<string>());
+                    Assert.Equal(200, game["party"]![0]!["artifact"]!["raw"]!.GetValue<string>().Length);
                     break;
                 }
                 Assert.True(DateTime.UtcNow < gameDeadline, "Production API did not accept C# GameAdapter state.");

@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {PublicPlayer} from '@pokerace/shared';
-import {nativeClient} from '../../../packages/shared/test/native-fixture.js';
+import {nativeClient,syntheticState} from '../../../packages/shared/test/native-fixture.js';
+import {nativeCan} from '../src/pokemon/game-actions.js';
+import {mapForPlayers} from '../src/map/game-maps.js';
 import {playerViews,adapterLabels,readOnlyParticipants,participantRoster} from '../src/native-clients.js';
 import {ranking} from '../src/progression.js';
 const legacy=():PublicPlayer=>{const display=playerViews([],[nativeClient()])[0].display;return {...display,state:{...display.state,trainer:{...display.state.trainer!,money:7}}};};
@@ -39,4 +41,31 @@ test('action roster replaces an offline legacy row but preserves the live legacy
  player.connected=true;
  const available=readOnlyParticipants(playerViews([player],[nativeClient()]));
  assert.deepEqual(available,[]);assert.equal(participantRoster([player],available)[0],player);
+});
+test('synthetic Gen IV/V clients display common fields and only the actions their capabilities announce',()=>{
+ for(const generation of [4,5] as const){
+  const state=syntheticState(generation);
+  const [view]=playerViews([],[nativeClient(state)]);
+  assert.equal(view.source,'native');
+  assert.equal(view.display.state.party[0].speciesName,state.party[0].speciesName);
+  assert.equal(view.display.state.party[0].nickname,'PINGU');
+  assert.equal(view.display.state.party[0].level,12);
+  assert.equal(view.display.state.party[0].currentHp,30);
+  assert.equal(view.display.state.location?.label,state.location.label);
+  assert.equal(view.display.state.trainer?.money,1250000);
+  assert.equal('raw' in view.display.state.party[0],false,'no Gen III copy for another generation');
+  assert.equal(nativeCan(view,'money.read'),true);
+  for(const write of ['money.write','pokemon.insert','pokemon.remove','pokemon.replace'] as const)assert.equal(nativeCan(view,write),false,write);
+ }
+ const gen3=nativeClient();gen3.adapter={...gen3.adapter,capabilities:[...gen3.adapter.capabilities,'money.write']};
+ assert.equal(nativeCan(playerViews([],[gen3])[0],'money.write'),true);
+});
+test('the map follows the game: Hoenn for Emerald, no structural Hoenn fallback for another region',()=>{
+ const emerald=playerViews([],[nativeClient()])[0].display;
+ assert.equal(mapForPlayers([emerald])?.region,'Hoenn');
+ assert.equal(mapForPlayers([emerald])?.areaFor(emerald)?.id!==undefined,true);
+ assert.equal(mapForPlayers([])?.region,'Hoenn','default while nobody is connected');
+ const gen4=playerViews([],[nativeClient(syntheticState(4))])[0].display;
+ assert.equal(gen4.state.game.name,'pokemon-platinum');
+ assert.equal(mapForPlayers([gen4]),undefined);
 });

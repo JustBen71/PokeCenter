@@ -1,4 +1,4 @@
-import type {PublicNativeClient,PublicPlayer} from '@pokerace/shared';
+import {nativeDisplayState,type PublicNativeClient,type PublicPlayer} from '@pokerace/shared';
 
 // Reading an active team is sufficient to generate a lot. Buying still uses /agent.
 export function auctionParticipants(legacy:PublicPlayer[],native:PublicNativeClient[]):PublicPlayer[]{
@@ -11,8 +11,7 @@ export function auctionParticipants(legacy:PublicPlayer[],native:PublicNativeCli
    playerId:client.accountId,account:players.get(client.accountId)?.account,connected:true,
    lastSeenAt:client.lastSeenAt,receivedAt:game.observedAt,
    state:{protocolVersion:1,playerId:client.accountId,playerName:client.playerName,
-    game:{name:'pokemon-emerald',language:game.game.language,profileId:game.adapter.profileId,romStatus:'recognized',revision:game.game.revision,header:null},
-    trainer:game.trainer,location:game.location,party:game.party,progression:game.progression,
+    ...nativeDisplayState(game),
     capabilities:client.canPurchase?["auction-purchase-v1"]:[],observedAt:game.observedAt,diagnostic:null}
   });
  }

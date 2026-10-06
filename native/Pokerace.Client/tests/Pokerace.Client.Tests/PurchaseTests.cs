@@ -18,7 +18,7 @@ public sealed class PurchaseTests
         Assert.True((await router.RouteAsync(command,default)).Ok);Assert.Equal(1,bridge.Transactions);
         var state=(await new GameAdapterManager(bridge,Identity).ObserveAsync(new(true,true,"GBA",1),default)).State!;
         Assert.Equal(12400u,state.Trainer.Money);Assert.Equal(2,state.Party.Length);
-        Assert.Equal(Convert.ToHexString(GameAdapterTests.MemoryBridge.Pokemon(0)).ToLowerInvariant(),state.Party[1].Raw);
+        Assert.Equal(Convert.ToHexString(GameAdapterTests.MemoryBridge.Pokemon(0)).ToLowerInvariant(),state.Party[1].Artifact!.Raw);
     }
     [Theory][InlineData("money")][InlineData("party")][InlineData("rom")]
     public async Task ChangedStateCannotBeDebited(string change)

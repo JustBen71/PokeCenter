@@ -3,6 +3,7 @@ import {decodePokemonCopy,encodePokemon,type NativeGameState,type PokemonInjecti
 
 export type FakeMode='apply'|'timeout'|'ack-lost'|{refuse:string};
 type Command={commandId:string;command:string;payload:Record<string,any>};
+type ConnectOptions={base:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number};
 
 export const template=(speciesId=1,level=5,nickname='TEST'):PokemonInjection=>({playerId:'fake',slot:1,speciesId,nickname,level,experience:135,currentHp:20,
  stats:{maxHp:20,attack:10,defense:10,speed:10,spAttack:10,spDefense:10},moves:[{id:33,pp:35},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:3,friendship:70,
@@ -20,17 +21,21 @@ export class FakeGameClient{
  mode:FakeMode='apply';
  readonly received:Command[]=[];
  money:number;party:string[];completed:string[]=['starter'];
- private constructor(private readonly socket:Socket,private readonly writes:boolean,money:number,party:string[]){
-  this.money=money;this.party=party;
+ location:{mapGroup:number;mapNumber:number;label:string};
+ private constructor(private readonly socket:Socket,private readonly options:ConnectOptions,money:number,party:string[]){
+  this.money=money;this.party=party;this.location=options.location??{mapGroup:0,mapNumber:9,label:'Bourg-en-Vol'};
   socket.on('COMMAND',(command:Command)=>this.handle(command));
+  // Like Pokerace.Client: periodic heartbeats keep the observation fresh for long (browser) scenarios.
+  if(options.heartbeatMs){const timer=setInterval(()=>socket.emit('HEARTBEAT',{type:'HEARTBEAT',protocolVersion:1,clientVersion:'fake',bridgeConnected:true,system:'GBA'}),options.heartbeatMs);timer.unref();socket.on('disconnect',()=>clearInterval(timer));}
  }
+ private get writes(){return this.options.writes??true;}
 
- static async connect(options:{base:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean}){
+ static async connect(options:ConnectOptions){
   const playerId=options.playerId??`fake-${options.playerName.toLowerCase()}`;
   const socket=connect(`${options.base}/client`,{path:`/rooms/${options.lobbyId}/socket.io`,transports:['websocket'],reconnection:false,
    auth:{protocolVersion:1,playerId,playerName:options.playerName,roomCode:options.inviteCode}});
   await new Promise<void>((resolve,reject)=>{socket.once('connect',resolve);socket.once('connect_error',reject);});
-  const client=new FakeGameClient(socket,options.writes??true,options.money??12500,options.party??[rawPokemon()]);
+  const client=new FakeGameClient(socket,options,options.money??12500,options.party??[rawPokemon()]);
   const bridge={type:'bizhawk' as const,connected:true,protocolVersion:1 as const,gameLoaded:true};
   socket.emit('HELLO',{type:'HELLO',protocolVersion:1,clientVersion:'fake',playerId,platform:'test',bridge,emulator:{name:'BizHawk'},system:'GBA'});
   socket.emit('CLIENT_STATUS',{type:'CLIENT_STATUS',protocolVersion:1,connected:true,allowMemoryWrites:false,canPurchase:true});
@@ -41,13 +46,16 @@ export class FakeGameClient{
  state():NativeGameState{
   const capabilities=[...READ,...(this.writes?WRITE:[])];
   const adapter={id:'pokemon.emerald.gen3',status:'ready' as const,profileId:'emerald-fr-bpef-v0',capabilities};
-  return {gameStateVersion:1,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
-   trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{mapGroup:0,mapNumber:9,label:'Bourg-en-Vol'},
-   party:this.party.map((raw,i)=>({raw,slot:i+1,speciesId:1,speciesName:'Bulbizarre',nickname:null,level:decodePokemonCopy(raw).level,currentHp:20,maxHp:20,shiny:false})),
+  return {gameStateVersion:2,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
+   trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{...this.location},
+   party:this.party.map((raw,i)=>{const p=decodePokemonCopy(raw);
+    return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
    progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString()};
  }
- publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:1,adapter:state.adapter,state});}
+ publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});}
  close(){this.socket.close();}
+ /** Disconnects, then connects again as the same installation with the same game (money, party). */
+ async reconnect(){this.close();return FakeGameClient.connect({...this.options,money:this.money,party:[...this.party],location:this.location});}
 
  private ack(command:Command,ok:boolean,body:Record<string,unknown>){this.socket.emit('COMMAND_ACK',{type:'COMMAND_ACK',protocolVersion:1,commandId:command.commandId,ok,...body});}
  private handle(command:Command){

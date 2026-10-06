@@ -5,7 +5,7 @@
 ## Utilisation
 
 1. Depuis le projet, double-cliquer sur `pokerace.cmd`. Sinon, récupérer l'artefact **pokerace-launcher-win-x64** du workflow **BizHawk bridge**, extraire le ZIP et double-cliquer sur **Pokerace.Client.exe**.
-2. Au premier lancement, renseigner l'adresse **HTTP ou HTTPS** du serveur existant, le pseudo du compte créé sur son portail et le code de son salon. Le serveur doit prendre en charge le namespace `/client`.
+2. Au premier lancement, renseigner l'adresse **HTTP ou HTTPS** du serveur existant, le pseudo du compte créé sur son portail et le code de son salon. Le serveur doit prendre en charge le namespace `/client`. Formats acceptés : `88.184.14.248`, `88.184.14.248:8080`, `localhost:3000`, `http://…` ou `https://…` (sans chemin ni paramètres). L'adresse est normalisée une seule fois en `schéma://hôte[:port]`, puis le port est demandé à chaque lancement (Entrée conserve celui affiché, `--port` le fixe). En cas d'échec, le lanceur affiche la cause en français : adresse introuvable, connexion refusée, pas de réponse (timeout), salon refusé ou configuration invalide.
 3. Choisir sa ROM dans la fenêtre de sélection. Annuler cette fenêtre ne lance aucune session.
 4. BizHawk s'ouvre avec la ROM, le bridge et le client démarrent automatiquement. Les connexions au serveur sont affichées dans la console.
 5. Sauvegarder normalement dans le jeu. Fermer BizHawk ou appuyer sur **Entrée** dans la console pour arrêter la session. Si BizHawk attend une confirmation de sauvegarde, le lanceur ne force pas sa fermeture.

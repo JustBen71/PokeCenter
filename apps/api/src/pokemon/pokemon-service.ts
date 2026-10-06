@@ -1,4 +1,4 @@
-import {pokemonActionSchema,type Account,type GameCapability} from '@pokerace/shared';
+import {gen3PartyRaw,pokemonActionSchema,type Account,type GameCapability} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
 import type {CurrentGameService} from '../game/current-game-service.js';
@@ -25,8 +25,9 @@ export class PokemonService{
    const slotRaw=(slot:number)=>{
     const pokemon=state.party.find(p=>p.slot===slot);
     if(!pokemon)throw new DomainError('VALIDATION_FAILED','Cet emplacement est vide');
-    if(!pokemon.raw)throw new DomainError('CAPABILITY_MISSING','Le client n’envoie pas la copie exacte de ce Pokémon');
-    return pokemon.raw;
+    const raw=gen3PartyRaw(pokemon);
+    if(!raw)throw new DomainError('CAPABILITY_MISSING','Le client n’envoie pas la copie exacte de ce Pokémon');
+    return raw;
    };
    const command=action.action==='insert'?{command:'game.pokemon.insert' as const,payload:{raw:raw!,expectedCount}}
     :action.action==='remove'?{command:'game.pokemon.remove' as const,payload:{slot:action.slot,expectedRaw:slotRaw(action.slot),expectedCount}}

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {io as connect,type Socket} from 'socket.io-client';
 import {Store} from '../src/store.js';
 import {createApp} from '../src/app.js';
-import {nativeState} from '../../../packages/shared/test/native-fixture.js';
+import {nativeState,nativeStateV1,syntheticState} from '../../../packages/shared/test/native-fixture.js';
 const hello={type:'HELLO',protocolVersion:1,playerId:'installation-test',clientVersion:'0.1.0',platform:'windows-x64',emulator:{name:'BizHawk'},bridge:{type:'bizhawk',connected:true,gameLoaded:true,protocolVersion:1},system:'GBA'};
-const observation=()=>{const state=nativeState();return {type:'GAME_STATE',protocolVersion:1,gameStateVersion:1,adapter:state.adapter,state};};
+const observation=()=>{const state=nativeState();return {type:'GAME_STATE',protocolVersion:1,gameStateVersion:state.gameStateVersion,adapter:state.adapter,state};};
 function event(socket:Socket,name:string,predicate:(value:any)=>boolean=()=>true):Promise<any>{return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{socket.off(name,listener);reject(Error('Timed out: '+name));},3000);const listener=(value:any)=>{if(predicate(value)){clearTimeout(timer);socket.off(name,listener);resolve(value);}};socket.on(name,listener);});}
 async function fixture(t:test.TestContext){
  const store=new Store(':memory:');store.accounts();store.putAccount({id:'account-test',name:'Tester',sprite:'may',admin:false},'tester');
@@ -42,7 +42,20 @@ for(const variant of ['invalid','oversized','raw','write-capability'] as const)t
  const {client,dashboard,nativeClients}=await fixture(t);const value:any=observation();
  if(variant==='invalid')value.state.trainer.money=-1;
  if(variant==='oversized')value.state.trainer.name='x'.repeat(40000);
- if(variant==='raw')value.state.party[0].raw='00'.repeat(100);
+ if(variant==='raw')value.state.party[0].artifact={format:'gen3-party-v1',raw:'00'.repeat(100)};
  if(variant==='write-capability')value.adapter.capabilities=['party.write'];
  const gone=event(dashboard,'native-clients',r=>r.length===0);client.emit('GAME_STATE',value);await gone;assert.deepEqual(nativeClients.publicSnapshot(),[]);
+});
+test('older clients sending gameStateVersion 1 are still accepted and projected as version 2',async t=>{
+ const {client,dashboard}=await fixture(t);const state=nativeStateV1();
+ const update=event(dashboard,'native-clients',r=>r[0]?.gameState);client.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:1,adapter:state.adapter,state});
+ const [row]=await update;assert.equal(row.gameState.gameStateVersion,2);assert.equal(row.gameState.trainer.money,12500);
+});
+for(const [system,accepted] of [['NDS',true],['GBA',false]] as const)test(`synthetic Gen IV GAME_STATE on ${system} is ${accepted?'accepted':'rejected'}`,async t=>{
+ const {client,dashboard,nativeClients}=await fixture(t);const state=syntheticState(4);
+ // The fixture HELLO already announces GBA; switching to NDS is a visible change.
+ if(system!==hello.system){const bridged=event(dashboard,'native-clients',r=>r[0]?.system===system);client.emit('BRIDGE_STATUS',{type:'BRIDGE_STATUS',protocolVersion:1,bridge:hello.bridge,system});await bridged;}
+ const update=event(dashboard,'native-clients',r=>accepted?r[0]?.gameState?.game.generation===4:r.length===0);
+ client.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});await update;
+ if(accepted)assert.equal(nativeClients.publicSnapshot()[0].gameState?.party[0].speciesName,'Tiplouf');else assert.deepEqual(nativeClients.publicSnapshot(),[]);
 });

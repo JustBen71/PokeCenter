@@ -1,6 +1,5 @@
 // Run only against the disposable bridge/ROM started by bridges/bizhawk/e2e/run-e2e.ps1.
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, copyFile, writeFile, readFile, rm } from 'node:fs/promises';
@@ -8,15 +7,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { Server } from 'socket.io';
-import { registerNativeClients } from '../../../apps/api/src/native-clients.ts';
+import { startE2EServer } from './e2e-server.mjs';
 
 assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted', 'Disposable GitHub runner required');
 assert.ok(process.env.POKERACE_BRIDGE_TOKEN);
 const fixture = JSON.parse(await readFile(new URL('../../../bridges/bizhawk/e2e/test-config.json', import.meta.url)));
-const http = createServer();
-const io = new Server(http, { transports: ['websocket'] });
-const registry = registerNativeClients(io, { roomCode: 'e2e-room', accountsRequired: false }, () => undefined);
+// Free port chosen by the OS, then passed verbatim to the client configuration.
+const server = await startE2EServer({ roomCode: 'e2e-room' });
+const { registry } = server;
 const directory = await mkdtemp(join(tmpdir(), 'pokerace-client-e2e-'));
 let child;
 const launcher = process.argv.includes('--launcher');
@@ -34,10 +32,10 @@ async function readExpected(data) {
   assert.equal(result.data.toLowerCase(), data.toLowerCase());
 }
 try {
-  await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
+  assert.equal((await fetch(`${server.url}/health`)).status, 200, 'Test server not ready');
   const config = join(directory, 'client.json');
   await writeFile(config, JSON.stringify({
-    serverUrl: `http://127.0.0.1:${http.address().port}`, allowInsecureLocalServer: true,
+    serverUrl: server.url, allowInsecureLocalServer: true,
     playerId: 'e2e-client', playerName: 'E2E', roomCode: 'e2e-room',
     bridgeHost: '127.0.0.1', bridgePort: Number(process.env.POKERACE_BRIDGE_PORT), allowMemoryWrites: true
   }));
@@ -52,10 +50,12 @@ try {
   let startError;
   child.on('error', error => { startError = error; });
   const deadline = Date.now() + (launcher ? 120000 : 30000);
+  let joined = false;
   while (!registry.snapshot().some(s => s.ready && s.bridge?.bridge.connected && s.bridge?.system === fixture.expectedSystemId && s.game?.adapter.status === 'unsupported_system')) {
     if (startError) throw startError;
     assert.equal(child.exitCode, null, 'Client exited before readiness');
-    assert.ok(Date.now() < deadline, 'Client readiness timeout');
+    if (!joined && registry.snapshot().some(s => s.ready)) { joined = true; console.log(`E2E_CLIENT_JOINED ${server.url}`); }
+    assert.ok(Date.now() < deadline, joined ? 'Client joined but bridge/adapter readiness timeout' : `Client readiness timeout: no client joined ${server.url}`);
     await delay(100);
   }
   assert.equal(registry.publicSnapshot()[0].gameState, null, 'NES must not activate Pokemon reads');
@@ -81,7 +81,7 @@ try {
         if (launcher) { assert.equal(child.exitCode, 0); console.log('E2E_LAUNCHER_VERIFIED: single executable + real BizHawk + client + ROM + shutdown'); }
       } finally { shutdownTimeout.abort(); if (child.exitCode === null && child.signalCode === null) child.kill(); }
     }
-    await new Promise(resolve => io.close(resolve));
+    await server.close();
     await rm(directory, { recursive: true, force: true });
   }
 }

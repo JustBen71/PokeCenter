@@ -31,10 +31,31 @@ La lecture tourne toutes les 750 ms, indépendamment des heartbeats et des recon
 Événement `/client` additif, strictement validé, limité à 32 Kio :
 
 ```text
-GAME_STATE { type, protocolVersion: 1, gameStateVersion: 1, adapter, state }
+GAME_STATE { type, protocolVersion: 1, gameStateVersion: 2, adapter, state }
 ```
 
-`adapter` contient `id`, `status`, `profileId`, `capabilities`. `state` vaut `null` pour un diagnostic ou contient l’observation normalisée de version 1. L’objet d’adaptateur est répété dans l’observation et doit être identique à celui de l’enveloppe. Les champs inattendus et états incohérents sont refusés. Le champ Pokémon optionnel raw accepte une copie hexadécimale de 100 octets validée par le décodeur partagé.
+`adapter` contient `id`, `status`, `profileId`, `capabilities`. `state` vaut `null` pour un diagnostic ou contient l’observation normalisée. L’objet d’adaptateur est répété dans l’observation et doit être identique à celui de l’enveloppe. Les champs inattendus et états incohérents sont refusés. Schéma : `packages/shared/src/native-client.ts`.
+
+### Version 2 : contrat multi-génération
+
+```text
+NativeGameState (gameStateVersion 2)
+├── adapter      id, status, profileId, capabilities
+├── game         family "pokemon", generation 1–9, title (slug), language (2 lettres), revision
+├── trainer      name, money (≤ 9 999 999 ; ≤ 999 999 en Gen III), playTimeSeconds, partyCount
+├── location     label, region?, mapId?, mapGroup?/mapNumber? (obligatoires en Gen III)
+├── party[]      PokemonLiveState : slot, speciesId, speciesName, nickname, level, currentHp, maxHp, shiny, artifact?
+├── progression  version 1, completed[] (identifiants vérifiés contre les objectifs Émeraude en Gen III)
+├── capabilities
+└── observedAt
+```
+
+- La partie commune (`PokemonLiveState`) suffit à l’interface : espèce, surnom, niveau, PV, sprite. `speciesId` est borné par la génération annoncée (151, 251, 386, 493…).
+- `artifact` porte la donnée **propre à la génération** utilisée par les écritures : `{format, raw}`. Seul `gen3-party-v1` (100 octets, décodés et vérifiés) est compris aujourd’hui ; un futur `gen4-party-v1` s’ajoutera sans modifier le contrat. Le format doit correspondre à la génération du jeu.
+- Les fonctionnalités restent pilotées par les **capabilities**, jamais par la génération : un futur adaptateur peut annoncer `party.read`, `money.read`, `location.read` sans aucune écriture.
+- L’API accepte un `GAME_STATE` uniquement si le système du bridge correspond à la génération (`SYSTEMS_BY_GENERATION` : GBA pour la Gen III, NDS pour les Gen IV–V…).
+- Compatibilité : un client ≤ 0.1 qui envoie `gameStateVersion: 1` (Émeraude, `raw` directement sur chaque Pokémon) est accepté et converti en version 2 par le serveur (`raw` → `artifact: {format: "gen3-party-v1", raw}`). Le reste du portail ne voit que la version 2.
+- Fixtures de contrat synthétiques Gen III, IV et V : `packages/shared/test/native-fixture.ts`. Aucun adaptateur Gen IV+ n’est implémenté.
 
 `GET /api/native-clients` et l’événement `/dashboard` `native-clients` utilisent la même projection explicite `PublicNativeClient` du package shared. Les contrôles de compte existants s’appliquent à la route et au dashboard. L’événement envoie la liste initiale, puis les changements utiles, et retire les clients déconnectés. `accountId` désigne le compte du serveur ; `playerId` désigne l’installation du client. Aucun objet interne de socket n’est publié.
 

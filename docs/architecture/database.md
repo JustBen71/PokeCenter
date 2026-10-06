@@ -1,6 +1,6 @@
 # Base de données et migrations
 
-Introduit au Sprint 0 du portail (voir `README_POKERACE_PORTAL_SPRINTS_CODEX.md`).
+Introduit lors de la refonte du portail (Sprint 0).
 
 ## Deux portées de base
 

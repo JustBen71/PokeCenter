@@ -1,4 +1,4 @@
-import {gameStateEventSchema,type PublicNativeClient} from '@pokerace/shared';
+import {SYSTEMS_BY_GENERATION,gameStateEventSchema,type PublicNativeClient} from '@pokerace/shared';
 import {createHash, timingSafeEqual} from 'node:crypto';
 import type {Server} from 'socket.io';
 import {z} from 'zod';
@@ -77,7 +77,9 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
    if(!state.ready||Buffer.byteLength(JSON.stringify(value)??'')>32768){socket.disconnect(true);return;}
    const parsed=gameStateEventSchema.safeParse(value);
    if(!parsed.success){socket.disconnect(true);return;}
-   if(parsed.data.state&&(!(state.bridge??state.hello)?.bridge.connected||!(state.bridge??state.hello)?.bridge.gameLoaded||(state.bridge??state.hello)?.system!=='GBA')){socket.disconnect(true);return;}
+   // A game snapshot must come from a loaded game on a system that generation actually runs on.
+   const current=state.bridge??state.hello;
+   if(parsed.data.state&&(!current?.bridge.connected||!current.bridge.gameLoaded||!SYSTEMS_BY_GENERATION[parsed.data.state.game.generation]?.includes(current.system??''))){socket.disconnect(true);return;}
    state.game=parsed.data;state.lastSeenAt=new Date().toISOString();changed();
   });
   socket.on('COMMAND_ACK',(value:unknown)=>{

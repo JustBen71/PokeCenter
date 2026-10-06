@@ -43,7 +43,7 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
             !ptr2.SequenceEqual(await memory.ReadAsync(profile.SaveBlock2Pointer, 4, cancellation)) ||
             count != (await memory.ReadAsync(profile.PartyCountAddress, 1, cancellation))[0]) throw new InvalidDataException("Game changed during observation.");
         var adapter = new GameAdapterState("pokemon.emerald.gen3", "ready", profile.ProfileId, capabilities);
-        return new(1, adapter, new("pokemon", 3, "emerald", profile.Language, profile.Revision),
+        return new(GameObservation.GameStateVersion, adapter, new("pokemon", 3, "emerald", profile.Language, profile.Revision),
             new(name, money, hours * 3600 + trainer[16] * 60 + trainer[17], count),
             new(location[0], location[1], data["maps"]![profile.Language]![$"{location[0]}:{location[1]}"]?.GetValue<string>() ?? $"Zone inconnue ({location[0]}:{location[1]})"),
             party, new(1, completed), capabilities, DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"));

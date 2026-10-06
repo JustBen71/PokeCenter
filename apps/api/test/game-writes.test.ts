@@ -40,7 +40,7 @@ test('admins edit parties and in-game money through verified game commands',asyn
   await until(()=>portal.services.currentGame.requireState(lobby.id,ben.id).state.party.length===2,'party refresh');
   assert.equal((await as(admin.id).post(pokemon,{action:'replace',slot:2,artifactId:copy.id,confirmOutOfBattle:true})).body.status,'COMPLETED');
   assert.equal(game.party[1],rawPokemon(7));assert.equal(game.received[1].payload.expectedRaw,rawPokemon(4,7,'SALA'));
-  await until(()=>portal.services.currentGame.requireState(lobby.id,ben.id).state.party[1].raw===rawPokemon(7),'replace refresh');
+  await until(()=>portal.services.currentGame.requireState(lobby.id,ben.id).state.party[1].artifact?.raw===rawPokemon(7),'replace refresh');
   assert.equal((await as(admin.id).post(pokemon,{action:'remove',slot:1,confirmOutOfBattle:true})).body.status,'COMPLETED');
   await until(()=>portal.services.currentGame.requireState(lobby.id,ben.id).state.party.length===1,'remove refresh');
   const before=game.received.length;

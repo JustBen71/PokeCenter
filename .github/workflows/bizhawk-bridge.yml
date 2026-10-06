@@ -3,7 +3,7 @@ on:
   pull_request:
     paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'pokerace.cmd', 'apps/api/**', 'packages/shared/**', 'emulator/profiles/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
   push:
-    branches: [master, main, 'bizhawk-bridge']
+    branches: [master, main, 'bizhawk-bridge', 'pokerace-client']
     paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'pokerace.cmd', 'apps/api/**', 'packages/shared/**', 'emulator/profiles/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
     tags: ['bizhawk-bridge-*']
   workflow_dispatch:
