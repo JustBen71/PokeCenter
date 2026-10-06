@@ -323,3 +323,16 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 .rarity-picker{display:flex;flex-wrap:wrap;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.rarity-picker legend{font-size:13px;color:#c5bcda;padding:0 4px}
 .passive-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.passive-actions .field{width:auto;margin:0;min-width:140px}
 .gage-choice{display:grid;gap:8px;margin:8px 0}.gage-choice>p{margin:0;color:#c5bcda}.gage-choice .btn{flex-direction:column;align-items:flex-start;text-align:left}.gage-choice .btn small{color:var(--muted);font-size:11px;font-weight:400}
+
+/* Combats commandités */
+.battle-admin form{display:grid;gap:10px}.battle-admin h3{margin:18px 0 8px;font-size:15px}
+.battle-slots{display:grid;gap:10px}.battle-slot{border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:8px}
+.battle-preview{margin-top:14px;border:1px solid #4c416c;border-radius:14px;padding:14px;background:#0f1322}
+.battle-preview h3{margin:0 0 4px;font-size:20px;letter-spacing:.5px}.battle-preview h3 span{color:#f2ce82;margin:0 6px}
+.battle-team{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px}.battle-team li{display:flex;align-items:center;gap:10px}
+.battle-team img{width:40px;height:40px;image-rendering:pixelated}.battle-team small{display:block;color:var(--muted);font-size:11px}
+.battle-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}.battle-list li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.battle-list li>div{flex:1;min-width:180px}.battle-list small{display:block;color:var(--muted);font-size:11px}
+.badge.status-pending{background:#262a3c;color:#c4c9e0}
+.battle-banner{margin:10px 0 0;padding:6px 10px;border-radius:8px;background:#2b2516;color:#f2ce82;font-size:12px;font-weight:700}
+.battle-banner.running{background:#3a1d22;color:#ffb3a6}.battle-banner.review{background:#3b331a;color:#f2d68a}

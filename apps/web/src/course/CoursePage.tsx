@@ -9,6 +9,8 @@ import {clientStateLabels,courseRows,type CourseRow} from './course-model';
 import {PlayerDrawer} from './PlayerDrawer';
 import {PassiveBadgeRow} from '../passives/PassiveBadge';
 import {ownedBy,usePassives} from '../passives/passives-data';
+import {battleStatusLabels} from '@pokerace/shared';
+import {activeBattle,battlesOf,useBattles} from '../battles/battles-data';
 
 type Pokemon=CourseRow['party'][number];
 
@@ -16,7 +18,7 @@ type Pokemon=CourseRow['party'][number];
 export function CoursePage({onPokemon}:{onPokemon:(row:CourseRow,pokemon:Pokemon)=>void}){
  const {members,views,runs}=useLive();
  const {objectives}=useLiveTopic<ObjectivesSnapshot>('objectives',{objectives:[],completions:[]});
- const passives=usePassives();
+ const passives=usePassives();const battles=useBattles();
  const rows=useMemo(()=>courseRows(members,views,runs,objectives),[members,views,runs,objectives]);
  const [selected,setSelected]=useState<string|null>(null);
  const active=rows.find(r=>r.accountId===selected)??null;
@@ -36,6 +38,7 @@ export function CoursePage({onPokemon}:{onPokemon:(row:CourseRow,pokemon:Pokemon
      <span><MapPin size={14}/>{row.location??'Position inconnue'}</span>
      <span className="money-inline"><PokeDollar size={14}/>{row.money===null?'—':row.money.toLocaleString('fr-FR')}</span>
     </div>
+    {(()=>{const b=activeBattle(battles,row.accountId);return b&&<p className={`battle-banner ${b.status.toLowerCase()}`}>⚔ Combat Pokérace VS {b.trainer.name} · {battleStatusLabels[b.status]}</p>;})()}
     {row.clientState==='offline'&&<p className="stale">Dernières données reçues : le jeu est déconnecté.</p>}
     <div className="party six">{Array.from({length:6},(_,i)=>{const p=row.party.find(m=>m.slot===i+1);
      if(!p)return <div key={i} className="slot empty"><div className="pokeball"/></div>;
@@ -47,6 +50,6 @@ export function CoursePage({onPokemon}:{onPokemon:(row:CourseRow,pokemon:Pokemon
      </button>;})}</div>
     <PassiveBadgeRow owned={ownedBy(passives,row.accountId)} ownerName={row.name}/>
    </article>)}</div>}
-  {active&&<PlayerDrawer row={active} passives={ownedBy(passives,active.accountId)} onClose={()=>setSelected(null)} onPokemon={p=>onPokemon(active,p)}/>}
+  {active&&<PlayerDrawer row={active} passives={ownedBy(passives,active.accountId)} battles={battlesOf(battles,active.accountId)} onClose={()=>setSelected(null)} onPokemon={p=>onPokemon(active,p)}/>}
  </section>;
 }
