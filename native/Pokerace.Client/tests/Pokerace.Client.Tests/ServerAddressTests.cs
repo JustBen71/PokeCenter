@@ -61,18 +61,9 @@ public sealed class ServerAddressTests
     public void PortReplacesTheExistingOneInsteadOfBeingAppended(string server, int port, string expected) =>
         Assert.Equal(expected, LaunchOptions.WithPort(server, port));
 
-    [Fact] public void LauncherKeepsTheTypedPortWhenEnterIsPressed()
-    {
-        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
-        try
-        {
-            // "host:port" typed, then Enter at the port prompt keeps that port instead of 80.
-            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false), new StringReader("127.0.0.1:47500\nBen\nsalon\n\n"), new StringWriter());
-            Assert.Equal("http://127.0.0.1:47500", result.ServerUrl);
-            Assert.Equal("http://127.0.0.1:47500", ConfigurationStore.Load(path).ServerUrl);
-        }
-        finally { File.Delete(path); }
-    }
+    // "host:port" typed in the form fills the port field instead of falling back to 80 (see LaunchFormTests).
+    [Fact] public void TypedPortIsSplitFromTheAddress() =>
+        Assert.Equal(("http://127.0.0.1", 47500), LaunchFields.Split(LaunchOptions.NormalizeServerUrl("127.0.0.1:47500")!));
 
     [Fact] public void EveryErrorCodeHasItsOwnHint()
     {

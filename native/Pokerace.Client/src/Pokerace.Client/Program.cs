@@ -14,11 +14,11 @@ public static class Program
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
         try
         {
-            if (args.Length == 0 && OperatingSystem.IsWindows() || args.FirstOrDefault() == "play")
+            if (args.Length == 0 || args[0] == "play")
                 return await Launcher.PlayerLauncher.RunAsync(args.Skip(args.Length == 0 ? 0 : 1).ToArray(), cancellation.Token);
-            if (args.Length == 0 || args[0] is "--help" or "help")
+            if (args[0] is "--help" or "help")
             {
-                Console.WriteLine("Pokerace.Client play [--rom <path>] [--config <path>] [--configure]\nWindows: no arguments launches BizHawk and the client with a ROM picker.\nPokerace.Client configure|doctor [--config <path>]\nPokerace.Client run [--config <path>] [--rom <path>]   (--rom: the ROM loaded in BizHawk, required to read the game outside play)\nBridge token for doctor/run: POKERACE_BRIDGE_TOKEN environment variable.");
+                Console.WriteLine("Pokerace.Client play [--rom <path>] [--config <path>] [--port <port>]\nNo arguments: same as play (connection form, then BizHawk and the client). Windows and Linux.\nPokerace.Client configure|doctor [--config <path>]\nPokerace.Client run [--config <path>] [--rom <path>]   (--rom: the ROM loaded in BizHawk, required to read the game outside play)\nBridge token for doctor/run: POKERACE_BRIDGE_TOKEN environment variable.");
                 return 0;
             }
             var (path, rom) = ParseOptions(args);
@@ -66,7 +66,7 @@ public static class Program
     }
     private static void WaitBeforeClose(string[] args)
     {
-        if (args.Length == 0 && OperatingSystem.IsWindows() && !Console.IsInputRedirected)
+        if ((args.Length == 0 || args[0] == "play") && !Console.IsInputRedirected)
         { Console.WriteLine("Appuyez sur Entrée pour fermer."); Console.ReadLine(); }
     }
 }

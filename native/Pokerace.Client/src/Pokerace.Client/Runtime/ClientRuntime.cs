@@ -8,15 +8,20 @@ using Pokerace.Client.Server;
 
 namespace Pokerace.Client.Runtime;
 
+// What the launcher dashboard shows; LastError is a ConnectionErrors code, null once connected.
+public sealed record ClientStatus(bool ServerConnected, string? LastError, BridgeStatus Bridge, GameObservation Game);
+
 public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClient bridge, IServerConnection server, ClientLog log,
-    TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null)
+    TimeSpan? pollInterval = null, TimeSpan? retryInterval = null, LocalRomIdentity? romIdentity = null, TextWriter? notices = null)
 {
+    private readonly TextWriter notices = notices ?? Console.Error;
     private readonly BridgeConnectionManager manager = new(bridge, log, pollInterval, retryInterval);
     private readonly GameAdapterManager games = new(bridge, romIdentity, configuration.AllowPokemonPurchases);
     private readonly CommandRouter router = new(bridge, configuration, romIdentity: romIdentity);
     private readonly Channel<(ServerMessage Message, long Session)> commands = Channel.CreateBounded<(ServerMessage, long)>(64);
     private long session;
-    private string? lastError;
+    private volatile string? lastError;
+    public ClientStatus Status => new(server.IsConnected, lastError, manager.Snapshot, games.Snapshot);
     public async Task RunAsync(CancellationToken cancellation)
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -44,7 +49,7 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 Interlocked.Increment(ref session);
                 failures = 0;
                 log.Write("INFO", "server_connected");
-                if (lastError != null) Console.Error.WriteLine("[OK] Connecté au serveur " + configuration.ServerUrl);
+                if (lastError != null) notices.WriteLine("[OK] Connecté au serveur " + configuration.ServerUrl);
                 lastError = null;
                 var initialSnapshot = manager.Snapshot;
                 await server.SendAsync("HELLO", ServerProtocol.Hello(configuration, initialSnapshot), connection.Token);
@@ -64,7 +69,7 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
                 var code = ConnectionErrors.Code(e);
                 log.Write("WARN", "server_disconnected", code);
                 // A readable hint once per distinct cause, so a wrong address or port is obvious to the player.
-                if (code != lastError) { lastError = code; Console.Error.WriteLine("[!] " + ConnectionErrors.Hint(code, configuration.ServerUrl)); }
+                if (code != lastError) { lastError = code; notices.WriteLine("[!] " + ConnectionErrors.Hint(code, configuration.ServerUrl)); }
             }
             finally
             {

@@ -8,4 +8,7 @@
     <EmbeddedResource Include="../../../../bridges/bizhawk/src/Pokerace.BizHawkBridge/bin/$(Configuration)/net48/Pokerace.BizHawkBridge.dll" LogicalName="Launcher.Pokerace.BizHawkBridge.dll" />
     <EmbeddedResource Include="../../../../bridges/bizhawk/src/Pokerace.BizHawkBridge/bin/$(Configuration)/net48/Pokerace.BizHawkBridge.Core.dll" LogicalName="Launcher.Pokerace.BizHawkBridge.Core.dll" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+  </ItemGroup>
 </Project>

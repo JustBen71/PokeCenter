@@ -14,7 +14,7 @@ Le bridge existant reste dans `bridges/bizhawk` : aucun déplacement n'est néce
 
 ## Démarrage sous Windows
 
-**Lancement automatique recommandé :** double-cliquer sur `pokerace.cmd` à la racine du projet, ou sur l'exécutable de la distribution `pokerace-launcher-win-x64`. Il propose la ROM, prépare BizHawk et démarre le bridge et le client vers votre serveur existant. Voir [le guide du lanceur](../../docs/bizhawk-launcher.md). Les commandes ci-dessous restent disponibles pour une installation manuelle.
+**Lancement automatique recommandé :** double-cliquer sur `pokerace.cmd` à la racine du projet (Linux : `./pokerace.sh`), ou sur l'exécutable de la distribution `pokerace-launcher-win-x64`. Un formulaire en console demande serveur, port, pseudo, salon et ROM, vérifie la connexion, prépare BizHawk et démarre le bridge et le client vers votre serveur existant. Voir [le guide du lanceur](../../docs/bizhawk-launcher.md). Les commandes ci-dessous restent disponibles pour une installation manuelle.
 
 Utiliser la distribution `win-x64` ou la construire avec les commandes ci-dessous. Ouvrir une console dans son dossier puis :
 
@@ -40,7 +40,7 @@ Testé le 6 octobre 2026 sur Debian 13 (BizHawk 2.11.1 Linux, Mono 6.12, ROM BPE
 
 ## Construire et tester
 
-Prérequis développeur : SDK .NET 8, Node.js 22 et dépendances npm du dépôt pour le test avec le **vrai Socket.IO**. Le binaire final n'a aucune dépendance Node/Python ni package NuGet externe.
+Prérequis développeur : SDK .NET 8, Node.js 22 et dépendances npm du dépôt pour le test avec le **vrai Socket.IO**. Le binaire final n'a aucune dépendance Node/Python ; seul package NuGet : Spectre.Console (affichage du formulaire et de l'état en console).
 
 Depuis la racine du dépôt :
 

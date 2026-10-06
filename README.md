@@ -12,7 +12,7 @@ ACCOUNT ─ LOBBY ─ PARTICIPATION ─ RUN #1, #2…      (une seule Run RUNNIN
 
 | Fonction | Client natif C# + BizHawk | Agent historique Python + mGBA |
 |---|---|---|
-| Lancement Windows | `pokerace.cmd` | `player.cmd` |
+| Lancement Windows / Linux | `pokerace.cmd` / `./pokerace.sh` | `player.cmd` |
 | Lecture équipe, argent, position, progression | Oui (ROM reconnue, profil validé) | Oui |
 | Écritures métier vérifiées (`game.money.*`, `game.pokemon.insert/remove/replace`, `pokemon.purchase`) | **Oui**, capabilities annoncées si le profil, le bridge et `client.json` l'autorisent | Non (anciennes commandes Lua seulement) |
 | Banque, boutique, roues, jackpot, objectifs, enchères du portail | Oui | Non : aucune nouvelle dépendance métier n'est ajoutée à l'ancien pipeline |
@@ -155,10 +155,10 @@ Double-cliquer `pokerace.cmd`. Le script utilise `native/Pokerace.Client/artifac
 
 ```powershell
 ./native/Pokerace.Client/tools/build-launcher.ps1
-./pokerace.cmd --configure
+./pokerace.cmd
 ```
 
-Adresse du serveur acceptée sous la forme `88.184.14.248`, `hôte:port`, `http://…` ou `https://…`. À chaque lancement, le code du salon puis le **port du serveur** sont demandés (Entrée conserve la valeur affichée). Pour donner le port directement : `pokerace.cmd 3000` ou `pokerace.cmd --port 3000` (le port du portail de dev est 3000, celui du Docker 8080 par défaut). Un échec de connexion affiche sa cause : adresse introuvable, connexion refusée, pas de réponse, salon refusé ou configuration invalide.
+Adresse du serveur acceptée sous la forme `88.184.14.248`, `hôte:port`, `http://…` ou `https://…`. Un formulaire en console (serveur, port, pseudo, salon, ROM) reprend les valeurs précédentes ; une erreur de saisie ou de connexion ramène au champ à corriger sans relancer le programme. Sous Linux : `./pokerace.sh` (Mono requis). Pour donner le port directement : `pokerace.cmd 3000` ou `pokerace.cmd --port 3000` (le port du portail de dev est 3000, celui du Docker 8080 par défaut). Un échec de connexion affiche sa cause : adresse introuvable, connexion refusée, pas de réponse, salon refusé ou configuration invalide.
 
 `%LOCALAPPDATA%\Pokerace\client.json` : `allowPokemonPurchases` (vrai par défaut) autorise **toutes** les écritures métier ; `allowMemoryWrites` (faux par défaut) ne concerne que les écritures génériques de diagnostic.
 

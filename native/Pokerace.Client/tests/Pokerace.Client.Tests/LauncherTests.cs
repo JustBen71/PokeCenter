@@ -8,46 +8,6 @@ namespace Pokerace.Client.Tests;
 public sealed class LauncherTests
 {
     [Theory]
-    [InlineData("nouveau-salon", "nouveau-salon")]
-    [InlineData("", "ancien-salon")]
-    public void EveryInteractiveLaunchAsksForRoomAndPreservesIdentity(string answer, string expected)
-    {
-        var path = Path.GetTempFileName();
-        try
-        {
-            var initial = new ClientConfiguration { ServerUrl = "http://localhost:8080", PlayerName = "Ben", RoomCode = "ancien-salon" };
-            ConfigurationStore.Save(path, initial);
-            var output = new StringWriter();
-            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false), new StringReader(answer + "\n"), output);
-            Assert.Contains("Code du salon", output.ToString());
-            Assert.Equal(expected, result.RoomCode);
-            Assert.Equal(initial.PlayerId, result.PlayerId);
-            Assert.Equal(initial.ServerUrl, result.ServerUrl);
-            Assert.Equal("Ben", result.PlayerName);
-            Assert.Equal(expected, ConfigurationStore.Load(path).RoomCode);
-        }
-        finally { File.Delete(path); }
-    }
-    [Theory]
-    [InlineData("salon\n3000\n", null, "http://localhost:3000")]
-    [InlineData("salon\n\n", null, "http://localhost:8080")]
-    [InlineData("salon\nabc\n4000\n", null, "http://localhost:4000")]
-    [InlineData("salon\n", 5000, "http://localhost:5000")]
-    public void PortIsAskedAtEachLaunchOrGivenOnTheCommandLine(string answers, int? argument, string expected)
-    {
-        var path = Path.GetTempFileName();
-        try
-        {
-            ConfigurationStore.Save(path, new ClientConfiguration { ServerUrl = "http://localhost:8080", PlayerName = "Ben", RoomCode = "ancien" });
-            var output = new StringWriter();
-            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false, argument), new StringReader(answers), output);
-            Assert.Equal(expected, result.ServerUrl);
-            Assert.Equal(expected, ConfigurationStore.Load(path).ServerUrl);
-            Assert.Equal(argument == null, output.ToString().Contains("Port du serveur"));
-        }
-        finally { File.Delete(path); }
-    }
-    [Theory]
     [InlineData("88.184.14.248", "http://88.184.14.248")]
     [InlineData(" 88.184.14.248:47500/ ", "http://88.184.14.248:47500")]
     [InlineData("http://88.184.14.248:47500/", "http://88.184.14.248:47500")]
@@ -56,18 +16,6 @@ public sealed class LauncherTests
     [InlineData("ftp://host", null)]
     [InlineData("", null)]
     public void TypedServerAddressesAreNormalized(string typed, string? expected) => Assert.Equal(expected, LaunchOptions.NormalizeServerUrl(typed));
-    [Fact] public void FirstLaunchWithoutSchemeAndPortArgumentWorks()
-    {
-        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
-        try
-        {
-            // First launch: address typed without http://, port given with pokerace.cmd 47500.
-            var result = PlayerLauncher.Configure(new LaunchOptions(path, null, false, 47500), new StringReader("pas une adresse\n88.184.14.248\nBen\nsalon\n"), new StringWriter());
-            Assert.Equal("http://88.184.14.248:47500", result.ServerUrl);
-            Assert.Equal("Ben", result.PlayerName);
-        }
-        finally { File.Delete(path); }
-    }
     [Fact] public void ConnectionFailuresGiveAReadableCause()
     {
         Assert.Equal("server_not_found", Pokerace.Client.Server.ConnectionErrors.Code(new HttpRequestException("x", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound))));
@@ -89,7 +37,7 @@ public sealed class LauncherTests
         var options = LaunchOptions.Parse(["--rom", "ROM avec espaces & caractères.gba", "--config", "other/client.json", "--configure"]);
         Assert.EndsWith("ROM avec espaces & caractères.gba", options.Rom);
         Assert.Equal(Path.GetFullPath("other/client.json"), options.ConfigPath);
-        Assert.True(options.Configure);
+
     }
     [Theory]
     [InlineData("--rom")]

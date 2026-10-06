@@ -2,3 +2,5 @@
 **/obj/
 artifacts/
 .runtime/
+.runtime-linux/
+.runtime-linux.tar.gz
