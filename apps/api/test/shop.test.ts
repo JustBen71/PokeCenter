@@ -96,5 +96,12 @@ test('shop: tickets paid in game, persistent queue, protections only block attac
   timShop=(await as(tim.id).get(shop)).body as ShopSnapshot;
   assert.equal(timShop.tickets.find(t=>t.id===uncertainId)!.status,'QUEUED');
   assert.ok(store.portal!.audit.list({category:'PROTECTION'}).length>=2);
+
+  // The admin may cancel a wheel still waiting in the queue.
+  const queued=poor.body as WheelTicket;
+  assert.equal((await as(ben.id).post(`${shop}/tickets/${queued.id}/cancel`)).body.error.code,'ADMIN_REQUIRED');
+  assert.equal((await as(admin.id).post(`${shop}/tickets/${queued.id}/cancel`)).body.status,'CANCELLED');
+  assert.equal((await as(admin.id).post(`${shop}/tickets/${queued.id}/cancel`)).body.error.code,'CONFLICT');
+  assert.ok(!((await as(admin.id).get(shop)).body as ShopSnapshot).queue.some(t=>t.id===queued.id));
  }finally{closers.forEach(c=>c());for(const c of portal.running.values())c.io.disconnectSockets(true);await new Promise<void>(r=>portal.server.close(()=>r()));store.close();}
 });

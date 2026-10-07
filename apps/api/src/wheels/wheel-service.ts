@@ -216,7 +216,9 @@ export class WheelService{
    this.deps.changed(lobbyId);
   };
   try{
-   const message=await wheelHandlers[before.gage.handler]({lobbyId,resolutionId:id,actorId:actor.id,gage:before.gage,owner,target,choice,services:this.services});
+   // A hostile wheel hits its target: a gage without a target (battle, level ±, items…) applies to the victim, never to the sender.
+   const subject=before.tone==='BAD'&&target&&!before.gage.requiresTarget?target:owner;
+   const message=await wheelHandlers[before.gage.handler]({lobbyId,resolutionId:id,actorId:actor.id,gage:before.gage,owner:subject,target,choice,services:this.services});
    finish('SUCCESS',message);
    if(target)this.suffered(lobbyId,id,before.tone,before.gage,target.id);
    this.services.domain.audit.record({lobbyId,actorAccountId:actor.id,targetAccountId:target?.id??owner.id,category:'WHEEL',action:'wheel.apply',status:'SUCCESS',message,metadata:{resolutionId:id}});

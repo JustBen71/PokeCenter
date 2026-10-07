@@ -24,4 +24,8 @@ export function registerShopRoutes(app:Express,s:Services){
   const v=currentAccount(res);requireAdmin(v);
   return s.shop.resolveTicket(lobbies.require(String(req.params.id)).id,String(req.params.ticketId),v);
  }));
+ app.post('/api/lobbies/:id/shop/tickets/:ticketId/cancel',route((req,res)=>{
+  const v=currentAccount(res);requireAdmin(v);
+  return s.shop.cancelTicket(lobbies.require(String(req.params.id)).id,String(req.params.ticketId),v);
+ }));
 }

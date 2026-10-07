@@ -15,10 +15,10 @@ test('wheel gages on games: random items gained / lost, Pokémon transfer, level
   const timGame=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Tim',party:[GAMMA]});closers.push(()=>timGame.close());
   await until(()=>!!portal.services.currentGame.resolve(lobby.id,ben.id).game.money&&!!portal.services.currentGame.resolve(lobby.id,tim.id).game.money,'games');
   for(const id of [ben.id,tim.id])await as(admin.id).post(`/api/lobbies/${lobby.id}/runs`,{accountId:id,start:true});
-  const run=async(handler:string,params:object,body:object={})=>{
-   const w=(await as(admin.id).post(wheels,{name:handler,price:0,icon:'green-2',tone:'NEUTRAL',gages:[{name:handler,handler,params}]})).body as WheelType;
+  const run=async(handler:string,params:object,body:object={},hostileTarget?:string)=>{
+   const w=(await as(admin.id).post(wheels,{name:handler,price:0,icon:hostileTarget?'purple-2':'green-2',tone:hostileTarget?'BAD':'NEUTRAL',gages:[{name:handler,handler,params}]})).body as WheelType;
    assert.ok(w.id,JSON.stringify(w));
-   const r=(await as(admin.id).post(`${wheels}/${w.id}/spin`,{ownerId:ben.id})).body as WheelResolution;
+   const r=(await as(admin.id).post(`${wheels}/${w.id}/spin`,{ownerId:ben.id,...(hostileTarget?{targetId:hostileTarget}:{})})).body as WheelResolution;
    return (await as(admin.id).post(`/api/lobbies/${lobby.id}/wheel-resolutions/${r.id}/apply`,body)).body as WheelResolution&{error?:{code:string}};
   };
   const slot=(game:FakeGameClient,i:number)=>decodePokemonCopy(game.party[i-1]!);
@@ -33,6 +33,10 @@ test('wheel gages on games: random items gained / lost, Pokémon transfer, level
   assert.equal((await run('ITEM_TAKE',{},{targetId:tim.id})).result,'Tim perd Potion');
   assert.equal(timGame.bag.size,0);
   assert.equal((await run('ITEM_TAKE',{},{targetId:tim.id})).result,'Tim n’a aucun objet à perdre');
+  // Hostile wheel sent by Ben to Tim (Rivalité, shop): a gage aimed at « the player » hits Tim, never Ben.
+  timGame.bag.set(13,1);
+  assert.equal((await run('ITEM_TAKE',{who:'OWNER'},{},tim.id)).result,'Tim perd Potion');
+  assert.equal(benGame.bag.size>0,true,'Ben keeps his items');
 
   // Transfer: Ben's chosen Pokémon (slot 2) goes to Tim, exact copy; out-of-battle confirmation required.
   assert.equal((await run('POKEMON_TRANSFER',{direction:'GIVE',selector:'choice'},{targetId:tim.id,slot:2})).error!.code,'SAFE_STATE_REQUIRED');
