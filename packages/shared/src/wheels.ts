@@ -7,8 +7,8 @@ export const wheelToneSchema=z.enum(['GOOD','BAD','NEUTRAL']);
 export type WheelTone=z.infer<typeof wheelToneSchema>;
 export const wheelToneLabels:Record<WheelTone,string>={GOOD:'Bienveillante',BAD:'Hostile',NEUTRAL:'Neutre'};
 
-// Ten local ticket icons: five green (kind) and five purple (hostile).
-export const ticketIcons=['green-1','green-2','green-3','green-4','green-5','purple-1','purple-2','purple-3','purple-4','purple-5'] as const;
+// Local ticket icons: five green (kind), five purple (hostile) and a grey one (neutral).
+export const ticketIcons=['green-1','green-2','green-3','green-4','green-5','purple-1','purple-2','purple-3','purple-4','purple-5','neutral-1'] as const;
 export const ticketIconSchema=z.enum(ticketIcons);
 
 /**

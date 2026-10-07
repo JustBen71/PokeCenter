@@ -10,8 +10,8 @@ import {TicketIcon} from './TicketIcon';
 import {launchedHere} from './launched';
 
 type Draft=WheelInput&{id?:string};
-// Untouched default icon follows the tone (purple for hostile wheels); a chosen icon is kept.
-const toneIcon=(tone:Draft['tone'])=>tone==='BAD'?'purple-1' as const:'green-1' as const;
+// Untouched default icon follows the tone (purple hostile, grey neutral); a chosen icon is kept.
+const toneIcon=(tone:Draft['tone'])=>tone==='BAD'?'purple-1' as const:tone==='NEUTRAL'?'neutral-1' as const:'green-1' as const;
 const emptyWheel=():Draft=>({name:'',description:'',price:1000,icon:'green-1',tone:'GOOD',enabled:true,forSale:true,gages:[{name:'',description:'',handler:'NOTICE',params:{},weight:1}]});
 const defaultParams:Record<GageHandler,Record<string,unknown>>={NOTICE:{},GIVE_MONEY:{amount:500},TAKE_MONEY:{amount:500},STEAL_MONEY:{amount:500},REMOVE_POKEMON:{selector:'random'},
  GIVE_LIBRARY_POKEMON:{artifactId:''},JACKPOT_FIXED:{amount:1000},JACKPOT_PERCENT:{percent:10},JACKPOT_SHARE:{},JACKPOT_EMPTY:{},

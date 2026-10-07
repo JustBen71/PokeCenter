@@ -4,7 +4,7 @@
 
 ## Types de roue
 
-Un admin crée, modifie et supprime des roues (tables `wheel_types` et `wheel_gages`). Champs : `name`, `description`, `price`, `icon` (un des dix tickets locaux), `tone` (`GOOD`, `BAD` ou `NEUTRAL`), `enabled` (utilisable), `forSale` (vendue dans la boutique ; une roue hors boutique reste lançable par l'admin, la roue automatique et les passifs) et la liste des gages. Les gages ont le même poids par défaut ; un poids de 1 à 100 permet d'ajuster leurs chances. Chaque lobby reçoit deux roues d'exemple, « Bonne étoile » et « Coup bas ».
+Un admin crée, modifie et supprime des roues (tables `wheel_types` et `wheel_gages`). Champs : `name`, `description`, `price`, `icon` (un des onze tickets locaux : cinq verts, cinq violets, un gris pour les roues neutres), `tone` (`GOOD`, `BAD` ou `NEUTRAL`), `enabled` (utilisable), `forSale` (vendue dans la boutique ; une roue hors boutique reste lançable par l'admin, la roue automatique et les passifs) et la liste des gages. Les gages ont le même poids par défaut ; un poids de 1 à 100 permet d'ajuster leurs chances. Chaque lobby reçoit deux roues d'exemple, « Bonne étoile » et « Coup bas ».
 
 La suppression est logique : les tirages passés gardent leur propre copie du gage, si bien que modifier ou supprimer une roue ne change jamais un résultat déjà tiré.
 
