@@ -103,7 +103,8 @@ export class ObjectiveService{
     // a lost confirmation is final until an admin checks it.
     const code=error instanceof DomainError?error.code:'INTERNAL_ERROR';
     if(code==='COMMAND_OUTCOME_UNKNOWN')this.setReward(lobbyId,row.objective_id,accountId,'REVIEW',String(error instanceof DomainError?error.details?.commandId??'':''),false);
-    else if(['GAME_STATE_CHANGED','GAME_COMMAND_FAILED','INSUFFICIENT_FUNDS','VALIDATION_FAILED'].includes(code))this.setReward(lobbyId,row.objective_id,accountId,'PENDING',null,true);
+    // Wallet full (VALIDATION_FAILED, checked before any command): waits without using an attempt.
+    else if(['GAME_STATE_CHANGED','GAME_COMMAND_FAILED'].includes(code))this.setReward(lobbyId,row.objective_id,accountId,'PENDING',null,true);
    }finally{this.inFlight.delete(key);}
   }
  }

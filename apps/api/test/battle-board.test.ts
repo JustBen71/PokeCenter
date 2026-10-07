@@ -59,6 +59,18 @@ test('Tableau des combats: first come first served, loss puts the team back, win
   await until(()=>notes.some(n=>n.includes(`Tim a vaincu ROXANE au tableau : +${created.reward.toLocaleString('fr-FR')} ₽`)),'win notification');
   assert.equal((await as(ben.id).post(`${board}/${created.id}/challenge`)).body.error.code,'CONFLICT');
 
+  // Wallet full (999 999 ₽): the reward waits without using its attempts, then is paid once money goes down.
+  const third=(await as(admin.id).post(board,{slots:[{mode:'RANDOM',minLevel:5,maxLevel:5}],reward:500})).body as BoardTeam;
+  timGame.money=999800;timGame.publish();
+  await as(tim.id).post(`${board}/${third.id}/challenge`);
+  await until(()=>timGame.battle.active===created.id||timGame.battle.active!==null,'third battle armed');
+  timGame.battleStarted();timGame.endBattle('WIN');
+  await eventually(async()=>(await team(third.id)).status==='WON','third won');
+  for(let i=0;i<8;i++){timGame.publish();await new Promise(r=>setTimeout(r,30));}
+  assert.equal((await team(third.id)).rewardStatus,'PENDING');assert.equal((await team(third.id)).attempts,0);
+  timGame.money=1000;timGame.publish();
+  await eventually(async()=>(await team(third.id)).rewardStatus==='PAID','paid once the wallet has room');
+  assert.equal(timGame.money,1500);
   // Forfeit before the battle starts: the team goes back, the battle is cancelled.
   const second=(await as(admin.id).post(board,{slots:[{mode:'RANDOM',minLevel:5,maxLevel:5}],reward:777})).body as BoardTeam;
   assert.equal(second.reward,777);assert.equal(second.trainer.name,'DÉFI');

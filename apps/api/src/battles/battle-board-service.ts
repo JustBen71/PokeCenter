@@ -159,7 +159,8 @@ export class BattleBoardService{
     // Game offline, no Run, busy player: still pending. A lost confirmation waits for an admin.
     const code=error instanceof DomainError?error.code:'INTERNAL_ERROR';
     if(code==='COMMAND_OUTCOME_UNKNOWN')this.set(team.id,{reward_status:'REVIEW',reward_command_id:String(error instanceof DomainError?error.details?.commandId??'':'')});
-    else if(['GAME_STATE_CHANGED','GAME_COMMAND_FAILED','INSUFFICIENT_FUNDS','VALIDATION_FAILED'].includes(code))this.set(team.id,{reward_attempts:team.attempts+1});
+    // Wallet full (VALIDATION_FAILED, checked before any command): waits without using an attempt.
+    else if(['GAME_STATE_CHANGED','GAME_COMMAND_FAILED'].includes(code))this.set(team.id,{reward_attempts:team.attempts+1});
    }finally{this.paying.delete(team.id);this.deps.changed(lobbyId);}
   }
  }

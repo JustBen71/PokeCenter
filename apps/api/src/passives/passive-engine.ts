@@ -8,7 +8,8 @@ import type {DomainEvent,PassiveContext,PassiveHandler,RewardRequest} from './pa
 type RewardRow={id:string;event_id:string;passive_id:string;lobby_id:string;account_id:string;type:string;payload_json:string;status:PassiveRewardStatus;command_id:string|null;attempts:number};
 const MAX_ATTEMPTS=5;
 // The game cannot take the reward right now: it stays PENDING for the next observation, without counting an attempt.
-const notYet=['GAME_NOT_CONNECTED','GAME_ADAPTER_NOT_READY','GAME_STATE_STALE','CAPABILITY_MISSING','PLAYER_BUSY','RUN_NOT_RUNNING','WRITES_DISABLED'];
+// VALIDATION_FAILED: in-game wallet full (999 999 ₽), checked before any command.
+const notYet=['GAME_NOT_CONNECTED','GAME_ADAPTER_NOT_READY','GAME_STATE_STALE','CAPABILITY_MISSING','PLAYER_BUSY','RUN_NOT_RUNNING','WRITES_DISABLED','VALIDATION_FAILED'];
 const catalogOrder=new Map(passiveCatalog.map((p,i)=>[p.id,i]));
 
 /**
