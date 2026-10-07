@@ -81,6 +81,8 @@ export class FakeGameClient{
  /** Back on the overworld: the result is published and the temporary data restored. */
  endBattle(outcome:'WIN'|'LOSS'|'DRAW'|'ABORTED'|'UNKNOWN'){this.battle={active:null,state:null,last:{encounterId:this.battle.active!,outcome},spec:this.battle.spec};this.publish();}
  setSafe(safe:boolean){this.safe=safe;this.publish();}
+ /** A new observation with different content (the player moved), as the real client keeps sending. */
+ step(){this.location={...this.location,mapNumber:this.location.mapNumber+1};this.publish();}
  trainerVictory(baseReward:number,eventId?:string){const before=this.money;this.money+=baseReward;this.publish();return this.gameEvent('TRAINER_VICTORY',{moneyBefore:before,moneyAfter:this.money,baseReward},eventId);}
  setSteps(absolute:number,eventId?:string){return this.gameEvent('STEPS_CHANGED',{absolute},eventId);}
  pokemonFainted(slot:number,speciesId:number,eventId?:string){return this.gameEvent('POKEMON_FAINTED',{slot,speciesId},eventId);}

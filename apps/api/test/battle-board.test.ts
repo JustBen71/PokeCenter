@@ -66,7 +66,7 @@ test('Tableau des combats: first come first served, loss puts the team back, win
   await until(()=>timGame.battle.active===created.id||timGame.battle.active!==null,'third battle armed');
   timGame.battleStarted();timGame.endBattle('WIN');
   await eventually(async()=>(await team(third.id)).status==='WON','third won');
-  for(let i=0;i<8;i++){timGame.publish();await new Promise(r=>setTimeout(r,30));}
+  for(let i=0;i<8;i++){timGame.step();await new Promise(r=>setTimeout(r,30));}
   assert.equal((await team(third.id)).rewardStatus,'PENDING');assert.equal((await team(third.id)).attempts,0);
   timGame.money=1000;timGame.publish();
   await eventually(async()=>(await team(third.id)).rewardStatus==='PAID','paid once the wallet has room');
@@ -94,5 +94,43 @@ test('Tableau des combats: first come first served, loss puts the team back, win
   const drawn=((await as(ben.id).get(board)).body as BoardSnapshot).teams[0]!;
   assert.equal(drawn.origin,'WHEEL');assert.equal(drawn.status,'OPEN');
   assert.ok(drawn.party.every(m=>m.level>=10&&m.level<=14),JSON.stringify(drawn.party));
+ }finally{for(const c of closers)c();await p.close();}
+});
+
+test('Tableau des combats: lost confirmation of the reward = to check; the admin says applied (paid) or not (paid again)',async()=>{
+ const p=await passivePortal();
+ const closers:(()=>void)[]=[];
+ try{
+  const {as,admin,tim,lobby,base,portal}=p;
+  const board=`/api/lobbies/${lobby.id}/board`;
+  const team=async(id:string)=>((await as(tim.id).get(board)).body as BoardSnapshot).teams.find(t=>t.id===id)!;
+  const game=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Tim',battles:true,money:1000,party:[encodePokemon(template(255,20,'POUSSIFEU'))]});closers.push(()=>game.close());
+  await until(()=>!!portal.services.currentGame.resolve(lobby.id,tim.id).game.money,'game');
+  await as(admin.id).post(`/api/lobbies/${lobby.id}/runs`,{accountId:tim.id,start:true});
+  const fight=async(reward:number)=>{
+   const t=(await as(admin.id).post(board,{slots:[{mode:'RANDOM',minLevel:5,maxLevel:5}],reward})).body as BoardTeam;
+   await as(tim.id).post(`${board}/${t.id}/challenge`);
+   await until(()=>game.battle.active!==null,'armed');
+   game.mode='timeout';// the money command is never confirmed
+   game.battleStarted();game.endBattle('WIN');
+   await eventually(async()=>(await team(t.id)).rewardStatus==='REVIEW','to check');
+   game.mode='apply';
+   return t;
+  };
+  const resolve=async(t:BoardTeam,applied:boolean)=>{
+   const commandId=game.received.filter(c=>c.command==='game.money.add').at(-1)!.commandId;
+   assert.equal((await as(admin.id).post(`/api/lobbies/${lobby.id}/game-commands/${commandId}/resolve`,{applied})).body.status,applied?'RESOLVED_APPLIED':'RESOLVED_NOT_APPLIED');
+  };
+  // Checked in the game: the money arrived.
+  const first=await fight(300);
+  await resolve(first,true);
+  assert.equal((await team(first.id)).rewardStatus,'PAID');
+  // Checked in the game: it did not arrive, so it is paid again on the next observation.
+  const second=await fight(400);
+  const before=game.money;
+  await resolve(second,false);
+  game.step();
+  await eventually(async()=>(await team(second.id)).rewardStatus==='PAID','paid again');
+  assert.equal(game.money,before+400);
  }finally{for(const c of closers)c();await p.close();}
 });

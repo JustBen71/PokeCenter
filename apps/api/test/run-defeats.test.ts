@@ -42,7 +42,7 @@ test('end of Run in the game: fainted Pokémon boxed, defeat = Run lost + new Ru
   for(let i=0;i<60&&!notes.some(n=>n.includes('PC de Ben plein'));i++)await new Promise(r=>setTimeout(r,100));
   assert.ok(notes.some(n=>n.includes('PC de Ben plein')),'PC full notification');
   const refusedCount=boxCommands();
-  for(let i=0;i<5;i++){game.publish();await new Promise(r=>setTimeout(r,40));}
+  for(let i=0;i<5;i++){game.step();await new Promise(r=>setTimeout(r,60));}
   assert.equal(boxCommands(),refusedCount,'not sent again for the same party');
   game.mode='apply';game.party.pop();game.publish();
   // The whole party down is a defeat, never a box move.
