@@ -52,6 +52,8 @@ export type PassiveHandler={
  wheelChoice?:(ctx:PassiveContext,draw:{tone:string;role:'owner'|'target';gageCount:number})=>number|null;
  // Periodic game observation (positions, team…): must be idempotent, rewards use deterministic event ids.
  observe?:(ctx:PassiveContext,state:NativeGameState)=>unknown;
+ // Before a fainted Pokémon goes to the PC box (out of battle): true = the passive saved it, nothing boxed this time.
+ rescue?:(ctx:PassiveContext,state:NativeGameState)=>Promise<boolean>;
  // Modifier: removes gages from a hostile wheel before its weighted draw (the holder is the target).
  filterHostileGages?:(ctx:PassiveContext,gages:Gage[])=>Gage[];
 };

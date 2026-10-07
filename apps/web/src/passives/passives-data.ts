@@ -28,6 +28,16 @@ export function progressLines(owned:OwnedPassive):string[]{
   case 'chaos-master':return [p.consumed?'Utilisé':'Prêt : s’active à la prochaine roue hostile contre toi'];
   case 'paradox':return [p.consumed?'Utilisé':'Prêt'];
   case 'bound-soul':{const b=p.bound as {name?:string;level?:number}|undefined;return b?[`Lié : ${b.name} (niv. ${b.level})`,p.ready?'Prêt à rejoindre la Run en cours (réinjection par un admin)':'Disponible après une Run perdue']:['Aucun Pokémon lié'];}
+  case 'loyal-companion':{const c=p.companion as {name?:string}|undefined;return c?[`Compagnon : ${c.name}`,p.heal?'Soin de l’équipe en attente (dès que tu es hors combat)':`Objectifs avec lui : ${count(p.objectives)} / ${def?.params.objectives??3}`]:['Compagnon : le premier Pokémon de ton équipe'];}
+  case 'last-standing':return [p.heal?'Soin à 50 % en attente (dès que tu es hors combat)':p.used?'Utilisé pendant cette Run':'Une fois par Run'];
+  case 'alchemist':return Array.isArray(p.natureNames)?[p.used?'Utilisé pendant cette Run':`Natures proposées : ${(p.natureNames as string[]).join(', ')}`]:['Natures tirées au début de la Run'];
+  case 'unstable-dna':return [`Charges : ${count(p.charges)}`,`Objectifs : ${count(p.objectives)} (une charge tous les ${def?.params.objectives??2})`];
+  case 'treasure-hunter':return [`Victoires contre des dresseurs : ${step(count(p.wins),every)}`,...(count(p.items)?[`${count(p.items)} objet(s) en attente d’une place dans le sac`]:[])];
+  case 'type-master':return count(p.items)?[`${count(p.items)} CT en attente d’une place dans le sac`]:[];
+  case 'marathoner':return [`${count(p.steps).toLocaleString('fr-FR')} pas sur la course`,`Paliers payés : ${count(p.paid)}`];
+  case 'resurrection':return [p.used?'Utilisé pendant cette Run':'Une fois par Run'];
+  case 'mutagen':{const o=p.offer as {pokemon?:string;moves?:{name:string}[]}|null|undefined;return o?[`Offre pour ${o.pokemon} : ${(o.moves??[]).map(m=>m.name).join(', ')}`]:[p.used?'Utilisé pendant cette Run':'Une fois par Run'];}
+  case 'legend-heir':return [p.hatched?`Éclos : ${String(p.hatched)}`:p.ready?'L’œuf a éclos : garde une place dans ton équipe':`Œuf : ${count(p.steps).toLocaleString('fr-FR')} / ${(def?.params.steps??50000).toLocaleString('fr-FR')} pas`];
   default:return [];
  }
 }

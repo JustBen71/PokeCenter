@@ -66,10 +66,12 @@ public sealed class DefeatTests
         var state = (await manager.ObserveAsync(new(true, true, "GBA", 1), default)).State!;
         Assert.Contains(Gen3Defeat.EventCapability, state.Capabilities);
         Assert.Contains(Gen3Defeat.BoxCapability, state.Capabilities);
-        Assert.Empty(outbox.Pending());
+        // The first observation only gives the step baseline (STEPS_CHANGED), no defeat.
+        Assert.Equal("STEPS_CHANGED", (string?)Assert.Single(outbox.Pending())["kind"]);
+        Assert.Contains("steps.read", state.Capabilities);
         bridge.Put32(Profile.Battle!.GMain + 4, (uint)Profile.Defeat!.Callback2WhiteOut);
         for (var i = 0; i < 3; i++) { try { await manager.ObserveAsync(new(true, true, "GBA", 1), default); } catch (Exception) { } }
-        var e = Assert.Single(outbox.Pending());
+        var e = Assert.Single(outbox.Pending(), p => (string?)p["kind"] == "PLAYER_DEFEATED");
         Assert.Equal("PLAYER_DEFEATED", (string?)e["kind"]);
         Assert.Equal("WHITE_OUT", (string?)e["data"]!["cause"]);
         Assert.DoesNotContain(Gen3Defeat.EventCapability, (await new GameAdapterManager(bridge, Identity, false, new(null), outbox).ObserveAsync(new(true, true, "GBA", 1), default)).State!.Capabilities);

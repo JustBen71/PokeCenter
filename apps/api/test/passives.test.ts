@@ -5,6 +5,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {passiveFixture,sequence} from './support/domain-fixture.js';
 import {DomainError} from '../src/errors.js';
+import {passiveById,passiveCatalog} from '@pokerace/shared';
+import {availability,missingCapabilities} from '../src/passives/passive-catalog.js';
 
 const code=(fn:()=>unknown)=>{try{fn();}catch(e){return e instanceof DomainError?e.code:String(e);}return 'OK';};
 test('migration 13: PASSIVE audit category and PASSIVE_REWARD ledger type are accepted, data kept',()=>{
@@ -20,8 +22,11 @@ test('passive service: availability, grant, duplicates, revoke, atomic transfer 
  const {passives,domain,notes,lobbyId}=passiveFixture(':memory:',new Set(['scout','rivalry','counterspell','usurper']));
  const entry=(id:string)=>passives.catalog(lobbyId).find(p=>p.id===id)!;
  assert.equal(entry('scout').availability,'AVAILABLE');
- assert.equal(entry('marathoner').availability,'DISABLED_MISSING_CAPABILITY');
- assert.deepEqual(entry('marathoner').missing,['steps.read']);
+ // Every capability of the catalogue is validated now; one missing would disable the passive.
+ assert.ok(passiveCatalog.every(p=>!missingCapabilities(p).length));
+ assert.equal(availability(passiveById.get('marathoner')!,new Set(['marathoner']),new Set(['money.write'])),'DISABLED_MISSING_CAPABILITY');
+ assert.deepEqual(missingCapabilities(passiveById.get('marathoner')!,new Set(['money.write'])),['steps.read']);
+ assert.equal(entry('marathoner').availability,'NOT_YET_IMPLEMENTED');
  assert.equal(entry('paradox').availability,'NOT_YET_IMPLEMENTED');
  // Never granted while it cannot work.
  assert.equal(code(()=>passives.grant(lobbyId,'ben','marathoner','ADMIN')),'CAPABILITY_MISSING');

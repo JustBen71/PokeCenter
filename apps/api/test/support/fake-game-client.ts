@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {io as connect,type Socket} from 'socket.io-client';
-import {decodePokemonCopy,encodePokemon,type GameEventKind,type NativeGameState,type PokemonInjection} from '@pokerace/shared';
+import {decodePokemonCopy,encodePokemon,nationalSpecies,type GameEventKind,type NativeGameState,type PokemonInjection} from '@pokerace/shared';
 
 export type FakeMode='apply'|'timeout'|'ack-lost'|{refuse:string};
 type Command={commandId:string;command:string;payload:Record<string,any>};
@@ -59,7 +59,7 @@ export class FakeGameClient{
   return {gameStateVersion:2,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
    trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{...this.location},
    party:this.party.map((raw,i)=>{const p=decodePokemonCopy(raw);
-    return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
+    return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:nationalSpecies.get(p.internalSpecies)??1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
    progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString(),
    ...((this.options.battles||this.options.defeats)&&this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
  }

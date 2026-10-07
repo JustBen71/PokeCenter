@@ -1,7 +1,7 @@
-import {gameCapabilitySchema,type PassiveAvailability,type PassiveCapability,type PassiveDefinition} from '@pokerace/shared';
+import {passiveCapabilitySchema,type PassiveAvailability,type PassiveCapability,type PassiveDefinition} from '@pokerace/shared';
 
 // Capabilities the existing GameAdapter can really provide (validated profiles). The future ones are never assumed.
-export const validatedCapabilities:ReadonlySet<PassiveCapability>=new Set(gameCapabilitySchema.options);
+export const validatedCapabilities:ReadonlySet<PassiveCapability>=new Set(passiveCapabilitySchema.options);
 
 export const missingCapabilities=(passive:PassiveDefinition,validated=validatedCapabilities)=>passive.requires.filter(c=>!validated.has(c));
 

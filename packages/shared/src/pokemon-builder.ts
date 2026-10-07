@@ -90,3 +90,22 @@ export async function buildPokemon(form:PokemonInjection):Promise<BuiltPokemon> 
   while(moves.length<4) moves.push({id:0,pp:0});
   return {stats:calculateStats(pokemon,form),experience,moves,choices,name:french(species.names,species.name)};
 }
+
+/** Moves a species can learn in Emerald: level-up up to `level`, TM/HM and tutor (ids 1–354). */
+export function compatibleMoves(data:PokemonData, level:number):number[] {
+  return [...new Set(data.moves.flatMap(m=>m.version_group_details
+    .filter(v=>v.version_group.name==='emerald' && (v.move_learn_method.name==='level-up' ? v.level_learned_at<=level : ['machine','tutor'].includes(v.move_learn_method.name)))
+    .map(()=>idOf(m.move))))].filter(id=>id>=1 && id<=354);
+}
+/** French name and Emerald PP of a move. */
+export async function moveInfo(id:number):Promise<{id:number; name:string; pp:number}> {
+  const move=await api<MoveData>(`move/${id}`);
+  return {id,name:french(move.names,move.name),pp:emeraldPP(move)};
+}
+/** Generation III types of a species (Fairy did not exist: past types apply). */
+export async function speciesTypes(id:number):Promise<string[]> {
+  type Types={type:Resource}[];
+  const data=await api<{types:Types; past_types:{generation:Resource; types:Types}[]}>(`pokemon/${id}`);
+  const past=data.past_types.filter(p=>idOf(p.generation)>=3).sort((a,b)=>idOf(a.generation)-idOf(b.generation))[0];
+  return (past?.types??data.types).map(t=>t.type.name);
+}

@@ -28,7 +28,7 @@ test('passive selection: private offers, one persistent choice, admin reset and 
   assert.equal(benOffer.length,3);assert.equal(new Set(benOffer).size,3);
   const offerable=new Set(started.catalog.filter(c=>c.availability==='AVAILABLE').map(c=>c.id));
   assert.ok(benOffer.every(id=>offerable.has(id)));
-  assert.ok(started.catalog.some(c=>c.id==='marathoner'&&c.availability==='DISABLED_MISSING_CAPABILITY'));
+  assert.ok(started.catalog.every(c=>c.availability==='AVAILABLE'),'every passive offerable');
   assert.deepEqual((await snapshot(ben.id)).myOffer,benOffer);
   // Offers are private: Tim's live snapshot only carries his own cards.
   await until(()=>pushed.some(s=>s.phase==='SELECTION'),'live selection');

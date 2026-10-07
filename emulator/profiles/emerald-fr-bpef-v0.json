@@ -61,5 +61,14 @@
     "status": "write-validated",
     "validatedOn": "2026-10-07, BizHawk 2.11.1 Linux, BPEF v0: Potion ×3, Master Ball, TM01 and Cheri Berry ×2 written by the client appeared in the right bag pockets with the right quantities",
     "evidence": "struct SaveBlock1 (pret/pokeemerald include/global.h): bagPocket_Items 0x560 ×30, KeyItems 0x5D8 ×30, PokeBalls 0x650 ×16, TMHM 0x690 ×64, Berries 0x790 ×46; ItemSlot {u16 itemId; u16 quantity ^ (u16)SaveBlock2.encryptionKey} (src/item.c GetBagItemQuantity); empty slot = item 0, quantity 0 ^ key (ClearItemSlots)"
+  },
+  "events": {
+    "status": "read-validated",
+    "validatedOn": "2026-10-07, BizHawk 2.11.1 Linux, BPEF v0: GAME_STAT_STEPS 86 -> 88 after walking two tiles; three real commanded trainer battles: POKEMON_FAINTED when the lead fell (1 HP), BATTLE_ENDED WIN with 1 conscious, TRAINER_VICTORY with the native reward (60 P, money read before/after); step events every 100 steps up to 50 000 (race total)",
+    "saveBlock1GameStats": 5532,
+    "evidence": {
+      "saveBlock1GameStats": "struct SaveBlock1 (pret/pokeemerald include/global.h) /*0x159C*/ u32 gameStats[NUM_GAME_STATS]; GetGameStat = gameStats[i] ^ gSaveBlock2Ptr->encryptionKey (src/overworld.c); GAME_STAT_STEPS 5 (include/constants/game_stat.h). Read on BPEF v0: [2,0,0,0,0,86,0,1,1,0,0,0] (saved 2, steps 86, battles 1, wild battles 1), steps 86 -> 88 after walking",
+      "battle": "in-battle flag gMain.inBattle (defeat.inBattleFlags), gBattleTypeFlags (battle.battleTypeFlags, BATTLE_TYPE_TRAINER = 1 << 3), gBattleOutcome (battle.battleOutcome, B_OUTCOME_WON 1 ... include/constants/battle.h), party current HP (offset 86)"
+    }
   }
 }

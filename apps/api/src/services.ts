@@ -19,7 +19,7 @@ import {BattleEncounterService} from './battles/battle-encounter-service.js';
 import {RunDefeatService} from './runs/run-defeat-service.js';
 import {BattleBoardService} from './battles/battle-board-service.js';
 import {pokeApiMoves,type MovesProvider} from './battles/board-draw.js';
-import {levelData} from '@pokerace/shared';
+import {levelData,moveInfo,speciesTypes} from '@pokerace/shared';
 import {passiveHandlers} from './passives/passive-handlers.js';
 import type {PassiveHandler} from './passives/passive-events.js';
 
@@ -27,7 +27,7 @@ export type Services=ReturnType<typeof createServices>;
 type Course=ReturnType<typeof createApp>;
 
 // Composition of the portal services; each lobby's course app provides its native clients and action locks.
-export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;emitTo?:(lobbyId:string,accountId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot;implementedPassives?:ReadonlySet<string>;passiveHandlers?:Record<string,PassiveHandler>;random?:Random;runChanged?:(lobbyId:string,run:Run)=>void;resetDelayMs?:number;battleMoves?:MovesProvider;levelData?:typeof levelData}){
+export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;emitTo?:(lobbyId:string,accountId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot;implementedPassives?:ReadonlySet<string>;passiveHandlers?:Record<string,PassiveHandler>;random?:Random;runChanged?:(lobbyId:string,run:Run)=>void;resetDelayMs?:number;battleMoves?:MovesProvider;levelData?:typeof levelData;moveInfo?:typeof moveInfo;speciesTypes?:typeof speciesTypes}){
  const course=(lobbyId:string)=>{const c=courses.get(lobbyId);if(!c)throw new Error(`Lobby ${lobbyId} is not running`);return c;};
  const currentGame=new CurrentGameService({lobbies:domain.lobbies,runs:domain.runs,clients:(lobbyId):PublicNativeClient[]=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],staleAfterMs:options.staleAfterMs});
  const commands=new GameCommandService({db:domain.db,audit:domain.audit,timeoutMs:options.commandTimeoutMs,
@@ -53,8 +53,8 @@ export function createServices(domain:PortalDomain,courses:Map<string,Course>,op
  const board:BattleBoardService=new BattleBoardService({domain,db:domain.db,battles,currentGame,transactions:()=>transactions,moves:options.battleMoves??pokeApiMoves,
   changed:lobbyId=>options.changed(lobbyId,'board'),notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n)});
  const runDefeats=new RunDefeatService({domain,currentGame,commands,changed:lobbyId=>options.changed(lobbyId,'runs'),runChanged:(lobbyId,run)=>options.runChanged?.(lobbyId,run),resetDelayMs:options.resetDelayMs,
-  notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n)});
- const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop,passives,passiveEngine,battles,runDefeats,board,levelData:options.levelData??levelData};
+  notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n),rescue:(lobbyId,accountId,state)=>passiveEngine.rescue(lobbyId,accountId,state)});
+ const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop,passives,passiveEngine,battles,runDefeats,board,levelData:options.levelData??levelData,moveInfo:options.moveInfo??moveInfo,speciesTypes:options.speciesTypes??speciesTypes};
  wheels.attach(services);shop.attach(services);passiveEngine.attach(services);
  return services;
 }

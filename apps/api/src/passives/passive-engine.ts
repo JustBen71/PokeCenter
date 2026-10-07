@@ -100,6 +100,21 @@ export class PassiveEngine{
   await this.retryPending(lobbyId,accountId);
  }
 
+ /** Before boxing fainted Pokémon: the first passive that saves one (Résurrection) stops the boxing this time. */
+ async rescue(lobbyId:string,accountId:string,state:NativeGameState):Promise<boolean>{
+  for(const owned of this.active(lobbyId,accountId)){
+   const rescue=this.handlers[owned.passiveId].rescue;
+   if(!rescue)continue;
+   try{if(await rescue(this.context(lobbyId,accountId,owned.passiveId),state)){this.services.passives.deps.changed(lobbyId);return true;}}
+   catch(error){
+    // Another action holds the game (a reward being paid…): the boxing waits and the rescue is tried again.
+    if(error instanceof DomainError&&error.code==='PLAYER_BUSY')throw error;
+    this.failed(lobbyId,accountId,owned.passiveId,'RESCUE',error);
+   }
+  }
+  return false;
+ }
+
  /** Modifier: the hostile gages a target's passives allow (Contre-sort). The list is never emptied. */
  filterHostileGages(lobbyId:string,targetId:string,gages:Gage[]):Gage[]{
   let result=gages;

@@ -11,8 +11,13 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
     // Writes are announced only for a write-validated profile, a transactional bridge and local consent.
     private readonly string[] capabilities = writesEnabled && profile.AllowWrites && bridge is ITransactionalBridge
         ? ReadCapabilities.Concat(WriteCapabilities).Concat(profile.Battle != null && battles != null ? [Gen3BattleEncounter.Capability] : [])
-            .Concat(profile.Battle != null && profile.Defeat != null && outbox != null ? [Gen3Defeat.EventCapability, Gen3Defeat.BoxCapability, Gen3Defeat.ResetCapability] : []).ToArray()
-        : ReadCapabilities;
+            .Concat(profile.Battle != null && profile.Defeat != null && outbox != null ? [Gen3Defeat.EventCapability, Gen3Defeat.BoxCapability, Gen3Defeat.ResetCapability] : [])
+            .Concat(EventCapabilities(profile, outbox)).ToArray()
+        : ReadCapabilities.Concat(EventCapabilities(profile, outbox)).ToArray();
+    // Battle and step events only read memory: announced with or without writes, with an outbox to keep them.
+    private static string[] EventCapabilities(Gen3MemoryProfile profile, Runtime.GameEventOutbox? outbox) =>
+        profile.Battle != null && profile.Defeat != null && profile.Events != null && outbox != null ? Gen3BattleEvents.Capabilities : [];
+    private readonly Gen3BattleEvents.Detector battleEvents = new();
     private readonly Gen3Defeat.Detector defeats = new();
     private readonly Gen3Memory memory = new(bridge);
     private readonly System.Text.Json.Nodes.JsonObject data = Gen3ProfileRegistry.Resource("game-data");
@@ -39,17 +44,27 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
         if (name.Length == 0 || name.Contains('?') || hours > 9999 || trainer[16] > 59 || trainer[17] > 59 || count > 6 || money > 999999)
             throw new InvalidDataException("Invalid trainer fields.");
         var party = new PokemonSnapshot[count];
-        if (count > 0)
-        {
-            var bytes = await memory.ReadAsync(profile.PartyAddress, count * 100, cancellation);
-            for (var i = 0; i < count; i++) party[i] = decoder.Decode(bytes.AsSpan(i * 100, 100), i + 1);
-        }
+        var bytes = count > 0 ? await memory.ReadAsync(profile.PartyAddress, count * 100, cancellation) : [];
+        for (var i = 0; i < count; i++) party[i] = decoder.Decode(bytes.AsSpan(i * 100, 100), i + 1);
+        var events = capabilities.Contains(Gen3BattleEvents.Capabilities[0]);
+        var steps = events ? U32(await memory.ReadAsync(sb1 + Gen3BattleEvents.StepsOffset(profile.Events!), 4, cancellation)) ^ U32(trainer.AsSpan(0xAC)) : 0;
         var flags = await memory.ReadAsync(sb1 + flagOffset, flagLength, cancellation);
         var completed = objectives.Where(o => o!["flags"]!.AsArray().Any(f => (flags[(int)f! / 8] & (1 << ((int)f! % 8))) != 0)).Select(o => (string)o!["id"]!).ToArray();
         // Save loads and party edits between requests invalidate this observation.
         if (!ptr1.SequenceEqual(await memory.ReadAsync(profile.SaveBlock1Pointer, 4, cancellation)) ||
             !ptr2.SequenceEqual(await memory.ReadAsync(profile.SaveBlock2Pointer, 4, cancellation)) ||
             count != (await memory.ReadAsync(profile.PartyCountAddress, 1, cancellation))[0]) throw new InvalidDataException("Game changed during observation.");
+        if (events)
+        {
+            // After the consistency check: an event is never derived from a torn observation.
+            var battleInfo = profile.Battle!;
+            var inBattle = ((await memory.ReadAsync(profile.Defeat!.InBattleFlags, 1, cancellation))[0] & 2) != 0;
+            var typeFlags = U32(await memory.ReadAsync(battleInfo.BattleTypeFlags, 4, cancellation));
+            var outcome = (await memory.ReadAsync(battleInfo.BattleOutcome, 1, cancellation))[0];
+            var members = party.Select((p, i) => new Gen3BattleEvents.Member(U32(bytes.AsSpan(i * 100)), p.Slot, p.SpeciesId, p.CurrentHp)).ToArray();
+            foreach (var (kind, data) in battleEvents.Observe(inBattle, typeFlags, outcome, money, members)) outbox!.Enqueue(kind, data);
+            if (battleEvents.Steps(steps) is { } stepsData) outbox!.Enqueue("STEPS_CHANGED", stepsData);
+        }
         var battle = capabilities.Contains(Gen3BattleEncounter.Capability) ? await Gen3BattleEncounter.TrackAsync(bridge, profile, profile.Battle!, battles!, cancellation) : null;
         var adapter = new GameAdapterState("pokemon.emerald.gen3", "ready", profile.ProfileId, capabilities);
         return new(GameObservation.GameStateVersion, adapter, new("pokemon", 3, "emerald", profile.Language, profile.Revision),

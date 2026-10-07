@@ -35,26 +35,26 @@ Un passif désactivé dans le lobby, incompatible ou déjà possédé est exclu 
 
 | Rareté | Passif | Statut | Mécanique |
 |---|---|---|---|
-| Commun | Prime de dresseur | DISABLED (`events.trainer_victory`) | +5 % de la récompense native |
+| Commun | Prime de dresseur | IMPLEMENTED | +5 % de la récompense native (argent gagné pendant le combat), payé en plus |
 | Commun | Cartographe | IMPLEMENTED | Grandes zones (ville, route ; « Ville — Bâtiment » compte pour la ville) ; ticket bienveillant tous les 5 |
-| Commun | Compagnon fidèle | DISABLED (`pokemon.hp.write`) | Restauration après 3 objectifs |
-| Commun | Dernier debout | DISABLED (`events.battle_ended`, `pokemon.hp.write`) | Restauration partielle |
+| Commun | Compagnon fidèle | IMPLEMENTED | Compagnon = 1er Pokémon (suivi par sa personnalité) ; 3 objectifs sans qu'il parte : équipe soignée (PV, statut) hors combat |
+| Commun | Dernier debout | IMPLEMENTED | Une fois par Run : combat fini avec 1 seul Pokémon conscient → équipe à 50 % de PV au moins |
 | Commun | Brocanteur | IMPLEMENTED | 3 enchères perdues : une vraie statistique du prochain lot rejoint, en privé |
 | Commun | Éclaireur | IMPLEMENTED | Prochain objectif et sa récompense révélés en privé |
 | Commun | Collectionneur | IMPLEMENTED | Espèces différentes dans l'équipe ; ticket bienveillant tous les 10 |
 | Peu commun | Deuxième souffle | IMPLEMENTED | +1 500 ₽ au départ d'une Run qui suit une Run perdue (3 fois) |
 | Peu commun | Contre-sort | IMPLEMENTED | Une roue hostile d'écart avant le même gage ; repli audité `counterspell_fallback` |
 | Peu commun | Rivalité | IMPLEMENTED | Le premier joueur dépassé reçoit un ticket hostile aléatoire |
-| Peu commun | Alchimiste | DISABLED (`pokemon.nature.write`) | Nouvelle nature |
-| Peu commun | Chasseur de trésors | DISABLED (`events.trainer_victory`, `item.write`) | Objet tous les 10 combats |
+| Peu commun | Alchimiste | IMPLEMENTED | Une fois par Run : 3 natures tirées au début de la Run, le joueur en applique une (personnalité recalculée, genre/chromatique gardés, stats recalculées) |
+| Peu commun | Chasseur de trésors | IMPLEMENTED | Objet aléatoire (hors objets rares/CS) tous les 10 combats de dresseurs gagnés ; en attente si la poche est pleine |
 | Peu commun | Le sixième homme | IMPLEMENTED | Nouveau badge avec 6 Pokémon : roue bienveillante, une fois par badge |
-| Rare | Marathonien | DISABLED (`steps.read`) | +10 000 ₽ tous les 25 000 pas |
-| Rare | ADN instable | DISABLED (`pokemon.iv.write`) | +2 IV |
-| Rare | Maître des types | DISABLED (`tm.give`) | CT aléatoire |
-| Rare | Résurrection | DISABLED (`events.pokemon_fainted`, `events.battle_ended`, `pokemon.hp.write`) | 1 PV après K.O. |
-| Rare | Mutagène | DISABLED (`pokemon.move.write`) | Nouvelle attaque |
-| Rare | Prime de risque | DISABLED (`events.trainer_victory`) | Ticket si PV moyens < 35 % |
-| Légendaire | Héritier des légendes | DISABLED (`steps.read`) | Œuf virtuel à 50 000 pas |
+| Rare | Marathonien | IMPLEMENTED | +10 000 ₽ tous les 25 000 pas cumulés sur la course |
+| Rare | ADN instable | IMPLEMENTED | Une charge tous les 2 objectifs ; une charge = +2 sur une IV au hasard d'un Pokémon choisi |
+| Rare | Maître des types | IMPLEMENTED | Objectif atteint avec 6 Pokémon couvrant 10 types (types Gen III) : une CT aléatoire |
+| Rare | Résurrection | IMPLEMENTED | Une fois par Run : le Pokémon K.O. revient à 1 PV au lieu d'aller dans la boîte (consommé seulement si le jeu confirme) |
+| Rare | Mutagène | IMPLEMENTED | Une fois par Run : 3 attaques apprenables (niveau, CT/CS, tuteur) proposées, une remplace une attaque (PP pleins) |
+| Rare | Prime de risque | IMPLEMENTED | Victoire contre un dresseur à moins de 35 % de PV moyens : ticket bienveillant, une fois par nombre de badges |
+| Légendaire | Héritier des légendes | IMPLEMENTED | 50 000 pas cumulés : un légendaire niv. 5 (même dresseur, il obéit) rejoint l'équipe dès qu'il y a une place |
 | Légendaire | Âme liée | IMPLEMENTED | Copie exacte gardée côté serveur, réinjectée par un admin hors combat après une Run perdue |
 | Légendaire | Usurpateur | IMPLEMENTED | Une fois : copie un passif non légendaire d'un adversaire |
 | Légendaire | Maître du chaos | IMPLEMENTED | Une fois : roue hostile subie → 3 gages, la cible choisit |
@@ -116,7 +116,9 @@ Le serveur répond `GAME_EVENT_ACK {eventId, ok}`. Si l'adaptateur n'annonce pas
 
 Le client C# garde les événements non acquittés dans `<configuration>.game-events.json`, à côté de la configuration (ex. `client.game-events.json`) (écriture atomique, 200 au plus), et renvoie **le même `eventId`** à chaque connexion jusqu'à l'ACK.
 
-**Aucun adaptateur n'émet encore d'événement** : victoire contre un dresseur, pas, K.O. et fin de combat n'ont pas de source mémoire validée (`pret/pokeemerald` + profil vérifié sur une vraie partie). Les passifs qui en dépendent restent `DISABLED_MISSING_CAPABILITY`. Pour en activer un : valider la lecture, faire annoncer la capability par l'adaptateur Gen III, l'ajouter à `validatedCapabilities` (`passive-catalog.ts`), écrire le handler et ses tests.
+**Sources mémoire (Émeraude FR BPEF v0, validées dans BizHawk)** : l'adaptateur Gen III suit chaque combat entre deux observations (drapeau « en combat » de `gMain`, `gBattleTypeFlags`, `gBattleOutcome`, argent, PV de l'équipe suivis par personnalité). Un membre qui tombe à 0 PV pendant le combat → `POKEMON_FAINTED` ; la sortie du combat → `BATTLE_ENDED` ; un combat de dresseur gagné → aussi `TRAINER_VICTORY` avec l'argent avant/après. Les pas viennent de `GAME_STAT_STEPS` (`SaveBlock1+0x159C`, chiffré par la clé de `SaveBlock2`), envoyés tous les 100 pas. Ces capabilities sont annoncées seulement avec la section `events` du profil, même sans écritures.
+
+Les passifs qui modifient un Pokémon (PV, nature, IV, attaque, nouveau Pokémon) passent par la copie exacte de l'équipe (`game.pokemon.replace` / `insert`, hors combat, `expectedRaw`) ; les objets par `game.item.add`. Si la partie est occupée (une récompense en cours…), le soin, l'éclosion ou la résurrection attendent l'observation suivante ; la mise en boîte attend aussi la Résurrection.
 
 ## Roues
 

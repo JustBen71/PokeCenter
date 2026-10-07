@@ -1,6 +1,7 @@
 import {gen3PartyRaw,passiveById,type PokemonInjection} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import type {PassiveContext,PassiveHandler} from './passive-events.js';
+import {gamePassiveHandlers} from './passive-game-handlers.js';
 
 const name=(ctx:PassiveContext,accountId=ctx.accountId)=>ctx.services.domain.accounts.get(accountId)?.name??accountId;
 const fmt=(n:number)=>`${n.toLocaleString('fr-FR')} ₽`;
@@ -257,7 +258,8 @@ export const passiveHandlers:Record<string,PassiveHandler>={
    if(!ctx.get('bound',null))return 'nothing bound';
    ctx.set('ready',true);ctx.notify(`🔗 Âme liée — ${ctx.get<{name:string}>('bound',{name:'?'}).name} pourra rejoindre la prochaine Run`,{private:true});
   }}
- }
+ },
+ ...gamePassiveHandlers
 };
 
 export const implementedPassives:ReadonlySet<string>=new Set(Object.keys(passiveHandlers));

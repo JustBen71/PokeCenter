@@ -15,10 +15,14 @@ type Moved={slot:number;speciesName:string;nickname:string|null;level:number;box
  */
 export class RunDefeatService{
  private readonly boxing=new Set<string>();
+ // An observation arrived while boxing (or a rescue) ran: decide again with the latest one afterwards.
+ private readonly again=new Set<string>();
  // Party refused for good (PC full…): not sent again until the party changes.
  private readonly refused=new Map<string,string>();
  constructor(private readonly deps:{domain:PortalDomain;currentGame:CurrentGameService;commands:GameCommandService;
-  changed:(lobbyId:string)=>void;runChanged:(lobbyId:string,run:Run)=>void;notify:(lobbyId:string,n:LobbyNotification)=>void;resetDelayMs?:number}){}
+  changed:(lobbyId:string)=>void;runChanged:(lobbyId:string,run:Run)=>void;notify:(lobbyId:string,n:LobbyNotification)=>void;resetDelayMs?:number;
+  // A passive may save a fainted Pokémon before the box (Résurrection).
+  rescue?:(lobbyId:string,accountId:string,state:NativeGameState)=>Promise<boolean>}){}
  private name(id:string){return this.deps.domain.accounts.get(id)?.name??id;}
  /**
   * After a defeat, the lost game stays « lost » until a new game is seen (reset done, or the player started one):
@@ -83,9 +87,11 @@ export class RunDefeatService{
   if(!fainted.length||fainted.length===state.party.length||!state.capabilities.includes('party.box_fainted')||!state.battle?.safe)return;
   const run=this.deps.domain.runs.running(lobbyId,accountId),key=`${lobbyId}:${accountId}`;
   const party=state.party.map(p=>`${p.speciesId}:${p.level}:${p.currentHp}`).join(',');
-  if(!run||this.boxing.has(key)||this.refused.get(key)===party)return;
+  if(!run||this.refused.get(key)===party)return;
+  if(this.boxing.has(key)){this.again.add(key);return;}
   this.boxing.add(key);
   try{
+   if(await this.deps.rescue?.(lobbyId,accountId,state))return;
    const context=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:['party.box_fainted'],requireRun:false});
    // The client re-checks the observed party count: a repeated or late command never moves anything twice.
    const outcome=await this.deps.commands.withPlayerLock(lobbyId,accountId,()=>this.deps.commands.send({lobbyId,accountId,playerId:context.playerId,runId:run.id,actorAccountId:null,
@@ -110,10 +116,13 @@ export class RunDefeatService{
   }catch(error){
    // Game offline: the next observation decides again. Another action held the player (a reward…): try again
    // shortly, as the game may not publish a new state by itself.
-   if(error instanceof DomainError&&error.code==='PLAYER_BUSY')setTimeout(()=>{
+   if(error instanceof DomainError&&error.code==='PLAYER_BUSY')this.again.add(key);
+  }
+  finally{
+   this.boxing.delete(key);
+   if(this.again.delete(key))setTimeout(()=>{
     try{void this.observe(lobbyId,accountId,this.deps.currentGame.requireState(lobbyId,accountId,{requireRun:false}).state).catch(()=>{});}catch{/* offline */}
    },1000);
   }
-  finally{this.boxing.delete(key);}
  }
 }

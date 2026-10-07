@@ -3,7 +3,8 @@ using System.Text.Json.Nodes;
 namespace Pokerace.Client.Games.Pokemon.Gen3;
 
 public sealed record Gen3MemoryProfile(string ProfileId, string Language, string Revision, long SaveBlock1Pointer,
-    long SaveBlock2Pointer, long PartyAddress, long PartyCountAddress, bool AllowWrites = false, Gen3BattleAddresses? Battle = null, Gen3DefeatAddresses? Defeat = null);
+    long SaveBlock2Pointer, long PartyAddress, long PartyCountAddress, bool AllowWrites = false, Gen3BattleAddresses? Battle = null, Gen3DefeatAddresses? Defeat = null,
+    Gen3EventAddresses? Events = null);
 
 public sealed class Gen3ProfileRegistry(Func<string, JsonObject>? resource = null)
 {
@@ -27,7 +28,8 @@ public sealed class Gen3ProfileRegistry(Func<string, JsonObject>? resource = nul
             p["revision"]?.GetValue<string>() != entry["revision"]?.GetValue<string>()) return ("profile_not_validated", null);
         var profile = new Gen3MemoryProfile(id, p["language"]!.GetValue<string>(), p["revision"]!.GetValue<string>(),
             (long)p["saveBlock1Pointer"]!, (long)p["saveBlock2Pointer"]!, (long)p["partyAddress"]!, (long)p["partyCountAddress"]!,
-            p["allowWrites"]?.GetValue<bool>() == true, Gen3BattleAddresses.From(p["battle"] as JsonObject), Gen3DefeatAddresses.From(p["defeat"] as JsonObject));
+            p["allowWrites"]?.GetValue<bool>() == true, Gen3BattleAddresses.From(p["battle"] as JsonObject), Gen3DefeatAddresses.From(p["defeat"] as JsonObject),
+            Gen3EventAddresses.From(p["events"] as JsonObject));
         if (!Gen3Memory.IsMapped(profile.SaveBlock1Pointer, 4) || !Gen3Memory.IsMapped(profile.SaveBlock2Pointer, 4) ||
             !Gen3Memory.IsMapped(profile.PartyAddress, 600) || !Gen3Memory.IsMapped(profile.PartyCountAddress, 1)) return ("profile_not_validated", null);
         return ("ready", profile);
