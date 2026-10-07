@@ -53,6 +53,14 @@ public sealed class BridgeForm : Form, IExternalToolForm
             Log("Startup failed: check configuration and port availability.");
         }
     }
+    // Informative window only: it must not take the keyboard from the game, or BizHawk's hotkeys (save slots…) stop
+    // working until the player clicks the game window (seen under Linux/Mono).
+    protected override bool ShowWithoutActivation => true;
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != this && f.GetType().Name == "MainForm")?.Activate();
+    }
     private static void Log(string message)
     {
         try

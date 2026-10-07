@@ -8,7 +8,7 @@ namespace Pokerace.Client.Server;
 public static class ServerProtocol
 {
     public const int Version = 1;
-    public const string ClientVersion = "0.2.4";
+    public const string ClientVersion = "0.2.5";
     public const string Namespace = "/client";
     public static JsonObject Message(string type) => new() { ["type"] = type, ["protocolVersion"] = Version };
     public static JsonObject BridgeState(BridgeStatus status) => new()

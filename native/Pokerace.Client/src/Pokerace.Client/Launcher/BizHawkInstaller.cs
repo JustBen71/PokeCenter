@@ -79,9 +79,15 @@ public static class BizHawkInstaller
             Directory.CreateDirectory(unpack);
             await using (var gzip = new GZipStream(File.OpenRead(archive), CompressionMode.Decompress))
                 await TarFile.ExtractToDirectoryAsync(gzip, unpack, overwriteFiles: true, cancellation);
+            // Merged over the existing folder like on Windows: never delete it, it holds the player's saves
+            // (GBA/SaveRAM, GBA/State), BizHawk's own files and the Pokérace archives.
             var inner = Directory.GetDirectories(unpack).Single();
-            if (Directory.Exists(runtime)) Directory.Delete(runtime, true);
-            Directory.Move(inner, runtime);
+            foreach (var file in Directory.EnumerateFiles(inner, "*", SearchOption.AllDirectories))
+            {
+                var target = Path.Combine(runtime, Path.GetRelativePath(inner, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                File.Move(file, target, overwrite: true);
+            }
             Directory.Delete(unpack, true);
         }
         var external = Path.Combine(runtime, "ExternalTools");
