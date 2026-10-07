@@ -167,6 +167,12 @@ public sealed class GameAdapterTests
             if (!(bool)response["ok"]!) throw new ClientException((string)response["error"]!["code"]!, "Transaction rejected");
             Transactions++; return Task.CompletedTask;
         }
+        public int Resets;
+        public Task<string> ResetGameAsync(string hash, CancellationToken c)
+        {
+            if (hash != Hash) throw new ClientException("state_changed", "Loaded game changed.");
+            Resets++; return Task.FromResult("20261007T000000000Z");
+        }
         private sealed class Domain(string name, byte[] bytes) : Pokerace.BizHawkBridge.Core.IMemoryDomainAdapter
         {
             public string Name => name; public long Size => bytes.Length; public bool Writable => true;
@@ -177,6 +183,8 @@ public sealed class GameAdapterTests
             public bool IsGameLoaded => true; public string SystemId => "GBA";
             public object GetGameInfo() => new { hash = bridge.Hash };
             public IReadOnlyList<Pokerace.BizHawkBridge.Core.IMemoryDomainAdapter> GetMemoryDomains() => [new Domain("EWRAM", bridge.Ewram), new Domain("IWRAM", bridge.Iwram)];
+            public void ArchiveGame(string directory) => throw new NotSupportedException();
+            public void EraseSaveAndReboot() => throw new NotSupportedException();
         }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

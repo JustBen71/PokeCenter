@@ -125,5 +125,11 @@ public sealed class BridgeClient(ClientConfiguration configuration, Func<string?
         var response = await CallAsync(new JsonObject { ["type"] = "compareWrite", ["gameHash"] = gameHash, ["edits"] = edits }, cancellation);
         if (!BridgeProtocol.Boolean(response, "verified")) throw new ClientException("verification_failed", "Purchase not verified.");
     }
+    public async Task<string> ResetGameAsync(string gameHash, CancellationToken cancellation)
+    {
+        if (!configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Game writes are disabled.");
+        var response = await CallAsync(new JsonObject { ["type"] = "resetGame", ["gameHash"] = gameHash }, cancellation);
+        return BridgeProtocol.Text(response, "archive");
+    }
     public async ValueTask DisposeAsync() { await DisconnectAsync(); gate.Dispose(); }
 }

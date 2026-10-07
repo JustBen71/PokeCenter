@@ -3,18 +3,25 @@ using static Pokerace.Client.Games.Pokemon.Gen3.Gen3PokemonDecoder;
 
 namespace Pokerace.Client.Games.Pokemon.Gen3;
 
-public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile profile, bool writesEnabled = false, BattleEncounterStore? battles = null) : IGameAdapter
+public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile profile, bool writesEnabled = false, BattleEncounterStore? battles = null,
+    Runtime.GameEventOutbox? outbox = null) : IGameAdapter
 {
     public static readonly string[] ReadCapabilities = ["trainer.read", "money.read", "party.read", "location.read", "progression.read"];
     public static readonly string[] WriteCapabilities = ["money.write", "party.write", "pokemon.insert", "pokemon.remove", "pokemon.replace"];
     // Writes are announced only for a write-validated profile, a transactional bridge and local consent.
     private readonly string[] capabilities = writesEnabled && profile.AllowWrites && bridge is ITransactionalBridge
-        ? ReadCapabilities.Concat(WriteCapabilities).Concat(profile.Battle != null && battles != null ? [Gen3BattleEncounter.Capability] : []).ToArray() : ReadCapabilities;
+        ? ReadCapabilities.Concat(WriteCapabilities).Concat(profile.Battle != null && battles != null ? [Gen3BattleEncounter.Capability] : [])
+            .Concat(profile.Battle != null && profile.Defeat != null && outbox != null ? [Gen3Defeat.EventCapability, Gen3Defeat.BoxCapability, Gen3Defeat.ResetCapability] : []).ToArray()
+        : ReadCapabilities;
+    private readonly Gen3Defeat.Detector defeats = new();
     private readonly Gen3Memory memory = new(bridge);
     private readonly System.Text.Json.Nodes.JsonObject data = Gen3ProfileRegistry.Resource("game-data");
     private readonly System.Text.Json.Nodes.JsonObject progression = Gen3ProfileRegistry.Resource("progression");
     public async Task<GameSnapshot> ReadAsync(CancellationToken cancellation)
     {
+        // First, and on its own reads: during a blackout the save blocks move and the rest of the observation may fail.
+        if (capabilities.Contains(Gen3Defeat.EventCapability) && await Gen3Defeat.ObserveAsync(memory, profile, defeats, cancellation) is { } cause)
+            outbox!.Enqueue("PLAYER_DEFEATED", new() { ["cause"] = cause });
         var ptr1 = await memory.ReadAsync(profile.SaveBlock1Pointer, 4, cancellation);
         var ptr2 = await memory.ReadAsync(profile.SaveBlock2Pointer, 4, cancellation);
         var sb1 = U32(ptr1); var sb2 = U32(ptr2);

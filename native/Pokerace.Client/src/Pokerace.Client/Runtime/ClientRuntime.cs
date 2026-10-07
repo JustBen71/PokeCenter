@@ -19,7 +19,7 @@ public sealed class ClientRuntime(ClientConfiguration configuration, IBridgeClie
     private readonly BridgeConnectionManager manager = new(bridge, log, pollInterval, retryInterval);
     // One battle store shared by the command (start) and the observation loop (follow, result, restore).
     private readonly Games.Pokemon.Gen3.BattleEncounterStore battleStore = battles ?? new(null);
-    private GameAdapterManager games => gamesInstance ??= new(bridge, romIdentity, configuration.AllowPokemonPurchases, battleStore);
+    private GameAdapterManager games => gamesInstance ??= new(bridge, romIdentity, configuration.AllowPokemonPurchases, battleStore, Outbox);
     private GameAdapterManager? gamesInstance;
     private CommandRouter router => routerInstance ??= new(bridge, configuration, romIdentity: romIdentity, battles: battleStore);
     private CommandRouter? routerInstance;

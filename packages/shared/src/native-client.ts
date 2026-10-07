@@ -6,9 +6,9 @@ import {battleStateSchema} from './battles.js';
 export const adapterStatusSchema=z.enum(['no_game','unsupported_system','unknown_rom','rom_identity_unavailable','profile_not_validated','memory_domain_unavailable','ready','read_error']);
 export const readCapabilitySchema=z.enum(['trainer.read','money.read','party.read','location.read','progression.read']);
 // Write capabilities are announced by clients whose adapter, profile and local settings allow verified writes.
-export const writeCapabilitySchema=z.enum(['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace','battle.trainer.start']);
+export const writeCapabilitySchema=z.enum(['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace','battle.trainer.start','party.box_fainted','game.reset']);
 // Game events (GAME_EVENT). No adapter announces them until its memory sources are validated.
-export const eventCapabilitySchema=z.enum(['events.trainer_victory','events.pokemon_fainted','events.battle_ended','steps.read']);
+export const eventCapabilitySchema=z.enum(['events.trainer_victory','events.pokemon_fainted','events.battle_ended','events.player_defeated','steps.read']);
 const capabilities=z.array(z.union([readCapabilitySchema,writeCapabilitySchema,eventCapabilitySchema])).max(20).refine(v=>new Set(v).size===v.length);
 export const adapterSchema=z.object({id:z.string().max(80).nullable(),status:adapterStatusSchema,profileId:z.string().max(80).nullable(),capabilities}).strict();
 const integer=(max:number)=>z.number().int().min(0).max(max);
@@ -115,6 +115,8 @@ export const gameEventKinds={
  TRAINER_VICTORY:{capability:'events.trainer_victory',data:z.object({moneyBefore:count(999999),moneyAfter:count(999999),baseReward:count(999999)}).strict()},
  POKEMON_FAINTED:{capability:'events.pokemon_fainted',data:z.object({slot:z.number().int().min(1).max(6),speciesId:z.number().int().min(1).max(1025)}).strict()},
  BATTLE_ENDED:{capability:'events.battle_ended',data:z.object({outcome:z.enum(['WIN','LOSS','FLEE','OTHER']),conscious:count(6)}).strict()},
+ // The player lost in the game: blackout (CB2_WhiteOut), blackout missed between two reads, or a lost commanded battle.
+ PLAYER_DEFEATED:{capability:'events.player_defeated',data:z.object({cause:z.enum(['WHITE_OUT','BATTLE_LOST','PARTY_FAINTED'])}).strict()},
  // Absolute counter read from the game; the server computes the deltas (a reset is a new baseline).
  STEPS_CHANGED:{capability:'steps.read',data:z.object({absolute:count(99999999)}).strict()}
 } as const;

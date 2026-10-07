@@ -62,6 +62,13 @@ public sealed class CommandRouter(IBridgeClient bridge, ClientConfiguration conf
             if (!configuration.AllowPokemonPurchases || battles == null) throw new ClientException("writes_disabled", "Game writes disabled locally.");
             return await Pokerace.Client.Games.Pokemon.Gen3.Gen3BattleEncounter.StartAsync(bridge, romIdentity, command.Payload, battles, cancellation);
         }
+        if (command.Command is Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.BoxCommand or Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.ResetCommand)
+        {
+            if (!configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Game writes disabled locally.");
+            return command.Command == Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.ResetCommand
+                ? await Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.ResetAsync(bridge, romIdentity, cancellation)
+                : await Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.BoxFaintedAsync(bridge, romIdentity, command.Payload, cancellation);
+        }
         // Business writes go through the game adapter only; "allowPokemonPurchases" is the local switch for all of them.
         if (Pokerace.Client.Games.Pokemon.Gen3.Gen3Writes.Commands.Contains(command.Command))
         {

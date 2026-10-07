@@ -15,7 +15,7 @@ const bridgeStatus = envelope.extend({type:z.literal('BRIDGE_STATUS'),bridge,sys
 const heartbeat = envelope.extend({type:z.literal('HEARTBEAT'),clientVersion:z.string().max(32),bridgeConnected:z.boolean(),system}).strict();
 const ack = envelope.extend({type:z.literal('COMMAND_ACK'),commandId:z.string().uuid(),ok:z.boolean(),result:z.record(z.unknown()).optional(),error:z.object({code:z.string().max(64)}).optional()}).strict();
 const command = envelope.extend({type:z.literal('COMMAND'),commandId:z.string().uuid(),command:z.enum([
- 'pokemon.purchase','game.battle.start','game.money.add','game.money.remove','game.money.set','game.pokemon.insert','game.pokemon.remove','game.pokemon.replace','game.party.snapshot','bridge.ping','bridge.getStatus','bridge.getSystem','bridge.getGameInfo','bridge.listMemoryDomains','bridge.readMemory','bridge.writeMemory'
+ 'pokemon.purchase','game.battle.start','game.money.add','game.money.remove','game.money.set','game.pokemon.insert','game.pokemon.remove','game.pokemon.replace','game.party.snapshot','game.party.box_fainted','game.reset','bridge.ping','bridge.getStatus','bridge.getSystem','bridge.getGameInfo','bridge.listMemoryDomains','bridge.readMemory','bridge.writeMemory'
 ]),payload:z.record(z.unknown())}).strict();
 export type NativeCommand=z.infer<typeof command>;
 export type NativeAck=z.infer<typeof ack>;

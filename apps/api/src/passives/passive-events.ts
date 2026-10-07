@@ -19,6 +19,7 @@ export type DomainEvent={lobbyId:string;accountId:string;id:string}&(
  |{type:'TRAINER_VICTORY';data:Extract<GameEvent,{kind:'TRAINER_VICTORY'}>['data']}
  |{type:'POKEMON_FAINTED';data:Extract<GameEvent,{kind:'POKEMON_FAINTED'}>['data']}
  |{type:'BATTLE_ENDED';data:Extract<GameEvent,{kind:'BATTLE_ENDED'}>['data']}
+ |{type:'PLAYER_DEFEATED';data:Extract<GameEvent,{kind:'PLAYER_DEFEATED'}>['data']}
  |{type:'STEPS_CHANGED';data:{absolute:number;delta?:number;total?:number}}
 );
 export type DomainEventType=DomainEvent['type'];

@@ -22,4 +22,6 @@ public interface IBridgeClient : IAsyncDisposable
 public interface ITransactionalBridge
 {
     Task CompareWriteAsync(string gameHash, JsonArray edits, CancellationToken cancellation);
+    /// <summary>Archives the running game (savestate + save), erases the save and reboots; returns the archive name.</summary>
+    Task<string> ResetGameAsync(string gameHash, CancellationToken cancellation);
 }

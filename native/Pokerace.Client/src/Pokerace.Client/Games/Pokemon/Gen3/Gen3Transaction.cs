@@ -81,16 +81,19 @@ public sealed class Gen3Transaction
         var bytes = new byte[4]; BinaryPrimitives.WriteUInt32LittleEndian(bytes, (uint)value ^ U32(key)); return bytes;
     }
 
-    // Pointers and key are always part of the comparison, so a save load or a new game aborts the write.
-    public Task CommitAsync(CancellationToken cancellation, byte[]? money = null, byte[]? party = null, int? newCount = null)
+    public static JsonObject Edit(long address, byte[] before, byte[]? after = null) => new()
     {
-        JsonObject Edit(long address, byte[] before, byte[]? after = null) => new()
-        {
-            ["domain"] = address >= 0x03000000 ? "IWRAM" : "EWRAM", ["address"] = address - (address >= 0x03000000 ? 0x03000000 : 0x02000000),
-            ["expected"] = Convert.ToHexString(before), ["data"] = after == null ? null : Convert.ToHexString(after)
-        };
+        ["domain"] = address >= 0x03000000 ? "IWRAM" : "EWRAM", ["address"] = address - (address >= 0x03000000 ? 0x03000000 : 0x02000000),
+        ["expected"] = Convert.ToHexString(before), ["data"] = after == null ? null : Convert.ToHexString(after)
+    };
+
+    // Pointers and key are always part of the comparison, so a save load or a new game aborts the write.
+    // "extra" edits join the same atomic compareWrite (12 edits at most, these 6 included).
+    public Task CommitAsync(CancellationToken cancellation, byte[]? money = null, byte[]? party = null, int? newCount = null, IEnumerable<JsonObject>? extra = null)
+    {
         var edits = new JsonArray(Edit(Profile.SaveBlock1Pointer, ptr1), Edit(Profile.SaveBlock2Pointer, ptr2), Edit(SaveBlock2 + 0xAC, key),
             Edit(SaveBlock1 + 0x490, moneyBytes, money), Edit(Profile.PartyAddress, Party, party), Edit(Profile.PartyCountAddress, count, newCount == null ? null : [(byte)newCount]));
+        foreach (var edit in extra ?? []) edits.Add(edit);
         return transaction.CompareWriteAsync(gameHash, edits, cancellation);
     }
 }

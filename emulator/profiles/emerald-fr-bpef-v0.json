@@ -43,5 +43,18 @@
       "romReleaseAllEnd": "bytes 6B 02 = releaseall; end",
       "saveBlock1": "struct SaveBlock1 offsets (vars 0x139C, secretBases 0x1A9C, 20 × 0xA0); flags offset 0x1270 of this profile matches"
     }
+  },
+  "defeat": {
+    "status": "write-validated",
+    "validatedOn": "2026-10-07, BizHawk 2.11.1 Linux, BPEF v0: real wild-battle blackout observed (outcome 2 then CB2_WhiteOut then overworld), fainted party member deposited in PC box 1 and read back with a valid checksum",
+    "callback2WhiteOut": 134766441,
+    "inBattleFlags": 50341625,
+    "pokemonStoragePointer": 50355604,
+    "evidence": {
+      "callback2WhiteOut": "special 203 SetCB2WhiteOut literal pool; gMain.callback2 sampled every 200 ms during a real defeat: 0x08038421 (battle, outcome 2) -> 0x08085F69 for 120 frames -> 0x08085E6D (CB2_Overworld). Every whiteout (battle, field poison, Space Center) goes through CB2_WhiteOut (pret/pokeemerald)",
+      "inBattleFlags": "gMain + 0x439, bit 1 = gMain.inBattle (struct Main): 1 during wild and trainer battles, 0 on the overworld",
+      "pokemonStoragePointer": "IWRAM pointer next to gSaveBlock2Ptr; currentBox at +0, 14 x 30 BoxPokemon (80 bytes) at +4 (struct PokemonStorage); moves with the save blocks on map loads",
+      "boxDeposit": "first 80 bytes of the party struct copied verbatim (same personality/OT id: encryption and checksum stay valid), party compacted, gPlayerPartyCount - 1 (as the PC deposit)"
+    }
   }
 }
