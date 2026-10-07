@@ -23,10 +23,11 @@ test('R1 · Pokémon tombé envoyé dans la boîte, blackout = Run perdue, Run s
   const page=await context.newPage();
   await page.goto('/#/course');
   await call(adminId,'POST',`/api/lobbies/${lobby.id}/runs`,{accountId:zoeId,start:true});
-  await expect(card(page,'Zoé R')).toBeVisible();
+  // The page follows the live game (notifications included) before anything happens in it.
+  await expect(card(page,'Zoé R')).toContainText('En jeu');
   game.faint(2);
-  await expect(page.locator('.toast').filter({hasText:'BRINDILLE (Bulbizarre, niv. 5) de Zoé R est tombé'}).first()).toBeVisible();
   await expect.poll(()=>game.box.length).toBe(1);
+  await expect(page.locator('.toast').filter({hasText:'BRINDILLE (Bulbizarre, niv. 5) de Zoé R est tombé'}).first()).toBeVisible();
   await game.defeated('WHITE_OUT');
   await expect(page.locator('.toast').filter({hasText:'Zoé R a perdu sa Run #1'}).first()).toBeVisible();
   await expect.poll(()=>game.resets).toBe(1);

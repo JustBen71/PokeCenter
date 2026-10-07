@@ -28,6 +28,7 @@ import {ShopPage} from './shop/ShopPage';
 import {JackpotPage} from './jackpot/JackpotPage';
 import {LogsPage} from './audit/LogsPage';
 import {PassivesPage} from './passives/PassivesPage';
+import {BoardPage} from './battles/BoardPage';
 import {PassiveSelection} from './passives/PassiveSelection';
 import {nativeActionUnavailable} from './native-clients';
 
@@ -62,6 +63,7 @@ function Portal(){
  return <Shell route={route}>
   {route==='course'&&<CoursePage onPokemon={(row,p)=>setSheet({row,slot:p.slot})}/>}
   {route==='map'&&<MapRoute/>}
+  {route==='board'&&<BoardPage/>}
   {route==='passives'&&<PassivesPage/>}
   {route==='auctions'&&<AuctionsPage/>}
   {route==='wheels'&&<WheelsAdminPage/>}

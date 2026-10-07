@@ -1,5 +1,6 @@
 import type {GameEvent,LobbyNotification,NativeGameState,Run} from '@pokerace/shared';
 import type {PortalDomain} from '../store.js';
+import {DomainError} from '../errors.js';
 import type {CurrentGameService} from '../game/current-game-service.js';
 import type {GameCommandService} from '../game/game-command-service.js';
 
@@ -77,7 +78,13 @@ export class RunDefeatService{
      message:`${mon} de ${who} est K.O. : envoyé dans la boîte ${m.box} (place ${m.place})`,metadata:{...m}});
     this.deps.notify(lobbyId,{kind:'warning',message:`🪦 ${mon} de ${who} est tombé : envoyé dans la boîte`});
    }
-  }catch{/* game offline, player busy: the next observation decides again */}
+  }catch(error){
+   // Game offline: the next observation decides again. Another action held the player (a reward…): try again
+   // shortly, as the game may not publish a new state by itself.
+   if(error instanceof DomainError&&error.code==='PLAYER_BUSY')setTimeout(()=>{
+    try{void this.observe(lobbyId,accountId,this.deps.currentGame.requireState(lobbyId,accountId,{requireRun:false}).state).catch(()=>{});}catch{/* offline */}
+   },1000);
+  }
   finally{this.boxing.delete(key);}
  }
 }

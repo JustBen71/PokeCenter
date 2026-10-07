@@ -340,3 +340,14 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 .badge.status-pending{background:#262a3c;color:#c4c9e0}
 .battle-banner{margin:10px 0 0;padding:6px 10px;border-radius:8px;background:#2b2516;color:#f2ce82;font-size:12px;font-weight:700}
 .battle-banner.running{background:#3a1d22;color:#ffb3a6}.battle-banner.review{background:#3b331a;color:#f2d68a}
+
+/* Tableau des combats */
+.board-page{display:grid;gap:16px}.board-page h2{margin:8px 0 0;font-size:18px}
+.board-new form{display:grid;gap:10px}
+.board-grid{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.board-team{display:grid;gap:6px;align-content:start}.board-team.won,.board-team.withdrawn{opacity:.75}
+.board-team-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.board-team-head small{display:block}
+.board-team .legendary{color:#f2ce82;font-style:normal;font-size:12px}
+.board-reward{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:20px;font-weight:800;color:#f2ce82}.board-reward small{font-size:12px;font-weight:400}
+.badge.board-open{background:#17352e;color:#7fe8bb}.badge.board-challenged{background:#3a1d22;color:#ffb3a6}
+.badge.board-won{background:#2b2516;color:#f2ce82}.badge.board-withdrawn{background:#262a3c;color:#c4c9e0}

@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {battleScalingLabels,battleScalingModes,battleSpriteIds,battleSpriteLabels,gageHandlerInfo,gageHandlers,passiveRarities,passiveRarityLabels,ticketIcons,wheelToneLabels,type GageHandler,type WheelInput,type WheelResolution,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
+import {boardLegendaryLabels,boardLegendaryModes,battleScalingLabels,battleScalingModes,battleSpriteIds,battleSpriteLabels,gageHandlerInfo,gageHandlers,passiveRarities,passiveRarityLabels,ticketIcons,wheelToneLabels,type GageHandler,type WheelInput,type WheelResolution,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
 import {Pencil,Play,Plus,Trash2} from 'lucide-react';
 import {api} from '../api/client';
 import {useLobby} from '../lobby/lobby-context';
@@ -16,7 +16,8 @@ const emptyWheel=():Draft=>({name:'',description:'',price:1000,icon:'green-1',to
 const defaultParams:Record<GageHandler,Record<string,unknown>>={NOTICE:{},GIVE_MONEY:{amount:500},TAKE_MONEY:{amount:500},STEAL_MONEY:{amount:500},REMOVE_POKEMON:{selector:'random'},
  GIVE_LIBRARY_POKEMON:{artifactId:''},JACKPOT_FIXED:{amount:1000},JACKPOT_PERCENT:{percent:10},JACKPOT_SHARE:{},JACKPOT_EMPTY:{},
  PASSIVE_GRANT_RANDOM:{rarities:['COMMON','UNCOMMON','RARE']},PASSIVE_GRANT_RARITY:{rarity:'LEGENDARY'},PASSIVE_STEAL:{},
- START_BATTLE:{builder:'MIRROR',fighter:'OWNER',scaling:{mode:'COPY_EXACT',delta:0}}};
+ START_BATTLE:{builder:'MIRROR',fighter:'OWNER',scaling:{mode:'COPY_EXACT',delta:0}},
+ BOARD_BATTLE:{count:3,spread:3,legendary:'NO'}};
 const statusLabels:Record<WheelResolution['status'],string>={DRAWN:'Tiré',AWAITING_CHOICE:'Choix requis',APPLYING:'En cours',SUCCESS:'Appliqué',FAILED:'Échec',REVIEW:'À vérifier',BLOCKED:'Bloqué'};
 
 function GageParams({handler,params,onChange,library}:{handler:GageHandler;params:Record<string,unknown>;onChange:(p:Record<string,unknown>)=>void;library:LibraryItem[]}){
@@ -33,6 +34,8 @@ function GageParams({handler,params,onChange,library}:{handler:GageHandler;param
    {scaling.mode!=='COPY_EXACT'&&<label>± niveaux<input className="field" value={scaling.delta} onChange={e=>onChange({...params,scaling:{...scaling,delta:Math.max(-99,Math.min(99,Number(e.target.value)||0))}})}/></label>}
    <label>Apparence<select className="field" value={String(params.spriteId??'')} onChange={e=>{const {spriteId:_s,...rest}=params;onChange(e.target.value?{...rest,spriteId:e.target.value}:rest);}}><option value="">automatique</option>{battleSpriteIds.map(s=><option key={s} value={s}>{battleSpriteLabels[s]}</option>)}</select></label>
   </>;}
+ if(handler==='BOARD_BATTLE')return <div className="form-row">{number('count','Pokémon (1–6)')}{number('spread','± niveaux autour du bénéficiaire')}
+  <label>Légendaire<select className="field" value={String(params.legendary??'NO')} onChange={e=>onChange({...params,legendary:e.target.value})}>{boardLegendaryModes.map(m=><option key={m} value={m}>{boardLegendaryLabels[m]}</option>)}</select></label></div>;
  if(handler==='PASSIVE_GRANT_RARITY')return <label>Rareté<select className="field" value={String(params.rarity)} onChange={e=>onChange({rarity:e.target.value})}>{passiveRarities.map(r=><option key={r} value={r}>{passiveRarityLabels[r]}</option>)}</select></label>;
  if(handler==='PASSIVE_GRANT_RANDOM'){const chosen=(params.rarities as string[]|undefined)??[];
   return <fieldset className="rarity-picker"><legend>Raretés possibles</legend>{passiveRarities.map(r=><label key={r} className="toggle"><input type="checkbox" checked={chosen.includes(r)}

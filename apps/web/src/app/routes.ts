@@ -1,12 +1,13 @@
-import {Gamepad2,Gavel,Gem,Landmark,Library,Map,ScrollText,Settings,ShoppingBag,Sparkles,Trophy,type LucideIcon} from 'lucide-react';
+import {Gamepad2,Gavel,Gem,Landmark,Library,Map,ScrollText,Settings,ShoppingBag,Sparkles,Swords,Trophy,type LucideIcon} from 'lucide-react';
 
-export type RouteId='course'|'passives'|'map'|'auctions'|'shop'|'bank'|'jackpot'|'wheels'|'library'|'management'|'logs';
+export type RouteId='course'|'board'|'passives'|'map'|'auctions'|'shop'|'bank'|'jackpot'|'wheels'|'library'|'management'|'logs';
 export type RouteDef={id:RouteId;hash:string;label:string;icon:LucideIcon;admin?:boolean};
 
 // Pages are added here as their sprint lands; the admin section is hidden for players (the API still checks roles).
 export const routes:RouteDef[]=[
  {id:'course',hash:'#/course',label:'Course',icon:Gamepad2},
  {id:'map',hash:'#/carte',label:'Carte',icon:Map},
+ {id:'board',hash:'#/tableau',label:'Tableau des combats',icon:Swords},
  {id:'passives',hash:'#/passifs',label:'Passifs',icon:Gem},
  {id:'auctions',hash:'#/encheres',label:'Enchères',icon:Gavel},
  {id:'shop',hash:'#/boutique',label:'Boutique',icon:ShoppingBag},
