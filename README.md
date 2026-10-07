@@ -113,6 +113,7 @@ Détails : [commandes de jeu](docs/game-commands.md), [ledger](docs/money-ledger
 |---|---|---|---|
 | Course | tous | Cartes joueur en direct (rang, Run, client, position, ₽, 6 Pokémon), panneau joueur, fiche Pokémon | [runs.md](docs/runs.md) |
 | Combats commandités | admin / tous | Vrai combat de dresseur dans la partie d'un joueur (Miroir, équipe d'un joueur, du #1, personnalisée), niveaux recalculés, lancé dès que le jeu est sur la carte ; gage de roue START_BATTLE | [battle-encounters.md](docs/battle-encounters.md) |
+| Tableau des combats | admin / tous | Équipes (choisies ou tirées, légendaires possibles) mises au tableau par un admin ou une roue ; le premier joueur qui accepte l'affronte dans son jeu ; victoire = récompense calculée, défaite = fin de Run | [battle-board.md](docs/battle-board.md) |
 | Fin de Run en jeu | automatique | Toute défaite termine la Run et lance la suivante, le jeu redémarre sans sauvegarde (3 dernières parties archivées) ; chaque Pokémon K.O. part dans la boîte PC | [end-of-run.md](docs/end-of-run.md) |
 | Passifs | tous / admin | Bonus permanents de course : choix initial parmi 3 cartes privées, badges sous chaque équipe, roues qui donnent ou volent un passif | [passives.md](docs/passives.md) |
 | Carte | tous | Carte du jeu (Hoenn pour Émeraude) avec les avatars, classement ex æquo par objectifs, récompenses ; sans carte pour un autre jeu, positions dans le classement | [objectives.md](docs/objectives.md) |
@@ -273,6 +274,7 @@ Guides :
 - [passifs de course](docs/passives.md)
 - [combats commandités](docs/battle-encounters.md)
 - [fin de Run en jeu](docs/end-of-run.md)
+- [tableau des combats](docs/battle-board.md)
 - [administration](docs/admin.md)
 - [audit](docs/audit.md)
 - [lanceur BizHawk](docs/bizhawk-launcher.md)
