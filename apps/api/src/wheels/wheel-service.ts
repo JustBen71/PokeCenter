@@ -1,13 +1,13 @@
 import type Database from 'better-sqlite3';
 import {randomInt,randomUUID} from 'node:crypto';
-import {applySchema,chooseGageSchema,gageHandlerInfo,gageNeedsTarget,spinSchema,wheelInputSchema,type Account,type Gage,type GageHandler,type LobbyNotification,type ResolutionStatus,type WheelInput,type WheelResolution,type WheelTone,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
+import {autoWheelSchema,applySchema,chooseGageSchema,gageHandlerInfo,gageNeedsTarget,spinSchema,wheelInputSchema,type Account,type AutoWheel,type Gage,type GageHandler,type LobbyNotification,type ResolutionStatus,type WheelInput,type WheelResolution,type WheelTone,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
 import {nowIso} from '../db/database.js';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
 import type {Services} from '../services.js';
 import {wheelHandlers} from './wheel-handlers.js';
 
-type WheelRow={id:string;name:string;description:string;price:number;icon:WheelType['icon'];tone:WheelTone;enabled:number};
+type WheelRow={id:string;name:string;description:string;price:number;icon:WheelType['icon'];tone:WheelTone;enabled:number;for_sale:number};
 type GageRow={id:string;name:string;description:string;handler:GageHandler;params_json:string;weight:number};
 type ResolutionRow={id:string;lobby_id:string;wheel_type_id:string;gage_json:string;owner_account_id:string;target_account_id:string|null;ticket_id:string|null;status:ResolutionStatus;strip_json:string;result:string|null;created_at:string;applied_at:string|null;options_json:string|null;chooser_account_id:string|null};
 
@@ -17,12 +17,12 @@ const PARTY_HANDLERS:GageHandler[]=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','PAS
 const STRIP_LENGTH=30,WINNER_INDEX=26;
 
 const defaults:WheelInput[]=[
- {name:'Bonne étoile',description:'Une roue bienveillante.',price:1000,icon:'green-1',tone:'GOOD',enabled:true,gages:[
+ {name:'Bonne étoile',description:'Une roue bienveillante.',price:1000,icon:'green-1',tone:'GOOD',enabled:true,forSale:true,gages:[
   {name:'Petit bonus',description:'',handler:'GIVE_MONEY',params:{amount:500},weight:1},
   {name:'Gros lot',description:'',handler:'GIVE_MONEY',params:{amount:2000},weight:1},
   {name:'Part du jackpot',description:'',handler:'JACKPOT_PERCENT',params:{percent:10},weight:1},
   {name:'Pause bien méritée',description:'Rien ne se passe : profites-en pour souffler.',handler:'NOTICE',params:{},weight:1}]},
- {name:'Coup bas',description:'Une roue hostile à lancer sur un adversaire.',price:1500,icon:'purple-1',tone:'BAD',enabled:true,gages:[
+ {name:'Coup bas',description:'Une roue hostile à lancer sur un adversaire.',price:1500,icon:'purple-1',tone:'BAD',enabled:true,forSale:true,gages:[
   {name:'Amende',description:'',handler:'TAKE_MONEY',params:{amount:500},weight:1},
   {name:'Braquage',description:'',handler:'STEAL_MONEY',params:{amount:1000},weight:1},
   {name:'Exil',description:'Un Pokémon au hasard quitte l’équipe.',handler:'REMOVE_POKEMON',params:{selector:'random'},weight:1},
@@ -37,7 +37,8 @@ export class WheelService{
  private services!:Services;
  // Hook for protections (Sprint 8): may block a hostile wheel before it is drawn.
  beforeSpin:(input:{lobbyId:string;wheel:WheelType;owner:Account;target:Account|null;ticketId:string|null;ticketReceivedAt:string|null})=>string|null=()=>null;
- constructor(private readonly deps:{db:Database.Database;notify:(lobbyId:string,n:LobbyNotification)=>void;changed:(lobbyId:string)=>void;spun:(lobbyId:string,r:WheelResolution)=>void}){}
+ // spinAllSpacingMs: time between two players' spins of « Lancer à tous » (each animation is seen); tests use 0.
+ constructor(private readonly deps:{db:Database.Database;notify:(lobbyId:string,n:LobbyNotification)=>void;changed:(lobbyId:string)=>void;spun:(lobbyId:string,r:WheelResolution)=>void;spinAllSpacingMs?:number}){}
  attach(services:Services){this.services=services;}
 
  seed(lobbyId:string){
@@ -51,15 +52,15 @@ export class WheelService{
  }
  list(lobbyId:string,includeDisabled=true):WheelType[]{
   return (this.deps.db.prepare(`SELECT * FROM wheel_types WHERE lobby_id=? AND deleted=0 ${includeDisabled?'':'AND enabled=1'} ORDER BY created_at,rowid`).all(lobbyId) as WheelRow[])
-   .map(w=>({id:w.id,name:w.name,description:w.description,price:w.price,icon:w.icon,tone:w.tone,enabled:w.enabled===1,gages:this.gages(w.id)}));
+   .map(w=>({id:w.id,name:w.name,description:w.description,price:w.price,icon:w.icon,tone:w.tone,enabled:w.enabled===1,forSale:w.for_sale===1,gages:this.gages(w.id)}));
  }
  require(lobbyId:string,wheelId:string){const wheel=this.list(lobbyId).find(w=>w.id===wheelId);if(!wheel)throw new DomainError('NOT_FOUND','Roue introuvable');return wheel;}
 
  private write(lobbyId:string,wheelId:string|null,input:WheelInput):WheelType{
   const id=wheelId??randomUUID(),now=nowIso();
   this.deps.db.transaction(()=>{
-   if(wheelId)this.deps.db.prepare('UPDATE wheel_types SET name=?,description=?,price=?,icon=?,tone=?,enabled=?,updated_at=? WHERE id=?').run(input.name,input.description,input.price,input.icon,input.tone,input.enabled?1:0,now,id);
-   else this.deps.db.prepare('INSERT INTO wheel_types(id,lobby_id,name,description,price,icon,tone,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(id,lobbyId,input.name,input.description,input.price,input.icon,input.tone,input.enabled?1:0,now,now);
+   if(wheelId)this.deps.db.prepare('UPDATE wheel_types SET name=?,description=?,price=?,icon=?,tone=?,enabled=?,for_sale=?,updated_at=? WHERE id=?').run(input.name,input.description,input.price,input.icon,input.tone,input.enabled?1:0,input.forSale?1:0,now,id);
+   else this.deps.db.prepare('INSERT INTO wheel_types(id,lobby_id,name,description,price,icon,tone,enabled,for_sale,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id,lobbyId,input.name,input.description,input.price,input.icon,input.tone,input.enabled?1:0,input.forSale?1:0,now,now);
    // Past resolutions keep their own copy of the gage, so gages can be replaced freely.
    this.deps.db.prepare('DELETE FROM wheel_gages WHERE wheel_type_id=?').run(id);
    const insert=this.deps.db.prepare('INSERT INTO wheel_gages(id,wheel_type_id,name,description,handler,params_json,weight,sort_order) VALUES(?,?,?,?,?,?,?,?)');
@@ -75,6 +76,68 @@ export class WheelService{
   this.deps.db.prepare('UPDATE wheel_types SET deleted=1,enabled=0,updated_at=? WHERE id=?').run(nowIso(),wheelId);
   this.audit(lobbyId,actor,'wheel.delete',`Roue « ${w.name} » supprimée`);this.deps.changed(lobbyId);
  }
+ /**
+  * « Lancer à tous » : one spin per player in a Run (the player owns it; for a hostile wheel the player is also its
+  * target), spaced so each animation is seen. An immediate gage is applied by the launcher; a gage needing a choice
+  * (target, Pokémon, passive) waits in « Derniers tirages » for an admin. `actor` null = the automatic wheel,
+  * applied as the lobby creator.
+  */
+ spinAll(lobbyId:string,wheelId:string,actor:Account|null):{players:number}{
+  const wheel=this.require(lobbyId,wheelId);
+  if(!wheel.enabled)throw new DomainError('CONFLICT','Cette roue est désactivée');
+  const {lobbies,runs,accounts}=this.services.domain;
+  const players=lobbies.members(lobbyId).filter(m=>runs.running(lobbyId,m.accountId)).map(m=>m.accountId);
+  if(!players.length)throw new DomainError('CONFLICT','Aucun joueur n’a de Run en cours');
+  const launcher=actor??accounts.get(lobbies.require(lobbyId).createdBy??'')??lobbies.members(lobbyId).map(m=>accounts.get(m.accountId)).find(a=>a?.admin);
+  if(!launcher)throw new DomainError('CONFLICT','Aucun administrateur pour appliquer les gages');
+  this.services.domain.audit.record({lobbyId,actorAccountId:actor?.id??null,category:'WHEEL',action:'wheel.spin_all',status:'SUCCESS',
+   message:`${wheel.name} lancée pour tous les joueurs en Run (${players.length})${actor?'':' — roue automatique'}`,metadata:{wheelId,players}});
+  this.deps.notify(lobbyId,{kind:'info',message:`🎡 ${wheel.name} : une roue pour chaque joueur (${players.length})${actor?'':' — roue automatique'}`});
+  const spacing=this.deps.spinAllSpacingMs??7000,wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
+  void (async()=>{
+   for(const [i,player] of players.entries()){
+    if(i)await wait(spacing);
+    try{
+     const r=this.spin(lobbyId,wheel.id,{ownerId:player,...(wheel.tone==='BAD'?{targetId:player}:{})},launcher);
+     // The result is announced after the animation (about 3 s in the browser).
+     if(r.status==='DRAWN'){await wait(spacing/2);await this.apply(lobbyId,r.id,{},launcher).catch(()=>{});}
+    }catch{/* audited by spin/apply; the other players still get their wheel */}
+   }
+  })();
+  return {players:players.length};
+ }
+
+ autoWheel(lobbyId:string):AutoWheel{
+  const row=this.deps.db.prepare('SELECT wheel_type_id AS wheelId,every_minutes AS everyMinutes,last_at AS lastAt FROM auto_wheels WHERE lobby_id=?').get(lobbyId) as {wheelId:string|null;everyMinutes:number;lastAt:string|null}|undefined;
+  if(!row)return {wheelId:null,everyMinutes:0,nextAt:null};
+  const on=row.wheelId&&row.everyMinutes>0&&row.lastAt;
+  return {wheelId:row.wheelId,everyMinutes:row.everyMinutes,nextAt:on?new Date(Date.parse(row.lastAt!)+row.everyMinutes*60000).toISOString():null};
+ }
+ /** The countdown starts when the setting is saved. */
+ setAutoWheel(lobbyId:string,body:unknown,actor:Account):AutoWheel{
+  const {wheelId,everyMinutes}=parseBody(autoWheelSchema,body);
+  if(wheelId&&!this.require(lobbyId,wheelId).enabled)throw new DomainError('CONFLICT','Cette roue est désactivée');
+  const now=nowIso();
+  this.deps.db.prepare(`INSERT INTO auto_wheels(lobby_id,wheel_type_id,every_minutes,last_at,updated_at) VALUES(?,?,?,?,?)
+   ON CONFLICT(lobby_id) DO UPDATE SET wheel_type_id=excluded.wheel_type_id,every_minutes=excluded.every_minutes,last_at=excluded.last_at,updated_at=excluded.updated_at`).run(lobbyId,wheelId,everyMinutes,now,now);
+  const wheel=wheelId?this.require(lobbyId,wheelId).name:null;
+  this.audit(lobbyId,actor,'wheel.auto',wheel&&everyMinutes?`Roue automatique : « ${wheel} » toutes les ${everyMinutes} min`:'Roue automatique désactivée');
+  this.deps.changed(lobbyId);
+  return this.autoWheel(lobbyId);
+ }
+ /** Called periodically: each lobby whose automatic wheel is due spins it for everyone (once per period, even after a restart). */
+ tickAutoWheels(now=Date.now()){
+  const due=this.deps.db.prepare("SELECT a.lobby_id AS lobbyId,a.wheel_type_id AS wheelId,a.every_minutes AS every,a.last_at AS lastAt FROM auto_wheels a JOIN lobbies l ON l.id=a.lobby_id WHERE a.every_minutes>0 AND a.wheel_type_id IS NOT NULL").all() as {lobbyId:string;wheelId:string;every:number;lastAt:string|null}[];
+  for(const a of due){
+   if(a.lastAt&&now-Date.parse(a.lastAt)<a.every*60000)continue;
+   // Claimed first: a second tick, or a failure below, never spins it twice for the same period.
+   this.deps.db.prepare('UPDATE auto_wheels SET last_at=? WHERE lobby_id=?').run(new Date(now).toISOString(),a.lobbyId);
+   this.deps.changed(a.lobbyId);
+   try{this.spinAll(a.lobbyId,a.wheelId,null);}
+   catch(error){this.services.domain.audit.record({lobbyId:a.lobbyId,category:'WHEEL',action:'wheel.auto',status:'FAILED',errorCode:error instanceof DomainError?error.code:'INTERNAL_ERROR',message:`Roue automatique non lancée : ${error instanceof Error?error.message:String(error)}`});}
+  }
+ }
+
  private audit(lobbyId:string,actor:Account,action:string,message:string){this.services.domain.audit.record({lobbyId,actorAccountId:actor.id,category:'WHEEL',action,status:'SUCCESS',message});}
 
  private toResolution(r:ResolutionRow):WheelResolution{
@@ -90,7 +153,7 @@ export class WheelService{
  }
  snapshot(lobbyId:string):WheelsSnapshot{
   const rows=this.deps.db.prepare('SELECT * FROM wheel_resolutions WHERE lobby_id=? ORDER BY created_at DESC,rowid DESC LIMIT 30').all(lobbyId) as ResolutionRow[];
-  return {wheels:this.list(lobbyId),resolutions:rows.map(r=>this.toResolution(r))};
+  return {wheels:this.list(lobbyId),resolutions:rows.map(r=>this.toResolution(r)),auto:this.autoWheel(lobbyId)};
  }
 
  private member(lobbyId:string,accountId:string|undefined,label:string){

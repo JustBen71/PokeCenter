@@ -475,7 +475,18 @@ export const migrations:readonly Migration[]=[
    );
    CREATE INDEX battle_board_teams_lobby ON battle_board_teams(lobby_id,created_at);
   `);
- }}
+ }},
+ // A wheel may be kept out of the shop (admin and automatic spins only); one automatic wheel per lobby.
+ {version:17,name:'wheel-sale-and-auto',scopes:['portal'],up:db=>db.exec(`
+  ALTER TABLE wheel_types ADD COLUMN for_sale INTEGER NOT NULL DEFAULT 1 CHECK(for_sale IN (0,1));
+  CREATE TABLE auto_wheels(
+   lobby_id TEXT PRIMARY KEY REFERENCES lobbies(id) ON DELETE CASCADE,
+   wheel_type_id TEXT REFERENCES wheel_types(id) ON DELETE SET NULL,
+   every_minutes INTEGER NOT NULL CHECK(every_minutes BETWEEN 0 AND 1440),
+   last_at TEXT,
+   updated_at TEXT NOT NULL
+  );
+ `)}
 ];
 
 // Rebuilds a table nothing references, with one CHECK list widened; data, columns and indexes are kept.

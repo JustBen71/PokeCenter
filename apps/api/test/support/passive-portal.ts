@@ -6,7 +6,7 @@ import {createPortal} from '../../src/rooms.js';
 // Portal with three members (admin, Ben, Tim) in one lobby, and passives enabled for tests.
 export async function passivePortal(options:{implemented?:ReadonlySet<string>;random?:(n:number)=>number;commandTimeoutMs?:number;resetDelayMs?:number;handlers?:Record<string,import('../../src/passives/passive-events.js').PassiveHandler>}={}){
  const store=new Store(':memory:');
- const portal=createPortal(store,{adminToken:'',corsOrigin:'http://localhost',offlineAfterMs:15000,commandTimeoutMs:options.commandTimeoutMs??300,resetDelayMs:options.resetDelayMs??0,battleMoves:async()=>[33,45],
+ const portal=createPortal(store,{adminToken:'',corsOrigin:'http://localhost',offlineAfterMs:15000,commandTimeoutMs:options.commandTimeoutMs??300,resetDelayMs:options.resetDelayMs??0,spinAllSpacingMs:0,battleMoves:async()=>[33,45],
   levelData:async(_species:number,level:number)=>({experience:level**3,pokemon:{stats:['hp','attack','defense','speed','special-attack','special-defense'].map(name=>({base_stat:50,stat:{name,url:''}})),past_stats:[],
    moves:[14,15,70,92].map(id=>({move:{name:`m${id}`,url:`https://pokeapi.co/api/v2/move/${id}/`},version_group_details:[{version_group:{name:'emerald',url:''},move_learn_method:{name:'machine',url:''},level_learned_at:0,order:null}]}))}}),
   moveInfo:async(id:number)=>({id,name:`Attaque ${id}`,pp:20}),speciesTypes:async(id:number)=>[`t${id}`,`u${id}`],
@@ -14,7 +14,7 @@ export async function passivePortal(options:{implemented?:ReadonlySet<string>;ra
  await new Promise<void>(r=>portal.server.listen(0,'127.0.0.1',r));
  const base=`http://127.0.0.1:${(portal.server.address() as {port:number}).port}`;
  const app=portal.app;
- const as=(id:string)=>({get:(p:string)=>request(app).get(p).set('x-account-id',id),post:(p:string,b:object={})=>request(app).post(p).set('x-account-id',id).send(b),patch:(p:string,b:object)=>request(app).patch(p).set('x-account-id',id).send(b)});
+ const as=(id:string)=>({get:(p:string)=>request(app).get(p).set('x-account-id',id),post:(p:string,b:object={})=>request(app).post(p).set('x-account-id',id).send(b),patch:(p:string,b:object)=>request(app).patch(p).set('x-account-id',id).send(b),put:(p:string,b:object)=>request(app).put(p).set('x-account-id',id).send(b)});
  const account=async(name:string,admin=false)=>(await request(app).post('/api/accounts').send({name,sprite:'may',admin})).body as {id:string;name:string};
  const admin=await account('Admin',true),ben=await account('Ben'),tim=await account('Tim');
  const lobby=(await as(admin.id).post('/api/lobbies',{name:'Course'})).body as {id:string;inviteCode:string};

@@ -25,7 +25,9 @@ export type Config={auctionGenerator?:typeof import('./auction-generator.js').ge
  // Stats and experience of a species at a level (PokéAPI); tests use a local table.
  levelData?:typeof import('@pokerace/shared').levelData;
  // Move PP/name and Gen III types (PokéAPI); tests use local values.
- moveInfo?:typeof import('@pokerace/shared').moveInfo;speciesTypes?:typeof import('@pokerace/shared').speciesTypes};
+ moveInfo?:typeof import('@pokerace/shared').moveInfo;
+ // Time between two players' spins of « Lancer à tous » (tests: 0).
+ spinAllSpacingMs?:number;speciesTypes?:typeof import('@pokerace/shared').speciesTypes};
 const hash=(s:string)=>createHash("sha256").update(s).digest();
 const safeEqual=(a:string,b:string)=>{const aa=hash(a),bb=hash(b);return timingSafeEqual(aa,bb)};
 // hooks.nativeClientsChanged lets the portal react to game observations (objectives, rankings) without polling.

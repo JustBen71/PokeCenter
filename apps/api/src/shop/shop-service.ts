@@ -39,7 +39,7 @@ export class ShopService{
    .map(p=>({id:p.id,accountId:p.account_id,status:p.status,price:p.price,acquiredAt:p.acquired_at,usedAt:p.used_at}));
  }
  snapshot(lobbyId:string,accountId:string):ShopSnapshot{
-  return {wheels:this.services.wheels.list(lobbyId,false),protectionPrice:this.services.domain.lobbies.settings(lobbyId).protectionPrice,
+  return {wheels:this.services.wheels.list(lobbyId,false).filter(w=>w.forSale),protectionPrice:this.services.domain.lobbies.settings(lobbyId).protectionPrice,
    protections:this.protections(lobbyId,accountId),
    tickets:this.tickets('t.lobby_id=? AND (t.buyer_account_id=? OR t.recipient_account_id=?)',lobbyId,accountId,accountId).slice(-30),
    queue:this.tickets("t.lobby_id=? AND t.status IN ('QUEUED','PAYMENT_REVIEW')",lobbyId)};
@@ -70,7 +70,7 @@ export class ShopService{
  async buyTicket(lobbyId:string,buyer:Account,body:unknown):Promise<WheelTicket>{
   const {wheelId,targetId,requestId}=parseBody(buyTicketSchema,body);
   const wheel=this.services.wheels.require(lobbyId,wheelId);
-  if(!wheel.enabled)throw new DomainError('CONFLICT','Cette roue n’est plus en vente');
+  if(!wheel.enabled||!wheel.forSale)throw new DomainError('CONFLICT','Cette roue n’est plus en vente');
   if(targetId&&!this.services.domain.lobbies.isMember(lobbyId,targetId))throw new DomainError('NOT_LOBBY_MEMBER','La cible ne participe pas à ce lobby');
   if(wheel.tone==='BAD'&&(!targetId||targetId===buyer.id))throw new DomainError('VALIDATION_FAILED','Choisissez un adversaire comme cible de cette roue');
   const existing=this.deps.db.prepare("SELECT id FROM wheel_tickets WHERE id=?").get(requestId) as {id:string}|undefined;

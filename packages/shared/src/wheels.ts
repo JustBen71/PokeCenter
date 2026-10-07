@@ -89,12 +89,16 @@ export const gageInputSchema=z.object({
 }).strict().superRefine((g,ctx)=>{const r=gageParamsSchemas[g.handler].safeParse(g.params);if(!r.success)ctx.addIssue({code:'custom',path:['params'],message:`Paramètres invalides pour ${g.handler}`});});
 export const wheelInputSchema=z.object({
  name:z.string().trim().min(1).max(60),description:z.string().trim().max(300).default(''),price:z.number().int().min(0).max(999999),
- icon:ticketIconSchema,tone:wheelToneSchema,enabled:z.boolean().default(true),gages:z.array(gageInputSchema).min(1).max(40)
+ // enabled: usable at all (admin spins, passives, automatic wheel); forSale: also sold to the players in the shop.
+ icon:ticketIconSchema,tone:wheelToneSchema,enabled:z.boolean().default(true),forSale:z.boolean().default(true),gages:z.array(gageInputSchema).min(1).max(40)
 }).strict();
 export type WheelInput=z.infer<typeof wheelInputSchema>;
 
 export type Gage={id:string;name:string;description:string;handler:GageHandler;params:Record<string,unknown>;weight:number;requiresTarget:boolean};
-export type WheelType={id:string;name:string;description:string;price:number;icon:typeof ticketIcons[number];tone:WheelTone;enabled:boolean;gages:Gage[]};
+export type WheelType={id:string;name:string;description:string;price:number;icon:typeof ticketIcons[number];tone:WheelTone;enabled:boolean;forSale:boolean;gages:Gage[]};
+// Automatic wheel of a lobby: every N minutes (0 = off) the chosen wheel is spun for every player in a Run.
+export const autoWheelSchema=z.object({wheelId:z.string().min(1).max(64).nullable(),everyMinutes:z.number().int().min(0).max(1440)}).strict();
+export type AutoWheel=z.infer<typeof autoWheelSchema>&{nextAt:string|null};
 
 export const resolutionStatusSchema=z.enum(['DRAWN','AWAITING_CHOICE','APPLYING','SUCCESS','FAILED','REVIEW','BLOCKED']);
 export type ResolutionStatus=z.infer<typeof resolutionStatusSchema>;
@@ -105,7 +109,7 @@ export type WheelResolution={
  options:Gage[]|null;chooserId:string|null;
 };
 export const chooseGageSchema=z.object({gageId:z.string().min(1).max(64)}).strict();
-export type WheelsSnapshot={wheels:WheelType[];resolutions:WheelResolution[]};
+export type WheelsSnapshot={wheels:WheelType[];resolutions:WheelResolution[];auto?:AutoWheel};
 
 export const spinSchema=z.object({ownerId:z.string().min(1).max(64),targetId:z.string().min(1).max(64).optional()}).strict();
 export const applySchema=z.object({targetId:z.string().min(1).max(64).optional(),slot:z.number().int().min(1).max(6).optional(),confirmOutOfBattle:z.boolean().optional(),passiveId:z.string().min(1).max(40).optional()}).strict();

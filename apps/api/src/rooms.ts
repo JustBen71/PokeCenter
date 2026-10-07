@@ -54,7 +54,7 @@ export function createPortal(store:Store,config:Config){
   if(run.status==='RUNNING'){const previous=domain.runs.history(lobbyId,run.accountId).find(r=>r.number<run.number);
    services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-started:${run.id}`,type:'RUN_STARTED',data:{runId:run.id,number:run.number,afterLoss:previous?.status==='LOST'}});}
  };
- const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,passiveHandlers:config.passives?.handlers,random:config.passives?.random,resetDelayMs:config.resetDelayMs,battleMoves:config.battleMoves,levelData:config.levelData,moveInfo:config.moveInfo,speciesTypes:config.speciesTypes,
+ const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,passiveHandlers:config.passives?.handlers,random:config.passives?.random,resetDelayMs:config.resetDelayMs,battleMoves:config.battleMoves,levelData:config.levelData,moveInfo:config.moveInfo,spinAllSpacingMs:config.spinAllSpacingMs,speciesTypes:config.speciesTypes,
   runChanged:(lobbyId,run)=>{void events.refresh(lobbyId,'runs');observe(lobbyId);runChanged(lobbyId,run);},
   emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),emitTo:(lobbyId,accountId,event,payload)=>events.emitTo(lobbyId,accountId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');if(topic==='passives')void events.refresh(lobbyId,'lobby');}});
  events.provide('objectives',lobbyId=>services.objectives.snapshot(lobbyId));
@@ -157,5 +157,8 @@ export function createPortal(store:Store,config:Config){
  app.use(accounts);
  const legacy=running.get(LEGACY);if(legacy)app.use(legacy.app);
  app.get('/health',(_req,res)=>res.json({ok:true}));
+ // Automatic wheels (Gestion → Roues): checked every 30 s, each lobby spins its wheel once per period.
+ const autoWheels=setInterval(()=>{try{services.wheels.tickAutoWheels();}catch(error){console.error('Auto wheels:',error);}},30000);autoWheels.unref();
+ server.once('close',()=>clearInterval(autoWheels));
  return {app,server,running,services,currentGame:services.currentGame,events};
 }

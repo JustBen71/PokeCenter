@@ -27,7 +27,7 @@ export type Services=ReturnType<typeof createServices>;
 type Course=ReturnType<typeof createApp>;
 
 // Composition of the portal services; each lobby's course app provides its native clients and action locks.
-export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;emitTo?:(lobbyId:string,accountId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot;implementedPassives?:ReadonlySet<string>;passiveHandlers?:Record<string,PassiveHandler>;random?:Random;runChanged?:(lobbyId:string,run:Run)=>void;resetDelayMs?:number;battleMoves?:MovesProvider;levelData?:typeof levelData;moveInfo?:typeof moveInfo;speciesTypes?:typeof speciesTypes}){
+export function createServices(domain:PortalDomain,courses:Map<string,Course>,options:{staleAfterMs:number;commandTimeoutMs?:number;changed:(lobbyId:string,topic:string)=>void;emit:(lobbyId:string,event:string,payload:unknown)=>void;emitTo?:(lobbyId:string,accountId:string,event:string,payload:unknown)=>void;generateLot?:typeof generateLot;implementedPassives?:ReadonlySet<string>;passiveHandlers?:Record<string,PassiveHandler>;random?:Random;runChanged?:(lobbyId:string,run:Run)=>void;resetDelayMs?:number;battleMoves?:MovesProvider;levelData?:typeof levelData;moveInfo?:typeof moveInfo;speciesTypes?:typeof speciesTypes;spinAllSpacingMs?:number}){
  const course=(lobbyId:string)=>{const c=courses.get(lobbyId);if(!c)throw new Error(`Lobby ${lobbyId} is not running`);return c;};
  const currentGame=new CurrentGameService({lobbies:domain.lobbies,runs:domain.runs,clients:(lobbyId):PublicNativeClient[]=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],staleAfterMs:options.staleAfterMs});
  const commands=new GameCommandService({db:domain.db,audit:domain.audit,timeoutMs:options.commandTimeoutMs,
@@ -44,7 +44,7 @@ export function createServices(domain:PortalDomain,courses:Map<string,Course>,op
  const auctions=new AuctionService({domain,db:domain.db,currentGame,transactions,library,generate:options.generateLot,
   clients:lobbyId=>courses.get(lobbyId)?.nativeClients.publicSnapshot()??[],changed:lobbyId=>options.changed(lobbyId,'auctions'),events:e=>passiveEngine.emit(e)});
  const wheels=new WheelService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'wheels'),
-  notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n),spun:(lobbyId,r)=>options.emit(lobbyId,'wheel-spin',r)});
+  notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n),spun:(lobbyId,r)=>options.emit(lobbyId,'wheel-spin',r),spinAllSpacingMs:options.spinAllSpacingMs});
  const shop=new ShopService({db:domain.db,changed:lobbyId=>options.changed(lobbyId,'shop')});
  const passives=new PassiveService({domain,implemented:options.implementedPassives??new Set(Object.keys(handlers)),random:options.random,changed:lobbyId=>options.changed(lobbyId,'passives'),
   notify:(lobbyId,n,accountId)=>accountId?options.emitTo?.(lobbyId,accountId,'notification',n):options.emit(lobbyId,'notification',n)});
