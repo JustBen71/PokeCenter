@@ -17,6 +17,7 @@ export * from './wheels.js';
 export * from './shop.js';
 export * from './passives.js';
 export * from './battles.js';
+export * from './battle-board.js';
 export {speciesInternal} from './species-internal.js';
 export {characters} from './pokemon-characters.js';
 import { z } from "zod";

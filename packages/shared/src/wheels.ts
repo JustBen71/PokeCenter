@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import {passiveRaritySchema} from './passives.js';
 import {battleScalingSchema,battleSpriteSchema} from './battles.js';
+import {boardGageParamsSchema} from './battle-board.js';
 
 export const wheelToneSchema=z.enum(['GOOD','BAD','NEUTRAL']);
 export type WheelTone=z.infer<typeof wheelToneSchema>;
@@ -15,7 +16,7 @@ export const ticketIconSchema=z.enum(ticketIcons);
  * The configuration never becomes a programming language.
  */
 export const gageHandlers=['NOTICE','GIVE_MONEY','TAKE_MONEY','STEAL_MONEY','REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','JACKPOT_FIXED','JACKPOT_PERCENT','JACKPOT_SHARE','JACKPOT_EMPTY',
- 'PASSIVE_GRANT_RANDOM','PASSIVE_GRANT_RARITY','PASSIVE_STEAL','START_BATTLE'] as const;
+ 'PASSIVE_GRANT_RANDOM','PASSIVE_GRANT_RARITY','PASSIVE_STEAL','START_BATTLE','BOARD_BATTLE'] as const;
 export const gageHandlerSchema=z.enum(gageHandlers);
 export type GageHandler=z.infer<typeof gageHandlerSchema>;
 const amount=z.number().int().min(1).max(999999);
@@ -35,7 +36,9 @@ export const gageParamsSchemas={
  PASSIVE_STEAL:z.object({}).strict(),
  // Commanded battle: who fights (the beneficiary, or the target of a hostile wheel) and against which team.
  START_BATTLE:z.object({builder:z.enum(['MIRROR','OTHER_PLAYER','LEADER']),fighter:z.enum(['OWNER','TARGET']).default('OWNER'),
-  scaling:battleScalingSchema.default({mode:'COPY_EXACT',delta:0}),spriteId:battleSpriteSchema.optional()}).strict()
+  scaling:battleScalingSchema.default({mode:'COPY_EXACT',delta:0}),spriteId:battleSpriteSchema.optional()}).strict(),
+ // New team on the Tableau des combats, drawn around the beneficiary's average level.
+ BOARD_BATTLE:boardGageParamsSchema
 } satisfies Record<GageHandler,z.ZodTypeAny>;
 export const gageHandlerInfo:Record<GageHandler,{label:string;target:'none'|'required';help:string}>={
  NOTICE:{label:'Gage à réaliser',target:'none',help:'Aucun effet en jeu : le gage est annoncé à tous.'},
@@ -51,7 +54,8 @@ export const gageHandlerInfo:Record<GageHandler,{label:string;target:'none'|'req
  PASSIVE_GRANT_RANDOM:{label:'Passif aléatoire',target:'none',help:'Le bénéficiaire gagne un passif compatible qu’il ne possède pas, parmi les raretés choisies.'},
  PASSIVE_GRANT_RARITY:{label:'Passif d’une rareté',target:'none',help:'Le bénéficiaire gagne un passif compatible de cette rareté.'},
  PASSIVE_STEAL:{label:'Vol de passif',target:'required',help:'Choisis une cible puis l’un de ses passifs : il passe au bénéficiaire avec sa progression.'},
- START_BATTLE:{label:'Combat commandité',target:'none',help:'Un vrai combat de dresseur démarre dans la partie du joueur (dès qu’il est libre sur la carte).'}
+ START_BATTLE:{label:'Combat commandité',target:'none',help:'Un vrai combat de dresseur démarre dans la partie du joueur (dès qu’il est libre sur la carte).'},
+ BOARD_BATTLE:{label:'Nouveau combat au tableau',target:'none',help:'Une équipe tirée au hasard, de niveau proche du bénéficiaire, apparaît au Tableau des combats : le premier joueur qui l’accepte l’affronte.'}
 };
 // START_BATTLE needs a target when the target fights, or when the opponent team is the target's.
 export const gageNeedsTarget=(handler:GageHandler,params:Record<string,unknown>)=>gageHandlerInfo[handler].target==='required'||

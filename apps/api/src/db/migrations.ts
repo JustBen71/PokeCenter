@@ -448,6 +448,33 @@ export const migrations:readonly Migration[]=[
    -- At most one commanded battle queued, in progress or uncertain per player.
    CREATE UNIQUE INDEX battle_encounters_active ON battle_encounters(lobby_id,account_id) WHERE status IN ('WAITING_SAFE_STATE','SENDING','STARTING','RUNNING','REVIEW');
   `);
+ }},
+ {version:16,name:'battle-board',scopes:['portal'],up:db=>{
+  widenCheck(db,'battle_encounters',"'LEADER_PARTY','CUSTOM_PARTY')","'LEADER_PARTY','CUSTOM_PARTY','BOARD_TEAM')");
+  widenCheck(db,'money_transactions',"'OBJECTIVE_REWARD','PASSIVE_REWARD')","'OBJECTIVE_REWARD','PASSIVE_REWARD','BATTLE_REWARD')");
+  db.exec(`
+   CREATE TABLE battle_board_teams(
+    id TEXT PRIMARY KEY,
+    lobby_id TEXT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+    trainer_name TEXT NOT NULL,
+    trainer_sprite TEXT NOT NULL,
+    slots_json TEXT NOT NULL CHECK(json_valid(slots_json)),
+    party_json TEXT NOT NULL CHECK(json_valid(party_json)),
+    reward INTEGER NOT NULL CHECK(reward BETWEEN 0 AND 999999),
+    status TEXT NOT NULL CHECK(status IN ('OPEN','CHALLENGED','WON','WITHDRAWN')),
+    origin TEXT NOT NULL CHECK(origin IN ('ADMIN','WHEEL')),
+    created_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    challenger_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    encounter_id TEXT,
+    winner_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    won_at TEXT,
+    reward_status TEXT NOT NULL DEFAULT 'NONE' CHECK(reward_status IN ('NONE','PENDING','PAID','REVIEW')),
+    reward_attempts INTEGER NOT NULL DEFAULT 0,
+    reward_command_id TEXT
+   );
+   CREATE INDEX battle_board_teams_lobby ON battle_board_teams(lobby_id,created_at);
+  `);
  }}
 ];
 

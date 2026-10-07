@@ -60,9 +60,9 @@ export type BattleScalingSpec=z.infer<typeof battleScalingSchema>;
 export const battleScalingLabels:Record<BattleScalingSpec['mode'],string>={COPY_EXACT:'Copie exacte',DELTA_LEVEL:'± N niveaux',MATCH_PLAYER_AVERAGE:'Moyenne du joueur ± N',
  MATCH_PLAYER_HIGHEST:'Plus haut niveau du joueur ± N',CUSTOM_LEVELS:'Niveaux choisis'};
 
-export const battleSourceTypes=['CURRENT_PLAYER_PARTY','OTHER_PLAYER_CURRENT_PARTY','LEADER_PARTY','CUSTOM_PARTY'] as const;
+export const battleSourceTypes=['CURRENT_PLAYER_PARTY','OTHER_PLAYER_CURRENT_PARTY','LEADER_PARTY','CUSTOM_PARTY','BOARD_TEAM'] as const;
 export type BattleSourceType=typeof battleSourceTypes[number];
-export const battleSourceLabels:Record<BattleSourceType,string>={CURRENT_PLAYER_PARTY:'Miroir',OTHER_PLAYER_CURRENT_PARTY:'Équipe d’un joueur',LEADER_PARTY:'Équipe du #1',CUSTOM_PARTY:'Équipe personnalisée'};
+export const battleSourceLabels:Record<BattleSourceType,string>={CURRENT_PLAYER_PARTY:'Miroir',OTHER_PLAYER_CURRENT_PARTY:'Équipe d’un joueur',LEADER_PARTY:'Équipe du #1',CUSTOM_PARTY:'Équipe personnalisée',BOARD_TEAM:'Tableau des combats'};
 
 // What builds the opponent party. Sources are snapshotted when the encounter is created.
 export const battleBuilderSchema=z.discriminatedUnion('type',[
