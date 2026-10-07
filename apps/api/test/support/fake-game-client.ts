@@ -8,7 +8,9 @@ type ConnectOptions={base:string;lobbyId:string;inviteCode:string;playerName:str
  // Game-event capabilities announced by this fake adapter (none by default, like the real Gen III adapter).
  events?:string[];
  // Commanded battles (battle.trainer.start), as the Gen III adapter with a battle profile.
- battles?:boolean};
+ battles?:boolean;
+ // End of Run in the game: PLAYER_DEFEATED events, fainted Pokémon to the PC box, game reset (Gen III defeat profile).
+ defeats?:boolean};
 
 export const template=(speciesId=1,level=5,nickname='TEST'):PokemonInjection=>({playerId:'fake',slot:1,speciesId,nickname,level,experience:135,currentHp:20,
  stats:{maxHp:20,attack:10,defense:10,speed:10,spAttack:10,spDefense:10},moves:[{id:33,pp:35},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:3,friendship:70,
@@ -51,14 +53,15 @@ export class FakeGameClient{
  }
 
  state():NativeGameState{
-  const capabilities=[...READ,...(this.writes?WRITE:[]),...(this.options.events??[]),...(this.options.battles&&this.writes?['battle.trainer.start']:[])];
+  const capabilities=[...READ,...(this.writes?WRITE:[]),...(this.options.events??[]),...(this.options.battles&&this.writes?['battle.trainer.start']:[]),
+   ...(this.options.defeats&&this.writes?['events.player_defeated','party.box_fainted','game.reset']:[])];
   const adapter={id:'pokemon.emerald.gen3',status:'ready' as const,profileId:'emerald-fr-bpef-v0',capabilities};
   return {gameStateVersion:2,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
    trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{...this.location},
    party:this.party.map((raw,i)=>{const p=decodePokemonCopy(raw);
     return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
    progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString(),
-   ...(this.options.battles&&this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
+   ...((this.options.battles||this.options.defeats)&&this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
  }
  publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});}
  close(){this.socket.close();}
@@ -80,6 +83,11 @@ export class FakeGameClient{
  setSteps(absolute:number,eventId?:string){return this.gameEvent('STEPS_CHANGED',{absolute},eventId);}
  pokemonFainted(slot:number,speciesId:number,eventId?:string){return this.gameEvent('POKEMON_FAINTED',{slot,speciesId},eventId);}
  battleEnded(outcome:'WIN'|'LOSS'|'FLEE'|'OTHER',conscious:number,eventId?:string){return this.gameEvent('BATTLE_ENDED',{outcome,conscious},eventId);}
+ defeated(cause:'WHITE_OUT'|'BATTLE_LOST'|'PARTY_FAINTED'='WHITE_OUT',eventId?:string){return this.gameEvent('PLAYER_DEFEATED',{cause},eventId);}
+ /** A party member drops to 0 HP (the game state is published, as the client's next observation). */
+ faint(slot:number){this.party[slot-1]=encodePokemon({...template(1,5,decodePokemonCopy(this.party[slot-1]!).nickname||'TEST'),currentHp:0});this.publish();}
+ /** PC box (BoxPokemon copies) and number of game resets, as seen by the fake game. */
+ box:string[]=[];resets=0;
  /** Disconnects, then connects again as the same installation with the same game (money, party). */
  async reconnect(){
   this.close();
@@ -112,6 +120,17 @@ export class FakeGameClient{
     if(this.mode==='ack-lost')return;
     return this.ack(command,true,{result:{state:'STARTING'}});
    }
+   case 'game.party.box_fainted':{
+    // Same rules as Gen3Defeat: overworld only, never the whole party; moved members leave the party.
+    if(!this.safe)return this.ack(command,false,{error:{code:'not_safe'}});
+    const fainted=this.party.map((raw,i)=>({raw,slot:i+1,p:decodePokemonCopy(raw)})).filter(m=>m.p.currentHp===0);
+    if(fainted.length===this.party.length)return this.ack(command,false,{error:{code:'party_fainted'}});
+    const moved=fainted.map(m=>{this.box.push(m.raw);return {slot:m.slot,speciesId:1,speciesName:'Bulbizarre',nickname:m.p.nickname||null,level:m.p.level,box:1,place:this.box.length};});
+    this.party=this.party.filter((_,i)=>!fainted.some(m=>m.slot===i+1));
+    this.publish();
+    return this.ack(command,true,{result:{moved,partyCount:this.party.length}});
+   }
+   case 'game.reset':this.resets++;this.party=[rawPokemon()];this.publish();return this.ack(command,true,{result:{archive:`lost-${this.resets}`}});
    case 'pokemon.purchase':if(this.party.length>=6)return this.ack(command,false,{error:{code:'party_full'}});this.money-=p.price;this.party.push(p.raw);break;
   }
   this.publish();

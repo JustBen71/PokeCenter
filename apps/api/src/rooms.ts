@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import {registerAccounts} from './accounts.js';
-import {accountKey,type Lobby} from '@pokerace/shared';
+import {accountKey,type Lobby,type Run} from '@pokerace/shared';
 import {Server} from 'node:http';
 import {createApp,type Config} from './app.js';
 import {Store} from './store.js';
@@ -41,9 +41,18 @@ export function createPortal(store:Store,config:Config){
    void services.objectives.observe(lobbyId,c.accountId,c.gameState.progression.completed).catch(error=>console.error('Objectives:',error));
    void services.passiveEngine.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Passives:',error));
    void services.battles.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Battles:',error));
+   void services.runDefeats.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Run defeats:',error));
   }
  };
- const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,passiveHandlers:config.passives?.handlers,random:config.passives?.random,
+ // Every Run change (admin or game defeat): live update, retries, and Run events for the passives;
+ // a new Run right after a lost one is flagged for « Deuxième souffle ».
+ const runChanged=(lobbyId:string,run:Run)=>{
+  if(run.status==='LOST')services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-lost:${run.id}`,type:'RUN_LOST',data:{runId:run.id}});
+  if(run.status==='RUNNING'){const previous=domain.runs.history(lobbyId,run.accountId).find(r=>r.number<run.number);
+   services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-started:${run.id}`,type:'RUN_STARTED',data:{runId:run.id,number:run.number,afterLoss:previous?.status==='LOST'}});}
+ };
+ const services=createServices(store.portal,running,{staleAfterMs:config.offlineAfterMs,commandTimeoutMs:config.commandTimeoutMs,generateLot:config.auctionGenerator,implementedPassives:config.passives?.implemented,passiveHandlers:config.passives?.handlers,random:config.passives?.random,resetDelayMs:config.resetDelayMs,
+  runChanged:(lobbyId,run)=>{void events.refresh(lobbyId,'runs');observe(lobbyId);runChanged(lobbyId,run);},
   emit:(lobbyId,event,payload)=>events.emit(lobbyId,event,payload),emitTo:(lobbyId,accountId,event,payload)=>events.emitTo(lobbyId,accountId,event,payload),changed:(lobbyId,topic)=>{void events.refresh(lobbyId,topic);if(['objectives','auctions','wheels','shop'].includes(topic))refreshMoney(lobbyId);if(topic==='wheels')void events.refresh(lobbyId,'shop');if(topic==='passives')void events.refresh(lobbyId,'lobby');}});
  events.provide('objectives',lobbyId=>services.objectives.snapshot(lobbyId));
  // Money topics: each viewer receives their own bank; jackpot and settings are shared by the lobby.
@@ -71,7 +80,11 @@ export function createPortal(store:Store,config:Config){
   services.objectives.seed(lobby.id);services.wheels.seed(lobby.id);
   // Each new game observation may complete objectives (and pay their rewards).
   const course=createApp(data,{...config,roomCode:lobby.inviteCode,tokens:legacy?config.tokens:undefined},{server,path:socketPath(lobby)},{nativeClientsChanged:clients=>observe(lobby.id,clients),
-   gameEvent:async(accountId,event)=>{await services.passiveEngine.publish({lobbyId:lobby.id,accountId,id:`game:${event.eventId}`,type:event.kind,data:event.data} as DomainEvent);}});
+   gameEvent:async(accountId,event)=>{
+    // publish() is false for an eventId already processed: a re-sent defeat never ends the new Run.
+    const fresh=await services.passiveEngine.publish({lobbyId:lobby.id,accountId,id:`game:${event.eventId}`,type:event.kind,data:event.data} as DomainEvent);
+    if(fresh&&event.kind==='PLAYER_DEFEATED')services.runDefeats.defeated(lobby.id,accountId,event.data.cause);
+   }});
   running.set(lobby.id,course);events.attach(lobby.id,course.io.of('/dashboard'));
   // The Pokémon library is global now: former lobby libraries are copied once.
   services.library.importOnce(lobby.id,data.library());
@@ -86,12 +99,7 @@ export function createPortal(store:Store,config:Config){
   for(const account of store.accounts())lobbies.addMember(LEGACY,account.id);
  }
  registerLobbyRoutes(app,domain,{created:start,changed:lobbyId=>void events.refresh(lobbyId,'lobby')});
- registerRunRoutes(app,domain,lobbyId=>{void events.refresh(lobbyId,'runs');observe(lobbyId);},(lobbyId,run)=>{
-  // Run events for the passives; a new Run right after a lost one is flagged for « Deuxième souffle ».
-  if(run.status==='LOST')services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-lost:${run.id}`,type:'RUN_LOST',data:{runId:run.id}});
-  if(run.status==='RUNNING'){const previous=domain.runs.history(lobbyId,run.accountId).find(r=>r.number<run.number);
-   services.passiveEngine.emit({lobbyId,accountId:run.accountId,id:`run-started:${run.id}`,type:'RUN_STARTED',data:{runId:run.id,number:run.number,afterLoss:previous?.status==='LOST'}});}
- });
+ registerRunRoutes(app,domain,lobbyId=>{void events.refresh(lobbyId,'runs');observe(lobbyId);},runChanged);
  registerGameRoutes(app,services,(lobbyId,topic)=>topic==='money'?refreshMoney(lobbyId):void events.refresh(lobbyId,topic));
  registerBankRoutes(app,services,refreshMoney);
  registerAuctionRoutes(app,services);
