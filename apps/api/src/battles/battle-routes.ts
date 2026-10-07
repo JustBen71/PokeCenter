@@ -24,4 +24,15 @@ export function registerBattleRoutes(app:Express,s:Services){
  app.get(`${base}/:battleId`,route((req,res)=>s.battles.get(lobby(String(req.params.id),currentAccount(res)),String(req.params.battleId))));
  app.post(`${base}/:battleId/start`,route((req,res)=>{const v=admin(res);return s.battles.queue(lobby(String(req.params.id),v),String(req.params.battleId),v.id);}));
  app.post(`${base}/:battleId/cancel`,route((req,res)=>{const v=admin(res);return s.battles.cancel(lobby(String(req.params.id),v),String(req.params.battleId),v.id);}));
+ // Tableau des combats: members read and accept; admins create, draw again, set the reward, withdraw.
+ const board='/api/lobbies/:id/board';
+ app.use(board,requireAccount(id=>accounts.get(id)));
+ app.get(board,route((req,res)=>s.board.snapshot(lobby(String(req.params.id),currentAccount(res)))));
+ app.post(board,route(async(req,res)=>{const v=admin(res);const team=await s.board.create(lobby(String(req.params.id),v),req.body,v.id);res.status(201);return team;}));
+ app.post(`${board}/:teamId/reroll`,route((req,res)=>{const v=admin(res);return s.board.reroll(lobby(String(req.params.id),v),String(req.params.teamId),v.id);}));
+ app.post(`${board}/:teamId/reward`,route((req,res)=>{const v=admin(res);return s.board.setReward(lobby(String(req.params.id),v),String(req.params.teamId),req.body,v.id);}));
+ app.post(`${board}/:teamId/withdraw`,route((req,res)=>{const v=admin(res);return s.board.withdraw(lobby(String(req.params.id),v),String(req.params.teamId),v.id);}));
+ // The viewer fights for themselves only.
+ app.post(`${board}/:teamId/challenge`,route((req,res)=>{const v=currentAccount(res);return s.board.challenge(lobby(String(req.params.id),v),String(req.params.teamId),v.id);}));
+ app.post(`${board}/:teamId/forfeit`,route((req,res)=>{const v=currentAccount(res);return s.board.forfeit(lobby(String(req.params.id),v),String(req.params.teamId),v.id);}));
 }

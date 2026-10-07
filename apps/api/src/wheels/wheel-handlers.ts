@@ -2,6 +2,7 @@ import {randomInt} from 'node:crypto';
 import {depositSplit,gageParamsSchemas,passiveById,passiveRarityLabels,type Account,type Gage,type GageHandler,type PassiveRarity} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import type {Services} from '../services.js';
+import {wheelSlots} from '../battles/board-draw.js';
 
 export type HandlerContext={
  lobbyId:string;resolutionId:string;actorId:string;gage:Gage;owner:Account;target:Account|null;
@@ -108,5 +109,16 @@ export const wheelHandlers:Record<GageHandler,Handler>={
   const builder=p.builder==='OTHER_PLAYER'?{type:'OTHER_PLAYER' as const,opponentId:(other??needTarget(ctx)).id}:{type:p.builder as 'MIRROR'|'LEADER'};
   const battle=ctx.services.battles.createFrom(ctx.lobbyId,{accountId:fighter.id,builder,scaling:p.scaling,trainer:p.spriteId?{spriteId:p.spriteId}:{}},ctx.actorId);
   return `Combat lancé : ${fighter.name} VS ${battle.trainer.name} (${battle.party.length} Pokémon, niv. ${battle.party.map(m=>m.level).join(' / ')}) — il démarre dès que ${fighter.name} est libre sur la carte`;
+ },
+ BOARD_BATTLE:async ctx=>{
+  const p=params(ctx,'BOARD_BATTLE');
+  // Levels around the beneficiary's team (their last observed party).
+  let levels:number[];
+  try{levels=ctx.services.currentGame.requireState(ctx.lobbyId,ctx.owner.id,{capabilities:['party.read'],requireRun:false,requireFresh:false}).state.party.map(m=>m.level);}
+  catch{throw new DomainError('GAME_ADAPTER_NOT_READY',`Équipe de ${ctx.owner.name} illisible : lancez son jeu pour calibrer les niveaux`);}
+  if(!levels.length)throw new DomainError('GAME_ADAPTER_NOT_READY',`${ctx.owner.name} n’a pas encore de Pokémon`);
+  const average=levels.reduce((a,b)=>a+b,0)/levels.length;
+  const team=await ctx.services.board.create(ctx.lobbyId,{slots:wheelSlots(average,p as {count:number;spread:number;legendary:'NO'|'ALLOWED'|'ONLY'})},ctx.actorId,'WHEEL');
+  return `Nouveau combat au tableau : ${team.trainer.name} (${team.party.length} Pokémon, niv. ${team.party.map(m=>m.level).join(' / ')}) — récompense ${fmt(team.reward)} pour le premier qui le remporte`;
  }
 };

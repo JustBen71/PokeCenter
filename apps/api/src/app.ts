@@ -19,7 +19,9 @@ export type Config={auctionGenerator?:typeof import('./auction-generator.js').ge
  // Tests only: deterministic passive draws and a chosen set of implemented passives.
  passives?:{implemented?:ReadonlySet<string>;random?:(n:number)=>number;handlers?:Record<string,import('./passives/passive-events.js').PassiveHandler>};
  // Delay between an in-game defeat and the automatic game reset (tests use 0).
- resetDelayMs?:number};
+ resetDelayMs?:number;
+ // Default moves of drawn Pokémon (PokéAPI); tests use a local table.
+ battleMoves?:import('./battles/board-draw.js').MovesProvider};
 const hash=(s:string)=>createHash("sha256").update(s).digest();
 const safeEqual=(a:string,b:string)=>{const aa=hash(a),bb=hash(b);return timingSafeEqual(aa,bb)};
 // hooks.nativeClientsChanged lets the portal react to game observations (objectives, rankings) without polling.

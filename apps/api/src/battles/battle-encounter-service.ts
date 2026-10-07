@@ -20,7 +20,9 @@ export type BattleSource={type:BattleSourceType;refId:string|null;label:string;s
 export class BattleEncounterService{
  readonly repository:BattleRepository;
  private readonly inFlight=new Set<string>();
- constructor(private readonly deps:{domain:PortalDomain;currentGame:CurrentGameService;commands:GameCommandService;objectives:()=>ObjectiveService;changed:(lobbyId:string)=>void;notify:(lobbyId:string,n:LobbyNotification,accountId?:string)=>void}){
+ constructor(private readonly deps:{domain:PortalDomain;currentGame:CurrentGameService;commands:GameCommandService;objectives:()=>ObjectiveService;changed:(lobbyId:string)=>void;notify:(lobbyId:string,n:LobbyNotification,accountId?:string)=>void;
+  // A battle reached WON, LOST, CANCELLED or FAILED (the Tableau des combats follows its own battles).
+  ended?:(e:BattleEncounter)=>void}){
   this.repository=new BattleRepository(deps.domain.db);
  }
  private name(id:string|null){return id?this.deps.domain.accounts.get(id)?.name??id:'—';}
@@ -115,7 +117,7 @@ export class BattleEncounterService{
   if(!['CREATED','WAITING_SAFE_STATE','REVIEW'].includes(e.status))throw new DomainError('CONFLICT',`Un combat « ${battleStatusLabels[e.status]} » ne peut plus être annulé`);
   const {after}=this.repository.transition(e.id,'CANCELLED');
   this.audit(after,'battle.cancelled',`Combat contre ${after.trainer.name} annulé pour ${this.name(after.accountId)}`,{actorId,status:'INFO'});
-  this.deps.changed(lobbyId);
+  this.deps.changed(lobbyId);this.deps.ended?.(after);
   return after;
  }
 
@@ -212,6 +214,7 @@ export class BattleEncounterService{
   const {after}=this.repository.transition(e.id,to,patch);
   if(log)this.audit(after,log.action,log.message,{status:log.status});
   this.deps.changed(e.lobbyId);
+  if(['WON','LOST','CANCELLED','FAILED'].includes(to))this.deps.ended?.(after);
   return after;
  }
 }
