@@ -22,6 +22,17 @@ Un gage désigne un **handler serveur testé** et lui passe des paramètres vali
 | `GIVE_LIBRARY_POKEMON` | `artifactId` | Le bénéficiaire reçoit un Pokémon de la bibliothèque |
 | `JACKPOT_FIXED` / `JACKPOT_PERCENT` / `JACKPOT_EMPTY` | `amount` / `percent` / — | Paiement depuis le jackpot, sous verrou du jackpot |
 | `JACKPOT_SHARE` | — | Jackpot réparti à parts égales entre les joueurs pouvant recevoir de l'argent |
+| `PASSIVE_GRANT_RANDOM` / `PASSIVE_GRANT_RARITY` / `PASSIVE_STEAL` | raretés / rareté / — | Passifs ([passives.md](passives.md)) |
+| `START_BATTLE` / `BOARD_BATTLE` | voir [combats commandités](battle-encounters.md) et [tableau](battle-board.md) | Vrai combat dans le jeu / équipe mise au tableau |
+| `ITEM_GIVE` | `who` OWNER / TARGET, `count` 1–5 | Objets au hasard ajoutés au sac (243 objets : tous sauf objets rares, CS et Baie Énigma) ; empilés ou première place libre de la poche |
+| `ITEM_TAKE` | `who` (défaut TARGET), `count` 1–5 | Une pile au hasard perd un exemplaire par objet (jamais objet rare ni CS) ; « aucun objet à perdre » si le sac est vide |
+| `POKEMON_TRANSFER` | `direction` GIVE / TAKE, `selector` | GIVE : un Pokémon du bénéficiaire part chez la cible ; TAKE : un Pokémon de la cible arrive chez le bénéficiaire. Copie exacte (le jeu le voit « obtenu dans un échange »), jamais le dernier, jamais vers une équipe pleine, remis en place si l'insertion échoue |
+| `POKEMON_LEVEL` | `who`, `delta` −10…+10, `selector` | Même Pokémon (personnalité, attaques, IV/EV, objet) au nouveau niveau : expérience de sa courbe et statistiques recalculées (PokéAPI), PV au prorata, pas d'évolution ni de nouvelle attaque |
+| `MAGIKARP_CURSE` | `who` (défaut TARGET), `selector` | Le Pokémon devient définitivement un Magicarpe niveau 1 (Trempette, même dresseur d'origine : il obéit) |
+
+`selector` : random (au hasard), highest / lowest (plus haut / bas niveau), choice (emplacement choisi par l'admin dans la
+fenêtre de la roue). Les gages qui modifient une équipe demandent la case « Le joueur n'est pas en combat ».
+`who` TARGET rend la cible obligatoire. Le sac est écrit à la mémoire validée sur BPEF v0 (profil, section `bag`).
 
 Toutes les écritures passent par le moteur d'argent ou par `PokemonService`, avec une clé d'idempotence par tirage (`wheel:<résolution>:<étape>`).
 

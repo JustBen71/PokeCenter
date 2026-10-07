@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {boardLegendaryLabels,boardLegendaryModes,battleScalingLabels,battleScalingModes,battleSpriteIds,battleSpriteLabels,gageHandlerInfo,gageHandlers,passiveRarities,passiveRarityLabels,ticketIcons,wheelToneLabels,type GageHandler,type WheelInput,type WheelResolution,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
+import {pokemonSelectorLabels,boardLegendaryLabels,boardLegendaryModes,battleScalingLabels,battleScalingModes,battleSpriteIds,battleSpriteLabels,gageHandlerInfo,gageHandlers,passiveRarities,passiveRarityLabels,ticketIcons,wheelToneLabels,type GageHandler,type WheelInput,type WheelResolution,type WheelType,type WheelsSnapshot} from '@pokerace/shared';
 import {Pencil,Play,Plus,Trash2} from 'lucide-react';
 import {api} from '../api/client';
 import {useLobby} from '../lobby/lobby-context';
@@ -17,7 +17,9 @@ const defaultParams:Record<GageHandler,Record<string,unknown>>={NOTICE:{},GIVE_M
  GIVE_LIBRARY_POKEMON:{artifactId:''},JACKPOT_FIXED:{amount:1000},JACKPOT_PERCENT:{percent:10},JACKPOT_SHARE:{},JACKPOT_EMPTY:{},
  PASSIVE_GRANT_RANDOM:{rarities:['COMMON','UNCOMMON','RARE']},PASSIVE_GRANT_RARITY:{rarity:'LEGENDARY'},PASSIVE_STEAL:{},
  START_BATTLE:{builder:'MIRROR',fighter:'OWNER',scaling:{mode:'COPY_EXACT',delta:0}},
- BOARD_BATTLE:{count:3,spread:3,legendary:'NO'}};
+ BOARD_BATTLE:{count:3,spread:3,legendary:'NO'},
+ ITEM_GIVE:{who:'OWNER',count:1},ITEM_TAKE:{who:'TARGET',count:1},POKEMON_TRANSFER:{direction:'GIVE',selector:'random'},
+ POKEMON_LEVEL:{who:'OWNER',delta:1,selector:'random'},MAGIKARP_CURSE:{who:'TARGET',selector:'random'}};
 const statusLabels:Record<WheelResolution['status'],string>={DRAWN:'Tiré',AWAITING_CHOICE:'Choix requis',APPLYING:'En cours',SUCCESS:'Appliqué',FAILED:'Échec',REVIEW:'À vérifier',BLOCKED:'Bloqué'};
 
 function GageParams({handler,params,onChange,library}:{handler:GageHandler;params:Record<string,unknown>;onChange:(p:Record<string,unknown>)=>void;library:LibraryItem[]}){
@@ -34,6 +36,12 @@ function GageParams({handler,params,onChange,library}:{handler:GageHandler;param
    {scaling.mode!=='COPY_EXACT'&&<label>± niveaux<input className="field" value={scaling.delta} onChange={e=>onChange({...params,scaling:{...scaling,delta:Math.max(-99,Math.min(99,Number(e.target.value)||0))}})}/></label>}
    <label>Apparence<select className="field" value={String(params.spriteId??'')} onChange={e=>{const {spriteId:_s,...rest}=params;onChange(e.target.value?{...rest,spriteId:e.target.value}:rest);}}><option value="">automatique</option>{battleSpriteIds.map(s=><option key={s} value={s}>{battleSpriteLabels[s]}</option>)}</select></label>
   </>;}
+ const select=(key:string,label:string,options:Record<string,string>)=><label>{label}<select className="field" value={String(params[key]??Object.keys(options)[0])} onChange={e=>onChange({...params,[key]:e.target.value})}>{Object.entries(options).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>;
+ const who=select('who','Qui',{OWNER:'Le bénéficiaire',TARGET:'La cible'}),selector=select('selector','Quel Pokémon',pokemonSelectorLabels);
+ if(handler==='ITEM_GIVE'||handler==='ITEM_TAKE')return <div className="form-row">{who}{number('count','Nombre d’objets (1–5)')}</div>;
+ if(handler==='POKEMON_TRANSFER')return <div className="form-row">{select('direction','Sens',{GIVE:'Du bénéficiaire vers la cible',TAKE:'De la cible vers le bénéficiaire'})}{selector}</div>;
+ if(handler==='POKEMON_LEVEL')return <div className="form-row">{who}<label>Niveaux (−10 à +10)<input className="field" inputMode="numeric" value={String(params.delta??'')} onChange={e=>onChange({...params,delta:Number(e.target.value.replace(/[^\d-]/g,''))||0})}/></label>{selector}</div>;
+ if(handler==='MAGIKARP_CURSE')return <div className="form-row">{who}{selector}</div>;
  if(handler==='BOARD_BATTLE')return <div className="form-row">{number('count','Pokémon (1–6)')}{number('spread','± niveaux autour du bénéficiaire')}
   <label>Légendaire<select className="field" value={String(params.legendary??'NO')} onChange={e=>onChange({...params,legendary:e.target.value})}>{boardLegendaryModes.map(m=><option key={m} value={m}>{boardLegendaryLabels[m]}</option>)}</select></label></div>;
  if(handler==='PASSIVE_GRANT_RARITY')return <label>Rareté<select className="field" value={String(params.rarity)} onChange={e=>onChange({rarity:e.target.value})}>{passiveRarities.map(r=><option key={r} value={r}>{passiveRarityLabels[r]}</option>)}</select></label>;
@@ -67,7 +75,7 @@ export function WheelsAdminPage(){
     <div className="row-actions"><button className="icon-button" aria-label="Modifier" onClick={()=>setDraft({...w,gages:w.gages.map(({id:_id,requiresTarget:_r,...g})=>g)})}><Pencil size={15}/></button>
      <button className="icon-button" aria-label="Supprimer" onClick={()=>window.confirm(`Supprimer la roue « ${w.name} » ?`)&&void run(()=>api(`${path}/wheels/${w.id}`,{method:'DELETE'}),'Roue supprimée')}><Trash2 size={15}/></button></div></header>
    {w.description&&<p className="muted">{w.description}</p>}
-   <ul className="gage-list">{w.gages.map(g=><li key={g.id}><strong>{g.name}</strong><small>{gageHandlerInfo[g.handler].label}{g.weight>1?` · poids ${g.weight}`:''}</small></li>)}</ul>
+   <ul className="gage-list">{w.gages.map(g=><li key={g.id}><strong>{g.name}</strong><small>{gageHandlerInfo[g.handler]?.label??g.handler}{g.weight>1?` · poids ${g.weight}`:''}</small></li>)}</ul>
    <button className="btn" disabled={!w.enabled} onClick={()=>setLaunch({wheel:w,owner:members[0]?.id??'',target:''})}><Play size={15}/>Lancer</button>
   </article>)}</div>
   <section className="panel"><header className="panel-head"><h2>Derniers tirages</h2></header>
@@ -98,7 +106,7 @@ export function WheelsAdminPage(){
    {draft.gages.map((g,i)=><fieldset key={i} className="gage-editor">
     <div className="form-row"><label>Nom<input className="field" required maxLength={80} value={g.name} onChange={e=>patchGage(i,{name:e.target.value})}/></label>
      <label>Effet<select className="field" value={g.handler} onChange={e=>{const h=e.target.value as GageHandler;patchGage(i,{handler:h,params:defaultParams[h]});}}>{gageHandlers.map(h=><option key={h} value={h}>{gageHandlerInfo[h].label}</option>)}</select></label></div>
-    <small className="muted">{gageHandlerInfo[g.handler].help}</small>
+    <small className="muted">{gageHandlerInfo[g.handler]?.help}</small>
     <div className="form-row"><GageParams handler={g.handler} params={g.params} library={library} onChange={params=>patchGage(i,{params})}/>
      <label>Poids<input className="field" inputMode="numeric" value={g.weight} onChange={e=>patchGage(i,{weight:Math.max(1,Number(e.target.value.replace(/\D/g,''))||1)})}/></label></div>
     <label>Description<input className="field" maxLength={500} value={g.description} onChange={e=>patchGage(i,{description:e.target.value})}/></label>

@@ -47,7 +47,8 @@ export function WheelOverlay(){
  const name=(id:string|null)=>members.find(m=>m.id===id)?.name??'—';
  if(!live)return null;
  const winner=26;
- const party=live.gage.handler==='REMOVE_POKEMON'&&live.gage.params.selector==='choice';
+ const POKEMON_GAGES=['REMOVE_POKEMON','POKEMON_TRANSFER','POKEMON_LEVEL','MAGIKARP_CURSE'];
+ const party=POKEMON_GAGES.includes(live.gage.handler)&&live.gage.params.selector==='choice';
  // Steal: the target's passives that the beneficiary does not own and that are not used up.
  const steal=live.gage.handler==='PASSIVE_STEAL';
  const owned=(id:string)=>passives.owned.filter(o=>o.accountId===id);
@@ -56,7 +57,7 @@ export function WheelOverlay(){
  const choosing=!!live.options;
  const canChoose=choosing&&(account.id===live.chooserId||account.admin);
  const choose=async(gageId:string)=>{setBusy(true);try{await api(`/api/lobbies/${lobby.id}/wheel-resolutions/${live.id}/choose`,{method:'POST',body:{gageId}});}catch(e){toast.error(e);}finally{setBusy(false);}};
- const needsConfirm=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON'].includes(live.gage.handler);
+ const needsConfirm=[...POKEMON_GAGES,'GIVE_LIBRARY_POKEMON'].includes(live.gage.handler);
  const done=['SUCCESS','FAILED','REVIEW','BLOCKED'].includes(live.status);
  const translate=rolling?-(winner-Math.floor(VISIBLE/2))*ROW:0;
  return <div className="wheel-overlay" role="dialog" aria-modal="true" aria-label={`Roue ${live.wheelName}`}>
@@ -70,7 +71,7 @@ export function WheelOverlay(){
    </div>
    {phase==='stopped'&&<section className="wheel-result">
     {!choosing&&<><h3>{live.gage.name}</h3>
-    <p>{live.gage.description||gageHandlerInfo[live.gage.handler].help}</p></>}
+    <p>{live.gage.description||gageHandlerInfo[live.gage.handler]?.help}</p></>}
     {live.status==='BLOCKED'&&<p className="notice">{live.result}</p>}
     {live.gage.handler==='START_BATTLE'&&live.status==='SUCCESS'&&(()=>{
      // The battle created by this gage (latest one of the fighter since the draw): followed live until its result.
@@ -79,9 +80,9 @@ export function WheelOverlay(){
      return battle&&<p className={`battle-banner ${battle.status.toLowerCase()}`}>{battle.status==='WON'?`✅ Victoire contre ${battle.trainer.name}`:battle.status==='LOST'?`❌ Défaite contre ${battle.trainer.name}`:`⚔ Combat contre ${battle.trainer.name} · ${battleStatusLabels[battle.status]}`}</p>;})()}
     {live.result&&live.status!=='BLOCKED'&&<p className={`outcome ${live.status.toLowerCase()}`}>{live.status==='SUCCESS'?'✔':live.status==='REVIEW'?'⚠':'✖'} {live.result}</p>}
     {choosing&&<div className="gage-choice"><p>{canChoose?'Choisis le gage qui s’applique :':`En attente du choix de ${name(live.chooserId)}…`}</p>
-     {live.options!.map(g=><button key={g.id} className="btn" disabled={!canChoose||busy} onClick={()=>void choose(g.id)}><strong>{g.name}</strong><small>{g.description||gageHandlerInfo[g.handler].help}</small></button>)}</div>}
+     {live.options!.map(g=><button key={g.id} className="btn" disabled={!canChoose||busy} onClick={()=>void choose(g.id)}><strong>{g.name}</strong><small>{g.description||gageHandlerInfo[g.handler]?.help}</small></button>)}</div>}
     {!choosing&&account.admin&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
-     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL','START_BATTLE'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL','START_BATTLE','POKEMON_TRANSFER'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
      {steal&&target&&(stealable.length?<label>Passif à voler<select className="field" value={passiveId} onChange={e=>setPassiveId(e.target.value)}><option value="">Choisir…</option>{stealable.map(o=>{const d=definition(o.passiveId);return <option key={o.id} value={o.passiveId}>{d?.name??o.passiveId}</option>;})}</select></label>
       :<p className="muted">{name(target)} n’a aucun passif volable.</p>)}
      {party&&<label>Emplacement<select className="field" value={slot} onChange={e=>setSlot(Number(e.target.value))}><option value={0}>Choisir…</option>{[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}</select></label>}
