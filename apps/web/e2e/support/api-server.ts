@@ -14,7 +14,7 @@ const directory=mkdtempSync(join(tmpdir(),'pokerace-web-e2e-'));
 const store=new Store(join(directory,'e2e.sqlite'));
 const build=async():Promise<BuiltPokemon>=>({name:'Bulbizarre',stats:{maxHp:20,attack:10,defense:10,speed:10,spAttack:10,spDefense:10},
  moves:[{id:33,pp:35},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],experience:100,choices:[]});
-const {server,running}=createPortal(store,{corsOrigin:process.env.CORS_ORIGIN??'http://127.0.0.1',offlineAfterMs:15000,adminToken:'',commandTimeoutMs:3000,
+const {server,running}=createPortal(store,{corsOrigin:process.env.CORS_ORIGIN??'http://127.0.0.1',offlineAfterMs:15000,adminToken:'',commandTimeoutMs:3000,resetDelayMs:500,
  auctionGenerator:players=>generateLot(players,()=>0,build)});
 server.listen(port,'127.0.0.1',()=>console.log(`E2E API listening on ${port}`));
 let stopping=false;

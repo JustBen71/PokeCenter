@@ -16,3 +16,6 @@ export const runCreateSchema=z.object({accountId:z.string().min(1).max(64),start
 export const runStatusChangeSchema=z.object({status:runStatusSchema}).strict();
 // Labels shared by every screen so a status is always worded the same way.
 export const runStatusLabels:Record<RunStatus,string>={NOT_STARTED:'Pas commencée',RUNNING:'En cours',LOST:'Perdue',COMPLETED:'Terminée',ABORTED:'Abandonnée'};
+
+// In-game end of Run journal of one player (defeats, fallen Pokémon, game resets), readable by the lobby members.
+export type RunJournalEntry={id:string;action:'run.lost'|'pokemon.boxed'|'run.reset'|'run.reset_failed';message:string;runId:string|null;at:string};

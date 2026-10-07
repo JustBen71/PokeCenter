@@ -1,5 +1,5 @@
 import type {Express} from 'express';
-import {runCreateSchema,runStatusChangeSchema,runStatusLabels,type Run} from '@pokerace/shared';
+import {runCreateSchema,runStatusChangeSchema,runStatusLabels,type Run,type RunJournalEntry} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import {currentAccount,parseBody,requireAccount,requireAdmin,route} from '../http.js';
 import type {PortalDomain} from '../store.js';
@@ -20,6 +20,13 @@ export function registerRunRoutes(app:Express,domain:PortalDomain,publish:(lobby
   const viewer=currentAccount(res),lobbyId=String(req.params.id);
   member(lobbyId,viewer.id,viewer.admin);
   return runs.listForLobby(lobbyId);
+ }));
+ const journalActions=new Set<string>(['run.lost','pokemon.boxed','run.reset','run.reset_failed']);
+ app.get('/api/lobbies/:id/runs/journal',route((req,res)=>{
+  const viewer=currentAccount(res),lobbyId=String(req.params.id),accountId=String(req.query.accountId??'');
+  member(lobbyId,viewer.id,viewer.admin);
+  return audit.list({lobbyId,accountId,category:'RUN',limit:200}).filter(l=>l.targetAccountId===accountId&&journalActions.has(l.action))
+   .map((l):RunJournalEntry=>({id:l.id,action:l.action as RunJournalEntry['action'],message:l.message,runId:l.runId,at:l.timestamp}));
  }));
  app.post('/api/lobbies/:id/runs',route((req,res)=>{
   const viewer=currentAccount(res),lobbyId=String(req.params.id);requireAdmin(viewer);lobbies.require(lobbyId);

@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {avatarUrl,runStatusLabels,type Run} from '@pokerace/shared';
+import {avatarUrl,runStatusLabels,type Run,type RunJournalEntry} from '@pokerace/shared';
 import {X} from 'lucide-react';
 import {api} from '../api/client';
 import {useSession} from '../auth/session-context';
@@ -20,6 +20,10 @@ const date=(iso:string|null)=>iso?new Date(iso).toLocaleString('fr-FR',{dateStyl
 export function PlayerDrawer({row,passives,battles,onClose,onPokemon}:{row:CourseRow;passives:OwnedPassive[];battles:BattleEncounter[];onClose:()=>void;onPokemon:(p:CourseRow['party'][number])=>void}){
  const {account}=useSession();const {lobby}=useLobby();const toast=useToast();const [busy,setBusy]=useState(false);
  useEffect(()=>{const esc=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',esc);return()=>window.removeEventListener('keydown',esc);},[onClose]);
+ // Defeats, fallen Pokémon and resets decided by the game; reloaded when the Runs or the party change.
+ const [journal,setJournal]=useState<RunJournalEntry[]>([]);
+ const journalKey=row.runs.map(r=>r.status).join()+':'+row.party.length;
+ useEffect(()=>{let live=true;api<RunJournalEntry[]>(`/api/lobbies/${lobby.id}/runs/journal?accountId=${encodeURIComponent(row.accountId)}`).then(j=>{if(live)setJournal(j);}).catch(()=>{});return()=>{live=false;};},[lobby.id,row.accountId,journalKey]);
  const act=async(a:ReturnType<typeof runActions>[number])=>{
   if(a.danger&&!window.confirm(`${a.label} pour ${row.name} ?`))return;
   setBusy(true);
@@ -44,6 +48,7 @@ export function PlayerDrawer({row,passives,battles,onClose,onPokemon}:{row:Cours
    {battles.length>0&&<section><h3>Combats commandités</h3><ol className="run-history">{battles.map(b=><li key={b.id}><strong>VS {b.trainer.name}</strong><span className={`badge ${statusClass(b)}`}>{battleStatusLabels[b.status]}</span><small>{b.sourceLabel} · niveaux {b.party.map(p=>p.level).join(' / ')} · {date(b.endedAt??b.createdAt)}</small></li>)}</ol></section>}
    <section><h3>Runs</h3>
     {row.runs.length===0?<p className="muted">Aucune Run pour l’instant.</p>:<ol className="run-history">{row.runs.map(r=><li key={r.id} className={r.status.toLowerCase()}><strong>Run #{r.number}</strong><span className={`badge run-${r.status.toLowerCase()}`}>{runStatusLabels[r.status]}</span><small>Début {date(r.startedAt)} · Fin {date(r.endedAt)}</small></li>)}</ol>}
+    {journal.length>0&&<><h4>Journal de Run</h4><ol className="run-journal">{journal.map(j=><li key={j.id} className={j.action.replace('.','-')}><span>{j.action==='pokemon.boxed'?'🪦':j.action==='run.lost'?'💀':j.action==='run.reset'?'🔄':'⚠'}</span><span>{j.message}<small>{date(j.at)}</small></span></li>)}</ol></>}
     {account.admin&&<div className="run-actions">{runActions(row.run).map(a=><button key={a.label} className={a.danger?'danger':a.kind==='create'&&a.start||a.status==='RUNNING'?'primary':''} disabled={busy} onClick={()=>void act(a)}>{a.label}</button>)}</div>}
    </section>
    {account.admin&&<section><h3>Corriger les Pokédollars</h3><AdminMoneyForm row={row}/></section>}

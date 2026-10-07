@@ -50,6 +50,9 @@ test('end of Run in the game: fainted Pokémon boxed, defeat = Run lost + new Ru
   assert.match(log.find(l=>l.action==='run.lost')!.message,/Run #1 de Ben perdue dans le jeu \(équipe K.O., renvoyé au Centre Pokémon\)/);
   assert.match(log.find(l=>l.action==='run.reset')!.message,/lost-1/);
   await until(()=>notes.some(n=>n.includes('Ben a perdu sa Run #1')),'defeat notification');
+  // The player's journal (readable by members): defeat, fallen Pokémon, reset.
+  const journal=(await as(p.tim.id).get(`/api/lobbies/${lobby.id}/runs/journal?accountId=${ben.id}`)).body as {action:string}[];
+  assert.deepEqual(journal.map(j=>j.action).sort(),['pokemon.boxed','pokemon.boxed','run.lost','run.reset']);
   // A re-sent event (lost ACK) never ends the new Run nor resets twice.
   assert.equal((await game.defeated('WHITE_OUT',eventId))?.ok,true);
   await new Promise(r=>setTimeout(r,200));

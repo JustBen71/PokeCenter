@@ -66,6 +66,10 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 .run-history{list-style:none;padding:0;margin:0;display:grid;gap:8px}
 .run-history li{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;padding:10px;border-radius:9px;background:#0d111c}
 .run-history small{grid-column:1/-1;color:var(--muted);font-size:11px}
+.run-journal{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.run-journal li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;padding:8px 10px;border-radius:9px;background:#0d111c;font-size:13px}
+.run-journal small{display:block;color:var(--muted);font-size:11px}
+.run-journal li.run-lost{border-left:3px solid var(--danger,#e5484d)}
 .run-history .badge{justify-self:start}
 .badge.run-running{background:#17352e;color:#7fe8bb}
 .badge.run-lost{background:#3a1d22;color:#ff9f9f}
