@@ -71,7 +71,7 @@ test('C2 · roue START_BATTLE (joueur choisi) : animation, combat créé dans le
   gages:[{name:'Affronte un joueur',handler:'START_BATTLE',params:{builder:'OTHER_PLAYER',scaling:{mode:'COPY_EXACT',delta:0}}}]});
  const {page}=admin;
  await page.goto('/#/roues');
- await page.locator('.wheel-type').filter({hasText:'Duel de copies'}).getByRole('button',{name:'Lancer'}).click();
+ await page.locator('.wheel-type').filter({hasText:'Duel de copies'}).getByRole('button',{name:'Lancer',exact:true}).click();
  await page.getByLabel('Bénéficiaire').selectOption({label:'Tom B'});
  await page.getByRole('button',{name:'Tourner'}).click();
  const overlay=page.locator('.wheel-overlay');

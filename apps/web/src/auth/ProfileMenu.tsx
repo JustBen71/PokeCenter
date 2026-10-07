@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {avatarUrl,type Account} from '@pokerace/shared';
 import {ChevronDown,DoorOpen,ImageIcon,LogOut,PenLine,ShieldCheck,ShieldOff} from 'lucide-react';
 import {api} from '../api/client';
@@ -39,8 +40,11 @@ export function ProfileMenu({money,moneyStale,onLeaveLobby}:{money?:number|null;
     :<button role="menuitem" onClick={()=>choose('admin')}><ShieldCheck size={16}/>Se connecter en admin</button>)}
    <button role="menuitem" onClick={()=>{setOpen(false);logout();}}><LogOut size={16}/>Changer de compte</button>
   </div>}
+  {/* Rendered in <body>: the top bar's backdrop-filter would otherwise confine position:fixed to the bar (the dialog overflowed above the screen). */}
+  {editing&&createPortal(<>
   {editing==='admin'&&<AdminDialog account={account} onClose={()=>setEditing(null)} onDone={a=>{setAccount(a);setEditing(null);toast.success('Connecté en administrateur');}}/>}
   {editing&&editing!=='admin'&&<ProfileDialog mode={editing} account={account} onClose={()=>setEditing(null)} onSaved={a=>{setAccount(a);setEditing(null);toast.success('Profil mis à jour');}}/>}
+  </>,document.body)}
  </div>;
 }
 

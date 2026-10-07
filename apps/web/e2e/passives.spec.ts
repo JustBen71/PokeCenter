@@ -75,7 +75,7 @@ test('P2 · roue bienveillante PASSIVE_GRANT_RARITY(LEGENDARY) : animation, lég
  await call(ids.admin,'POST',`/api/lobbies/${ids.lobby}/wheels`,{name:'Roue divine',price:0,icon:'green-5',tone:'GOOD',gages:[{name:'Passif légendaire',handler:'PASSIVE_GRANT_RARITY',params:{rarity:'LEGENDARY'}}]});
  const {page}=admin;
  await page.goto('/#/roues');
- await page.locator('.wheel-type').filter({hasText:'Roue divine'}).getByRole('button',{name:'Lancer'}).click();
+ await page.locator('.wheel-type').filter({hasText:'Roue divine'}).getByRole('button',{name:'Lancer',exact:true}).click();
  await page.getByLabel('Bénéficiaire').selectOption({label:'Tom'});
  await page.getByRole('button',{name:'Tourner'}).click();
  // Every viewer plays the same animation, then the result.
@@ -95,7 +95,7 @@ test('P3 · roue PASSIVE_STEAL : cible, choix du passif, transfert, badges des d
  for(const s of [lea,tom])await s.page.goto('/#/course');
  await expect(card(lea.page,'Tom').locator('.passive-badge',{hasText:legendaryName})).toBeVisible();
  await page.goto('/#/roues');
- await page.locator('.wheel-type').filter({hasText:'Voleur'}).getByRole('button',{name:'Lancer'}).click();
+ await page.locator('.wheel-type').filter({hasText:'Voleur'}).getByRole('button',{name:'Lancer',exact:true}).click();
  await page.getByLabel('Bénéficiaire').selectOption({label:'Léa'});
  await page.getByRole('button',{name:'Tourner'}).click();
  const overlay=page.locator('.wheel-overlay');

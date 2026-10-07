@@ -160,7 +160,7 @@ test('5 · boutique : création de roue, achat de ticket et de protection, file 
 test('6 · roue : overlay gris, roulette verticale animée, résultat et notification pour tout le lobby',async()=>{
  const a=admin.page,p=player.page;
  await a.goto('/#/roues');
- await a.locator('.wheel-type').filter({hasText:'Roue E2E'}).getByRole('button',{name:'Lancer'}).click();
+ await a.locator('.wheel-type').filter({hasText:'Roue E2E'}).getByRole('button',{name:'Lancer',exact:true}).click();
  await a.getByRole('button',{name:'Tourner'}).click();
  for(const page of [a,p]){
   const overlay=page.getByRole('dialog',{name:'Roue Roue E2E'});
