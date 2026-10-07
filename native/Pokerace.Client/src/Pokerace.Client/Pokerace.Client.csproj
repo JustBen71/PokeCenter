@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><Version>0.1.0</Version></PropertyGroup>
+  <PropertyGroup><OutputType>Exe</OutputType><Version>0.2.0</Version></PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../../../emulator/profiles/*.json" Exclude="../../../../emulator/profiles/*.schema.json" LogicalName="Games.%(Filename)%(Extension)" />
     <EmbeddedResource Include="../../../../bridges/bizhawk/e2e/bizhawk-version.json" LogicalName="Launcher.bizhawk-version.json" />
