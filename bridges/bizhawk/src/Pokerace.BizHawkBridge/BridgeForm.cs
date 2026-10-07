@@ -20,6 +20,8 @@ public sealed class BridgeForm : Form, IExternalToolForm
     [RequiredService] public IEmulator Emulator { get; set; } = null!;
     [OptionalService] public ISaveRam? SaveRam { get; set; }
     private TcpBridgeServer? server;
+    // Every 5 minutes, on the emulator thread: a copy of the game (savestate + in-game save), the last 3 kept.
+    private readonly System.Windows.Forms.Timer autosave = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
     private readonly Label status = new Label { Dock = DockStyle.Fill, AutoSize = false };
     public BridgeForm()
     {
@@ -37,8 +39,11 @@ public sealed class BridgeForm : Form, IExternalToolForm
             var token = Environment.GetEnvironmentVariable("POKERACE_BRIDGE_TOKEN") ?? "";
             var rawPort = Environment.GetEnvironmentVariable("POKERACE_BRIDGE_PORT") ?? "43821";
             if (!int.TryParse(rawPort, out var port) || port < 1 || port > 65535) throw new ArgumentException("Invalid port.");
-            server = new TcpBridgeServer(port, token, new BridgeService(new BizHawkHostAdapter(this), Environment.GetEnvironmentVariable("POKERACE_LOST_GAMES_DIR")), new FormDispatcher(this), log: Log);
+            var service = new BridgeService(new BizHawkHostAdapter(this), Environment.GetEnvironmentVariable("POKERACE_LOST_GAMES_DIR"), Environment.GetEnvironmentVariable("POKERACE_AUTOSAVES_DIR"));
+            server = new TcpBridgeServer(port, token, service, new FormDispatcher(this), log: Log);
             server.Start();
+            autosave.Tick += (_, _) => { try { service.Autosave(); } catch (Exception) { Log("Autosave failed; the previous copies are kept."); } };
+            autosave.Start();
             status.Text = "Bridge actif sur 127.0.0.1:" + server.Port + "\nProtocole 1 — authentification requise.";
         }
         catch (Exception)
@@ -59,7 +64,7 @@ public sealed class BridgeForm : Form, IExternalToolForm
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) server?.Dispose();
+        if (disposing) { autosave.Dispose(); server?.Dispose(); }
         base.Dispose(disposing);
     }
     public bool IsActive => IsHandleCreated && !IsDisposed;

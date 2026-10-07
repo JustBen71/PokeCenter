@@ -119,6 +119,8 @@ public sealed class EmulatorSession : IAsyncDisposable
         { ["LastWrittenFrom"] = "2.11.1", ["FirstBoot"] = false, ["SkipOutdatedOsCheck"] = true, ["SkipSuperuserPrivsCheck"] = true };
         // Windows: GDI+. Linux: OpenGL; GDI+ under Mono can freeze BizHawk waiting for an X event (libgdiplus/cairo, MIT-SHM).
         config["DispMethod"] = OperatingSystem.IsWindows() ? 1 : 0;
+        // The in-game save is written to disk every minute, not only when BizHawk closes (a crash would lose it).
+        config["AutosaveSaveRAM"] = true; config["FlushSaveRamFrames"] = 60 * 60;
         var dll = Path.GetFullPath(Path.Combine(folder, "ExternalTools", "Pokerace.BizHawkBridge.dll"));
         var trust = config["TrustedExtTools"] as JsonObject ?? new JsonObject();
         trust[dll] = "SHA512:" + Convert.ToHexString(SHA512.HashData(await File.ReadAllBytesAsync(dll, cancellation)));
