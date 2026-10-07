@@ -1,12 +1,12 @@
 import type {ErrorCode} from '@pokerace/shared';
-import {sessionIds} from '../auth/storage';
+import {adminToken,sessionIds} from '../auth/storage';
 
 // Portal-wide endpoints; everything else is served by the active lobby under /rooms/<id>.
-const GLOBAL=['/api/accounts','/api/rooms','/api/lobbies','/api/me','/api/library'];
+const GLOBAL=['/api/accounts','/api/rooms','/api/lobbies','/api/me','/api/library','/api/admin'];
 
 export function apiFetch(input:string,init:RequestInit={}){
  const headers=new Headers(init.headers);const {accountId,lobbyId}=sessionIds();
- if(accountId)headers.set('x-account-id',accountId);
+ if(accountId){headers.set('x-account-id',accountId);const token=adminToken(accountId);if(token)headers.set('x-admin-token',token);}
  const global=GLOBAL.some(p=>input===p||input.startsWith(p+'/')||input.startsWith(p+'?'));
  return fetch(lobbyId&&!global?`/rooms/${encodeURIComponent(lobbyId)}${input}`:input,{...init,headers});
 }

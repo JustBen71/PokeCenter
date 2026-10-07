@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {accountInput,accountKey,accountUpdateSchema,type Account} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
-import {parseBody} from '../http.js';
+import {adminPasswordRequired,parseBody} from '../http.js';
 import type {AuditService} from '../audit/audit-service.js';
 import type {AccountRepository} from './account-repository.js';
 
@@ -15,7 +15,8 @@ export class AccountService{
  create(body:unknown):Account{
   const data=parseBody(accountInput,body);
   if(this.accounts.findByName(data.name))throw new DomainError('CONFLICT','Ce nom existe déjà : sélectionnez ce compte');
-  const account=this.accounts.save({...data,id:'p-'+randomUUID().replaceAll('-','')});
+  // With a server admin password, nobody declares the role at creation: it comes from « Se connecter en admin ».
+  const account=this.accounts.save({...data,admin:adminPasswordRequired()?false:data.admin,id:'p-'+randomUUID().replaceAll('-','')});
   this.audit.record({actorAccountId:account.id,targetAccountId:account.id,category:'ACCOUNT',action:'account.create',status:'SUCCESS',message:`Compte « ${account.name} » créé`,metadata:{admin:account.admin}});
   return account;
  }

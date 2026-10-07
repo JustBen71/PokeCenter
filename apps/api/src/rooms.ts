@@ -15,6 +15,7 @@ import {registerWheelRoutes} from './wheels/wheel-routes.js';
 import {registerShopRoutes} from './shop/shop-routes.js';
 import {registerAuditRoutes} from './audit/audit-routes.js';
 import {setErrorAuditor} from './errors.js';
+import {configureAdminPassword} from './http.js';
 import {registerLobbyRoutes,lobbySummary} from './lobbies/lobby-routes.js';
 import {registerRunRoutes} from './runs/run-routes.js';
 import {registerPassiveRoutes} from './passives/passive-routes.js';
@@ -28,8 +29,9 @@ const socketPath=(lobby:Lobby)=>lobby.id===LEGACY?'/socket.io':`/rooms/${lobby.i
 // Each lobby owns its course database and Socket.IO transport; accounts, lobbies, runs and money live in the portal database.
 export function createPortal(store:Store,config:Config){
  if(!store.portal)throw new Error('The portal requires the main database');
+ configureAdminPassword(config.adminToken);
  const {lobbies,audit}=store.portal;
- const app=express();app.disable('x-powered-by');app.use(helmet({contentSecurityPolicy:false}));app.use(cors({origin:config.corsOrigin}));app.use(express.json({limit:32768}));const server=new Server(app);
+ const app=express();app.disable('x-powered-by');app.set('trust proxy','loopback, uniquelocal');app.use(helmet({contentSecurityPolicy:false}));app.use(cors({origin:config.corsOrigin}));app.use(express.json({limit:32768}));const server=new Server(app);
  const accounts=express();registerAccounts(accounts,store,true);
  const running=new Map<string,ReturnType<typeof createApp>>();
  const members=(lobbyId:string)=>new Set(lobbies.members(lobbyId).map(m=>m.accountId));

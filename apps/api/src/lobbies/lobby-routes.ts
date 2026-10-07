@@ -1,7 +1,7 @@
 import type {Express} from 'express';
 import {lobbyCreateSchema,lobbyJoinSchema,lobbyUpdateSchema,type Account,type Lobby,type LobbySummary} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
-import {currentAccount,parseBody,requireAccount,requireAdmin,route} from '../http.js';
+import {adminPasswordRequired,adminSessionToken,checkAdminPassword,currentAccount,parseBody,requireAccount,requireAdmin,route} from '../http.js';
 import type {PortalDomain} from '../store.js';
 
 /**
@@ -25,6 +25,25 @@ export function registerLobbyRoutes(app:Express,domain:PortalDomain,events:{crea
 
  const auth=requireAccount(id=>accounts.get(id));
  app.get('/api/me',auth,route((_req,res)=>currentAccount(res)));
+ // « Se connecter en admin »: the server password (ADMIN_TOKEN) gives this account an admin session.
+ // Failed attempts are limited per address (10 per 15 minutes) and audited.
+ const failures=new Map<string,number[]>();
+ app.get('/api/admin/session',(_req,res)=>res.json({passwordRequired:adminPasswordRequired()}));
+ app.post('/api/admin/session',auth,route((req,res)=>{
+  const account=currentAccount(res),ip=req.ip??'?',now=Date.now();
+  if(!adminPasswordRequired())throw new DomainError('CONFLICT','Aucun mot de passe administrateur n’est configuré sur ce serveur');
+  const recent=(failures.get(ip)??[]).filter(t=>now-t<15*60*1000);
+  if(recent.length>=10)throw new DomainError('FORBIDDEN','Trop d’essais : réessayez dans quelques minutes');
+  const password=typeof req.body?.password==='string'?req.body.password:'';
+  if(!checkAdminPassword(password)){
+   failures.set(ip,[...recent,now]);
+   domain.audit.record({actorAccountId:account.id,targetAccountId:account.id,category:'ADMIN',action:'admin.login',status:'FAILED',message:`Mot de passe administrateur incorrect pour ${account.name}`});
+   throw new DomainError('FORBIDDEN','Mot de passe administrateur incorrect');
+  }
+  failures.delete(ip);
+  domain.audit.record({actorAccountId:account.id,targetAccountId:account.id,category:'ADMIN',action:'admin.login',status:'SUCCESS',message:`${account.name} est connecté en administrateur`});
+  return adminSessionToken(account.id);
+ }));
  app.use('/api/lobbies',auth);
  app.get('/api/lobbies',route((_req,res)=>{
   const viewer=currentAccount(res);

@@ -19,8 +19,12 @@ async function portalWithPlayers(){
  const admin=(await request(app).post('/api/accounts').send({name:'Admin',sprite:'red',admin:true})).body;
  const ben=(await request(app).post('/api/accounts').send({name:'Ben',sprite:'may',admin:false})).body;
  const tim=(await request(app).post('/api/accounts').send({name:'Tim',sprite:'leaf',admin:false})).body;
- const as=(id:string)=>({get:(p:string)=>request(app).get(p).set('x-account-id',id),post:(p:string,b:object={})=>request(app).post(p).set('x-account-id',id).send(b),
-  patch:(p:string,b:object)=>request(app).patch(p).set('x-account-id',id).send(b),delete:(p:string)=>request(app).delete(p).set('x-account-id',id)});
+ // Production mode (server password): the admin role is the session « Se connecter en admin » gives.
+ const sessions=new Map<string,string>();
+ const auth=(r:request.Test,id:string)=>r.set('x-account-id',id).set('x-admin-token',sessions.get(id)??'');
+ const as=(id:string)=>({get:(p:string)=>auth(request(app).get(p),id),post:(p:string,b:object={})=>auth(request(app).post(p),id).send(b),
+  patch:(p:string,b:object)=>auth(request(app).patch(p),id).send(b),delete:(p:string)=>auth(request(app).delete(p),id)});
+ sessions.set(admin.id,(await as(admin.id).post('/api/admin/session',{password:ADMIN_TOKEN})).body.token);
  const lobby=(await as(admin.id).post('/api/lobbies',{name:'Course'})).body;
  for(const p of [ben,tim])await as(p.id).post('/api/lobbies/join',{code:lobby.inviteCode});
  const benGame=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Ben',money:20000});

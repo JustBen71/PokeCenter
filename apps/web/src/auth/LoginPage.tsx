@@ -10,6 +10,8 @@ export function LoginPage({onLogin}:{onLogin:(a:Account)=>void}){
  const toast=useToast();
  const [accounts,setAccounts]=useState<Account[]|null>(null),[selected,setSelected]=useState(lastAccountId()??''),[creating,setCreating]=useState(false);
  const [name,setName]=useState(''),[sprite,setSprite]=useState('brendan'),[admin,setAdmin]=useState(false),[busy,setBusy]=useState(false);
+ const [passwordRequired,setPasswordRequired]=useState(false);
+ useEffect(()=>{void api<{passwordRequired:boolean}>('/api/admin/session').then(r=>setPasswordRequired(r.passwordRequired)).catch(()=>{});},[]);
  useEffect(()=>{api<Account[]>('/api/accounts').then(list=>{setAccounts(list);if(list.length===0)setCreating(true);}).catch(e=>{setAccounts([]);toast.error(e);});},[]);
  const chosen=accounts?.find(a=>a.id===selected);
  async function create(e:React.FormEvent){
@@ -33,8 +35,9 @@ export function LoginPage({onLogin}:{onLogin:(a:Account)=>void}){
     <label>Nom<input value={name} required maxLength={32} autoFocus onChange={e=>setName(e.target.value)} placeholder="Ben, Timéo…"/></label>
     <p className="field-label">Avatar</p>
     <AvatarPicker value={sprite} onChange={setSprite}/>
+    {passwordRequired?<p className="muted">Le rôle administrateur s’obtient ensuite depuis le menu du compte : « Se connecter en admin », avec le mot de passe du serveur.</p>:<>
     <label className="admin-check"><input type="checkbox" checked={admin} onChange={e=>setAdmin(e.target.checked)}/>Administrateur</label>
-    <p className="muted">Un administrateur reste un joueur. Il peut en plus créer des lobbies et gérer la course. Après la création, seul un administrateur peut changer un rôle.</p>
+    <p className="muted">Un administrateur reste un joueur. Il peut en plus créer des lobbies et gérer la course. Après la création, seul un administrateur peut changer un rôle.</p></>}
     <button className="primary" disabled={busy}>Créer et entrer</button>
     {!!accounts?.length&&<button type="button" disabled={busy} onClick={()=>setCreating(false)}>Retour</button>}
    </form>}

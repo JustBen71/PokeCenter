@@ -25,3 +25,8 @@ export function writeSession(session:StorageLike,local:StorageLike,ids:Ids){
 export const sessionIds=():Ids=>{const s=browser();return s?readSession(s.session,s.local):{accountId:null,lobbyId:null};};
 export const saveSession=(ids:Ids)=>{const s=browser();if(s)writeSession(s.session,s.local,ids);};
 export const lastAccountId=()=>{const s=browser();return s?safe(()=>s.local.getItem(LAST),null):null;};
+
+// Admin session (server password) of one account, kept in this browser until « Quitter le mode admin ».
+const ADMIN='pokerace-admin:';
+export const adminToken=(accountId:string)=>{const s=browser();return s?safe(()=>s.local.getItem(ADMIN+accountId),null):null;};
+export const saveAdminToken=(accountId:string,token:string|null)=>{const s=browser();if(s)safe(()=>token?s.local.setItem(ADMIN+accountId,token):s.local.removeItem(ADMIN+accountId),undefined);};
