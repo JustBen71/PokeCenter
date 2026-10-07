@@ -15,6 +15,8 @@ type Moved={slot:number;speciesName:string;nickname:string|null;level:number;box
  */
 export class RunDefeatService{
  private readonly boxing=new Set<string>();
+ // Party refused for good (PC full…): not sent again until the party changes.
+ private readonly refused=new Map<string,string>();
  constructor(private readonly deps:{domain:PortalDomain;currentGame:CurrentGameService;commands:GameCommandService;
   changed:(lobbyId:string)=>void;runChanged:(lobbyId:string,run:Run)=>void;notify:(lobbyId:string,n:LobbyNotification)=>void;resetDelayMs?:number}){}
  private name(id:string){return this.deps.domain.accounts.get(id)?.name??id;}
@@ -80,15 +82,25 @@ export class RunDefeatService{
   const fainted=state.party.filter(p=>p.currentHp===0);
   if(!fainted.length||fainted.length===state.party.length||!state.capabilities.includes('party.box_fainted')||!state.battle?.safe)return;
   const run=this.deps.domain.runs.running(lobbyId,accountId),key=`${lobbyId}:${accountId}`;
-  if(!run||this.boxing.has(key))return;
+  const party=state.party.map(p=>`${p.speciesId}:${p.level}:${p.currentHp}`).join(',');
+  if(!run||this.boxing.has(key)||this.refused.get(key)===party)return;
   this.boxing.add(key);
   try{
    const context=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:['party.box_fainted'],requireRun:false});
    // The client re-checks the observed party count: a repeated or late command never moves anything twice.
    const outcome=await this.deps.commands.withPlayerLock(lobbyId,accountId,()=>this.deps.commands.send({lobbyId,accountId,playerId:context.playerId,runId:run.id,actorAccountId:null,
     command:'game.party.box_fainted',payload:{expectedCount:state.party.length}}));
-   if(outcome.status!=='COMPLETED')return;// moved, busy or refused: the next observation decides again
    const who=this.name(accountId);
+   if(outcome.status==='FAILED'&&!['not_safe','state_changed'].includes(outcome.errorCode??'')){
+    // Will not change by itself: said once, tried again when the party changes.
+    this.refused.set(key,party);
+    const full=outcome.errorCode==='box_full';
+    this.deps.domain.audit.record({lobbyId,targetAccountId:accountId,runId:run.id,category:'RUN',action:'pokemon.box_refused',status:'FAILED',commandId:outcome.commandId,metadata:{code:outcome.errorCode},
+     message:full?`Boîtes PC de ${who} pleines : ses Pokémon K.O. restent dans l’équipe (libérer de la place)`:`Pokémon K.O. de ${who} non envoyés dans la boîte (${outcome.errorCode})`});
+    this.deps.notify(lobbyId,{kind:'error',message:full?`📦 PC de ${who} plein : ses Pokémon K.O. ne peuvent pas aller dans la boîte`:`✖ Pokémon K.O. de ${who} non envoyés dans la boîte`});
+    return;
+   }
+   if(outcome.status!=='COMPLETED')return;// busy, moved, unknown: the next observation decides again
    for(const m of (outcome.result.moved??[]) as Moved[]){
     const mon=`${m.nickname??m.speciesName} (${m.speciesName}, niv. ${m.level})`;
     this.deps.domain.audit.record({lobbyId,targetAccountId:accountId,runId:run.id,category:'RUN',action:'pokemon.boxed',status:'INFO',commandId:outcome.commandId,
