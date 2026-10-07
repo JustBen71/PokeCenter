@@ -36,7 +36,7 @@ public sealed class Gen3Transaction
     public static async Task<Gen3Transaction> BeginAsync(IBridgeClient bridge, LocalRomIdentity? identity, CancellationToken cancellation, string unavailableCode = "write_unavailable", bool requireWritableProfile = true)
     {
         if (identity == null || bridge is not ITransactionalBridge transaction) throw new ClientException(unavailableCode, "Launch a recognized ROM with the updated bridge.");
-        var (_, profile) = new Gen3ProfileRegistry().Resolve(identity.Sha256);
+        var (_, profile) = new Gen3ProfileRegistry().Resolve(identity);
         var game = await bridge.GetGameInfoAsync(cancellation);
         if (profile == null || !identity.MatchesLoadedGame(game) || await bridge.GetSystemAsync(cancellation) != "GBA" || !Gen3Memory.HasDomains(await bridge.GetMemoryDomainsAsync(cancellation)))
             throw new ClientException(unavailableCode, "ROM identity or memory domains unavailable.");

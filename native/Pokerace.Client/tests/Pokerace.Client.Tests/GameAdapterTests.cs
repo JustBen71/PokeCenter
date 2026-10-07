@@ -29,6 +29,18 @@ public sealed class GameAdapterTests
         var candidate = new Gen3ProfileRegistry(name => { var data = Gen3ProfileRegistry.Resource(name); if (name == Profile.ProfileId) data["status"] = "candidate"; return data; });
         Assert.Equal("profile_not_validated", candidate.Resolve(KnownHash).Status);
     }
+    [Fact] public async Task RandomizedRomIsRecognizedByHeader()
+    {
+        var rom = new byte[0x200];
+        "BPEF"u8.CopyTo(rom.AsSpan(0xAC));
+        var identity = await LocalRomIdentity.FromStreamAsync(new MemoryStream(rom), default);
+        Assert.Equal("BPEF v0", identity.Revision);
+        Assert.Equal("ready", new Gen3ProfileRegistry().Resolve(identity).Status);
+        rom[0xBC] = 1;
+        Assert.Equal("unknown_rom", new Gen3ProfileRegistry().Resolve(await LocalRomIdentity.FromStreamAsync(new MemoryStream(rom), default)).Status);
+        "BPEE"u8.CopyTo(rom.AsSpan(0xAC)); rom[0xBC] = 0;
+        Assert.Equal("unknown_rom", new Gen3ProfileRegistry().Resolve(await LocalRomIdentity.FromStreamAsync(new MemoryStream(rom), default)).Status);
+    }
     [Theory]
     [InlineData("no_game")][InlineData("unsupported_system")][InlineData("rom_identity_unavailable")][InlineData("unknown_rom")][InlineData("memory_domain_unavailable")]
     public async Task UnsupportedStatesNeverReadProfileMemory(string expected)

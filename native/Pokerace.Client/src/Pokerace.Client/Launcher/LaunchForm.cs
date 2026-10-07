@@ -174,7 +174,7 @@ public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, C
         {
             using var stream = File.OpenRead(path);
             var identity = LocalRomIdentity.FromStreamAsync(stream, CancellationToken.None).GetAwaiter().GetResult();
-            var (_, profile) = new Gen3ProfileRegistry().Resolve(identity.Sha256);
+            var (_, profile) = new Gen3ProfileRegistry().Resolve(identity);
             return profile == null ? "[yellow]⚠ ROM non reconnue : Pokérace ne pourra pas lire la partie[/]"
                 : $"[green]✔ Pokémon Émeraude ({Markup.Escape(profile.Language)}, {Markup.Escape(profile.Revision)}) reconnue[/]";
         }

@@ -111,7 +111,7 @@ public static class Gen3Defeat
     {
         if (identity == null || bridge is not ITransactionalBridge transaction) throw new ClientException("reset_unavailable", "Launch a recognized ROM with the updated bridge.");
         var game = await bridge.GetGameInfoAsync(cancellation);
-        if (!identity.MatchesLoadedGame(game) || new Gen3ProfileRegistry().Resolve(identity.Sha256).Profile?.Defeat == null)
+        if (!identity.MatchesLoadedGame(game) || new Gen3ProfileRegistry().Resolve(identity).Profile?.Defeat == null)
             throw new ClientException("reset_unavailable", "ROM identity unavailable.");
         return new() { ["archive"] = await transaction.ResetGameAsync(game!["hash"]!.GetValue<string>(), cancellation) };
     }
