@@ -1,0 +1,83 @@
+name: Release
+# Pushing a tag v* (ex. v0.2.0) builds both launchers and publishes a GitHub release with them and the notes
+# docs/releases/<tag>.md. Workflow dispatch rebuilds the release of an existing tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag existant (ex. v0.2.0)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build the Windows launcher (pinned BizHawk, bundled bridge)
+        shell: pwsh
+        run: ./native/Pokerace.Client/tools/build-launcher.ps1 -Dotnet (Get-Command dotnet).Source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-windows
+          path: native/Pokerace.Client/artifacts/launcher-win-x64/Pokerace.Client.exe
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build the Linux launcher (pinned BizHawk, bundled bridge)
+        run: sh native/Pokerace.Client/tools/build-launcher.sh
+      - name: Smoke test
+        run: native/Pokerace.Client/artifacts/launcher-linux-x64/Pokerace.Client --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux
+          path: native/Pokerace.Client/artifacts/launcher-linux-x64/Pokerace.Client
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, linux]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Name the files after the version
+        id: files
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          mkdir out
+          cp dist/launcher-windows/Pokerace.Client.exe "out/Pokerace-$tag-windows-x64.exe"
+          cp dist/launcher-linux/Pokerace.Client "out/Pokerace-$tag-linux-x64"
+          chmod +x "out/Pokerace-$tag-linux-x64"
+          (cd out && sha256sum * > SHA256SUMS.txt)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.files.outputs.tag }}
+          name: Pokérace ${{ steps.files.outputs.tag }}
+          body_path: docs/releases/${{ steps.files.outputs.tag }}.md
+          files: out/*

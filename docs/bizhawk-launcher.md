@@ -4,6 +4,8 @@
 
 ## Utilisation
 
+Les lanceurs prêts à l'emploi (Windows et Linux) sont attachés à chaque **release GitHub** (`Pokerace-vX.Y.Z-windows-x64.exe`, `Pokerace-vX.Y.Z-linux-x64`). Une release se publie en poussant un tag `vX.Y.Z` avec ses notes dans `docs/releases/vX.Y.Z.md` (workflow `release.yml`).
+
 1. **Windows** : double-cliquer sur `pokerace.cmd` (ou sur **Pokerace.Client.exe** de l'artefact **pokerace-launcher-win-x64**). **Linux** : lancer `./pokerace.sh` dans un terminal (Mono requis par BizHawk : `sudo apt install mono-complete`, le lanceur indique la commande sinon). macOS n'est pas pris en charge (pas de BizHawk).
 2. Un formulaire s'affiche dans la console : **Serveur**, **Port**, **Pseudo**, **Code du salon** et **ROM**. Au premier lancement chaque champ est demandé ; ensuite les valeurs précédentes sont reprises. Flèches pour choisir une ligne, Entrée pour la modifier. Une saisie invalide est redemandée avec son explication : pas besoin de relancer le programme. Formats d'adresse acceptés : `88.184.14.248`, `localhost`, `http://…` ou `https://…` ; un port tapé avec l'adresse (`hôte:3000`) remplit le champ Port.
 3. La ROM se choisit dans une fenêtre de sélection (Windows, ou zenity/kdialog sous Linux) ; sinon, taper ou glisser le chemin du fichier. Le formulaire indique si la ROM est reconnue.
