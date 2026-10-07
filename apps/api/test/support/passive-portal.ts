@@ -7,6 +7,7 @@ import {createPortal} from '../../src/rooms.js';
 export async function passivePortal(options:{implemented?:ReadonlySet<string>;random?:(n:number)=>number;commandTimeoutMs?:number;resetDelayMs?:number;handlers?:Record<string,import('../../src/passives/passive-events.js').PassiveHandler>}={}){
  const store=new Store(':memory:');
  const portal=createPortal(store,{adminToken:'',corsOrigin:'http://localhost',offlineAfterMs:15000,commandTimeoutMs:options.commandTimeoutMs??300,resetDelayMs:options.resetDelayMs??0,battleMoves:async()=>[33,45],
+  levelData:async(_species:number,level:number)=>({experience:level**3,pokemon:{stats:['hp','attack','defense','speed','special-attack','special-defense'].map(name=>({base_stat:50,stat:{name,url:''}})),past_stats:[],moves:[]}}),
   passives:{implemented:options.implemented??new Set(passiveCatalog.map(p=>p.id)),random:options.random,handlers:options.handlers}});
  await new Promise<void>(r=>portal.server.listen(0,'127.0.0.1',r));
  const base=`http://127.0.0.1:${(portal.server.address() as {port:number}).port}`;

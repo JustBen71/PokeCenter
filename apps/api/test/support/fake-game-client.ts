@@ -18,7 +18,7 @@ export const template=(speciesId=1,level=5,nickname='TEST'):PokemonInjection=>({
 export const rawPokemon=(speciesId=1,level=5,nickname='TEST')=>encodePokemon(template(speciesId,level,nickname));
 
 const READ=['trainer.read','money.read','party.read','location.read','progression.read'] as const;
-const WRITE=['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace'] as const;
+const WRITE=['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace','items.write'] as const;
 
 /**
  * Simulated Pokerace.Client + BizHawk: speaks the real /client protocol, keeps money and party,
@@ -92,6 +92,8 @@ export class FakeGameClient{
  faint(slot:number){this.party[slot-1]=encodePokemon({...template(1,5,decodePokemonCopy(this.party[slot-1]!).nickname||'TEST'),currentHp:0});this.publish();}
  /** PC box (BoxPokemon copies) and number of game resets, as seen by the fake game. */
  box:string[]=[];resets=0;
+ /** Bag: item id → quantity (no pockets: the real limits are the client's). */
+ bag=new Map<number,number>();
  /** Disconnects, then connects again as the same installation with the same game (money, party). */
  async reconnect(){
   this.close();
@@ -133,6 +135,12 @@ export class FakeGameClient{
     this.party=this.party.filter((_,i)=>!fainted.some(m=>m.slot===i+1));
     this.publish();
     return this.ack(command,true,{result:{moved,partyCount:this.party.length}});
+   }
+   case 'game.item.add':this.bag.set(p.itemId,(this.bag.get(p.itemId)??0)+1);return this.ack(command,true,{result:{itemId:p.itemId,quantity:this.bag.get(p.itemId)}});
+   case 'game.item.take_random':{
+    const ids=[...this.bag.keys()];if(!ids.length)return this.ack(command,false,{error:{code:'bag_empty'}});
+    const id=ids[Math.floor(Math.random()*ids.length)]!,left=this.bag.get(id)!-1;if(left)this.bag.set(id,left);else this.bag.delete(id);
+    return this.ack(command,true,{result:{itemId:id,quantity:left}});
    }
    case 'game.reset':this.resets++;this.party=[rawPokemon()];this.publish();return this.ack(command,true,{result:{archive:`lost-${this.resets}`}});
    case 'pokemon.purchase':if(this.party.length>=6)return this.ack(command,false,{error:{code:'party_full'}});this.money-=p.price;this.party.push(p.raw);break;

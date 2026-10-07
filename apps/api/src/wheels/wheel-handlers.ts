@@ -1,8 +1,10 @@
 import {randomInt} from 'node:crypto';
-import {depositSplit,gageParamsSchemas,passiveById,passiveRarityLabels,type Account,type Gage,type GageHandler,type PassiveRarity} from '@pokerace/shared';
+import {calculateStats,decodePokemonCopy,depositSplit,gageParamsSchemas,gen3Items,gen3PartyRaw,magikarpFrom,nationalSpecies,passiveById,passiveRarityLabels,withLevel,
+ type Account,type Gage,type GageHandler,type PassiveRarity,type PokemonInjection} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import type {Services} from '../services.js';
 import {wheelSlots} from '../battles/board-draw.js';
+import {GameCommandService} from '../game/game-command-service.js';
 
 export type HandlerContext={
  lobbyId:string;resolutionId:string;actorId:string;gage:Gage;owner:Account;target:Account|null;
@@ -28,6 +30,33 @@ const gameMoney=(ctx:HandlerContext,account:Account,amount:number,direction:'in'
 };
 
 const fmt=(n:number)=>`${n.toLocaleString('fr-FR')} ₽`;
+// Whose game a gage changes (beneficiary or target).
+const whom=(ctx:HandlerContext,who:'OWNER'|'TARGET')=>who==='TARGET'?needTarget(ctx):ctx.owner;
+// One Pokémon of a party: random, highest or lowest level, or the slot chosen after the draw.
+const pickPokemon=(ctx:HandlerContext,account:Account,selector:'random'|'highest'|'lowest'|'choice',capability:'pokemon.replace'|'pokemon.remove')=>{
+ const {state}=ctx.services.currentGame.requireState(ctx.lobbyId,account.id,{capabilities:[capability]});
+ const party=[...state.party];
+ if(!party.length)throw new DomainError('VALIDATION_FAILED',`${account.name} n’a pas de Pokémon`);
+ const slot=selector==='choice'?ctx.choice.slot:selector==='random'?party[randomInt(party.length)]!.slot
+  :[...party].sort((a,b)=>selector==='highest'?b.level-a.level:a.level-b.level)[0]!.slot;
+ const pokemon=party.find(p=>p.slot===slot);
+ if(!pokemon)throw new DomainError('VALIDATION_FAILED','Choisissez l’emplacement du Pokémon');
+ const raw=gen3PartyRaw(pokemon);
+ if(!raw)throw new DomainError('CAPABILITY_MISSING','Le client n’envoie pas la copie exacte de ce Pokémon');
+ return {pokemon,raw,state,label:`${pokemon.nickname||pokemon.speciesName} (niv. ${pokemon.level})`};
+};
+const outOfBattle=(ctx:HandlerContext)=>ctx.choice.confirmOutOfBattle===true;
+// Bag commands: sent once (an unknown outcome is to check, never replayed).
+const itemCommand=async(ctx:HandlerContext,account:Account,command:'game.item.add'|'game.item.take_random',payload:Record<string,unknown>)=>{
+ const {services}=ctx;
+ return services.commands.withPlayerLock(ctx.lobbyId,account.id,async()=>{
+  const {context,playerId}=services.currentGame.requireState(ctx.lobbyId,account.id,{capabilities:['items.write']});
+  const outcome=await services.commands.send({lobbyId:ctx.lobbyId,accountId:account.id,playerId,runId:context.run?.id??null,actorAccountId:ctx.actorId,command,payload});
+  if(outcome.status!=='COMPLETED')GameCommandService.raise(outcome);
+  return outcome.result as {itemId:number};
+ });
+};
+const itemName=(id:number)=>gen3Items.find(i=>i[0]===id)?.[2]??`objet n°${id}`;
 const payout=(ctx:HandlerContext)=>({actorAccountId:ctx.actorId,idempotencyKey:key(ctx,'jackpot'),label:ctx.gage.name,metadata:{resolutionId:ctx.resolutionId}});
 // A passive drawn among compatible, enabled, not owned ones; no fake success when there is none.
 const grantPassive=(ctx:HandlerContext,rarities:PassiveRarity[])=>{
@@ -109,6 +138,61 @@ export const wheelHandlers:Record<GageHandler,Handler>={
   const builder=p.builder==='OTHER_PLAYER'?{type:'OTHER_PLAYER' as const,opponentId:(other??needTarget(ctx)).id}:{type:p.builder as 'MIRROR'|'LEADER'};
   const battle=ctx.services.battles.createFrom(ctx.lobbyId,{accountId:fighter.id,builder,scaling:p.scaling,trainer:p.spriteId?{spriteId:p.spriteId}:{}},ctx.actorId);
   return `Combat lancé : ${fighter.name} VS ${battle.trainer.name} (${battle.party.length} Pokémon, niv. ${battle.party.map(m=>m.level).join(' / ')}) — il démarre dès que ${fighter.name} est libre sur la carte`;
+ },
+ ITEM_GIVE:async ctx=>{
+  const p=params(ctx,'ITEM_GIVE'),account=whom(ctx,p.who),got:string[]=[];
+  for(let i=0;i<p.count;i++){
+   const item=gen3Items[randomInt(gen3Items.length)]!;
+   try{await itemCommand(ctx,account,'game.item.add',{itemId:item[0]});got.push(item[2]);}
+   catch(error){if(!got.length)throw error;break;}// pocket full after some items: keep what was given
+  }
+  return `${account.name} reçoit ${got.join(', ')}`;
+ },
+ ITEM_TAKE:async ctx=>{
+  const p=params(ctx,'ITEM_TAKE'),account=whom(ctx,p.who),lost:string[]=[];
+  for(let i=0;i<p.count;i++){
+   try{lost.push(itemName((await itemCommand(ctx,account,'game.item.take_random',{})).itemId));}
+   catch(error){
+    const empty=error instanceof DomainError&&error.details?.clientError==='bag_empty';
+    if(empty&&!lost.length)return `${account.name} n’a aucun objet à perdre`;
+    if(empty)break;
+    throw error;
+   }
+  }
+  return `${account.name} perd ${lost.join(', ')}`;
+ },
+ POKEMON_TRANSFER:async ctx=>{
+  const p=params(ctx,'POKEMON_TRANSFER'),target=needTarget(ctx);
+  const [from,to]=p.direction==='GIVE'?[ctx.owner,target]:[target,ctx.owner];
+  const {pokemon,raw,state,label}=pickPokemon(ctx,from,p.selector,'pokemon.remove');
+  if(state.party.length<=1)throw new DomainError('LAST_POKEMON',`${from.name} n’a plus qu’un Pokémon`);
+  const dest=ctx.services.currentGame.requireState(ctx.lobbyId,to.id,{capabilities:['pokemon.insert']}).state;
+  if(dest.party.length>=6)throw new DomainError('PARTY_FULL',`L’équipe de ${to.name} est complète`);
+  await ctx.services.pokemon.removeSlot(ctx.lobbyId,from.id,actor(ctx),pokemon.slot,outOfBattle(ctx));
+  try{await ctx.services.pokemon.insertRaw(ctx.lobbyId,to.id,actor(ctx),raw,true);}
+  catch(error){
+   // Put it back where it was: never lose a Pokémon between two games.
+   await ctx.services.pokemon.insertRaw(ctx.lobbyId,from.id,actor(ctx),raw,true).catch(()=>{});
+   throw error;
+  }
+  return `${label} passe de l’équipe de ${from.name} à celle de ${to.name}`;
+ },
+ POKEMON_LEVEL:async ctx=>{
+  const p=params(ctx,'POKEMON_LEVEL'),account=whom(ctx,p.who);
+  const {pokemon,raw,label}=pickPokemon(ctx,account,p.selector,'pokemon.replace');
+  const level=Math.max(1,Math.min(100,pokemon.level+p.delta));
+  if(level===pokemon.level)return `${label} de ${account.name} est déjà au niveau ${level}`;
+  const copy=decodePokemonCopy(raw),speciesId=nationalSpecies.get(copy.internalSpecies)!;
+  const {pokemon:data,experience}=await ctx.services.levelData(speciesId,level).catch(()=>{throw new DomainError('VALIDATION_FAILED','PokéAPI indisponible : niveau inchangé');});
+  const stats=calculateStats(data,{speciesId,level,nature:copy.nature,ivs:copy.ivs as PokemonInjection['ivs'],evs:copy.evs as PokemonInjection['evs']});
+  await ctx.services.pokemon.replaceRaw(ctx.lobbyId,account.id,actor(ctx),pokemon.slot,withLevel(raw,{level,experience,stats}),outOfBattle(ctx));
+  return `${label} de ${account.name} ${level>pokemon.level?'monte':'descend'} au niveau ${level}`;
+ },
+ MAGIKARP_CURSE:async ctx=>{
+  const p=params(ctx,'MAGIKARP_CURSE'),account=whom(ctx,p.who);
+  const {pokemon,raw,label}=pickPokemon(ctx,account,p.selector,'pokemon.replace');
+  await ctx.services.pokemon.replaceRaw(ctx.lobbyId,account.id,actor(ctx),pokemon.slot,magikarpFrom(raw),outOfBattle(ctx));
+  return `🐟 Malédiction : ${label} de ${account.name} devient un Magicarpe niveau 1`;
  },
  BOARD_BATTLE:async ctx=>{
   const p=params(ctx,'BOARD_BATTLE');

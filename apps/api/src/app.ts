@@ -21,7 +21,9 @@ export type Config={auctionGenerator?:typeof import('./auction-generator.js').ge
  // Delay between an in-game defeat and the automatic game reset (tests use 0).
  resetDelayMs?:number;
  // Default moves of drawn Pokémon (PokéAPI); tests use a local table.
- battleMoves?:import('./battles/board-draw.js').MovesProvider};
+ battleMoves?:import('./battles/board-draw.js').MovesProvider;
+ // Stats and experience of a species at a level (PokéAPI); tests use a local table.
+ levelData?:typeof import('@pokerace/shared').levelData};
 const hash=(s:string)=>createHash("sha256").update(s).digest();
 const safeEqual=(a:string,b:string)=>{const aa=hash(a),bb=hash(b);return timingSafeEqual(aa,bb)};
 // hooks.nativeClientsChanged lets the portal react to game observations (objectives, rankings) without polling.

@@ -13,7 +13,7 @@ type ResolutionRow={id:string;lobby_id:string;wheel_type_id:string;gage_json:str
 
 // Party changes need an explicit "not in battle" confirmation and a steal needs the passive to take:
 // they always wait for the admin form.
-const PARTY_HANDLERS:GageHandler[]=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','PASSIVE_STEAL'];
+const PARTY_HANDLERS:GageHandler[]=['REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','PASSIVE_STEAL','POKEMON_TRANSFER','POKEMON_LEVEL','MAGIKARP_CURSE'];
 const STRIP_LENGTH=30,WINNER_INDEX=26;
 
 const defaults:WheelInput[]=[

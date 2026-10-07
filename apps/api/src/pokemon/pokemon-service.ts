@@ -28,6 +28,16 @@ export class PokemonService{
   return this.execute(lobbyId,accountId,actor,{action:'insert',confirmOutOfBattle:true},raw);
  }
 
+ /** Wheel gages: the exact copy of a slot replaced (level change, Magikarp curse) or the slot removed (transfer). */
+ replaceRaw(lobbyId:string,accountId:string,actor:Account,slot:number,raw:string,confirmOutOfBattle:boolean){
+  if(!confirmOutOfBattle)throw new DomainError('SAFE_STATE_REQUIRED','Confirmez que le joueur n’est pas en combat : l’équipe de combat est une copie que le jeu réécrit');
+  return this.execute(lobbyId,accountId,actor,{action:'replace',slot,confirmOutOfBattle:true},raw);
+ }
+ removeSlot(lobbyId:string,accountId:string,actor:Account,slot:number,confirmOutOfBattle:boolean){
+  if(!confirmOutOfBattle)throw new DomainError('SAFE_STATE_REQUIRED','Confirmez que le joueur n’est pas en combat : l’équipe de combat est une copie que le jeu réécrit');
+  return this.execute(lobbyId,accountId,actor,{action:'remove',slot,confirmOutOfBattle:true},null);
+ }
+
  private execute(lobbyId:string,accountId:string,actor:Account,action:{action:'insert'|'remove'|'replace';slot?:number;confirmOutOfBattle?:boolean},raw:string|null){
   return this.deps.commands.withPlayerLock(lobbyId,accountId,async()=>{
    const {context,playerId,state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:[capability[action.action]]});

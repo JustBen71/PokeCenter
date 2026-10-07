@@ -59,6 +59,15 @@ export function levelMoves(data:PokemonData, level:number) {
     .sort((a,b)=>a.level-b.level || a.order-b.order || a.id-b.id);
 }
 
+/** Gen III stats and experience of a species at a level (PokéAPI), for a level change of an existing Pokémon. */
+export async function levelData(speciesId:number, level:number):Promise<{pokemon:PokemonData; experience:number}> {
+  const [pokemon,species]=await Promise.all([api<PokemonData>(`pokemon/${speciesId}`),api<{growth_rate:Resource}>(`pokemon-species/${speciesId}`)]);
+  const growth=await api<{levels:{level:number; experience:number}[]}>(`growth-rate/${idOf(species.growth_rate)}`);
+  const experience=growth.levels.find(l=>l.level===level)?.experience;
+  if (experience===undefined) throw new Error('Courbe d’expérience indisponible.');
+  return {pokemon,experience};
+}
+
 export async function buildPokemon(form:PokemonInjection):Promise<BuiltPokemon> {
   if (!Number.isInteger(form.speciesId) || form.speciesId<1 || form.speciesId>386 || !Number.isInteger(form.level) || form.level<1 || form.level>100) throw new Error('Choisissez une espèce entre 1 et 386 et un niveau entre 1 et 100.');
   if (!Number.isInteger(form.nature) || form.nature<0 || form.nature>24 || Object.values(form.ivs).some(v=>!Number.isInteger(v)||v<0||v>31) || Object.values(form.evs).some(v=>!Number.isInteger(v)||v<0||v>255) || Object.values(form.evs).reduce((a,b)=>a+b,0)>510) throw new Error('Vérifiez la nature, les IV (0–31) et les EV (510 au total).');

@@ -16,10 +16,16 @@ export const ticketIconSchema=z.enum(ticketIcons);
  * The configuration never becomes a programming language.
  */
 export const gageHandlers=['NOTICE','GIVE_MONEY','TAKE_MONEY','STEAL_MONEY','REMOVE_POKEMON','GIVE_LIBRARY_POKEMON','JACKPOT_FIXED','JACKPOT_PERCENT','JACKPOT_SHARE','JACKPOT_EMPTY',
- 'PASSIVE_GRANT_RANDOM','PASSIVE_GRANT_RARITY','PASSIVE_STEAL','START_BATTLE','BOARD_BATTLE'] as const;
+ 'PASSIVE_GRANT_RANDOM','PASSIVE_GRANT_RARITY','PASSIVE_STEAL','START_BATTLE','BOARD_BATTLE',
+ 'ITEM_GIVE','ITEM_TAKE','POKEMON_TRANSFER','POKEMON_LEVEL','MAGIKARP_CURSE'] as const;
 export const gageHandlerSchema=z.enum(gageHandlers);
 export type GageHandler=z.infer<typeof gageHandlerSchema>;
 const amount=z.number().int().min(1).max(999999);
+// Whose game a gage changes: the beneficiary of the wheel or its target.
+const gageWho=z.enum(['OWNER','TARGET']);
+// Which Pokémon of the party: random, highest or lowest level, or chosen after the draw (party slot).
+const pokemonSelector=z.enum(['random','highest','lowest','choice']).default('random');
+export const pokemonSelectorLabels={random:'Au hasard',highest:'Plus haut niveau',lowest:'Plus bas niveau',choice:'Choisi après le tirage'} as const;
 export const gageParamsSchemas={
  NOTICE:z.object({}).strict(),
  GIVE_MONEY:z.object({amount}).strict(),
@@ -38,7 +44,15 @@ export const gageParamsSchemas={
  START_BATTLE:z.object({builder:z.enum(['MIRROR','OTHER_PLAYER','LEADER']),fighter:z.enum(['OWNER','TARGET']).default('OWNER'),
   scaling:battleScalingSchema.default({mode:'COPY_EXACT',delta:0}),spriteId:battleSpriteSchema.optional()}).strict(),
  // New team on the Tableau des combats, drawn around the beneficiary's average level.
- BOARD_BATTLE:boardGageParamsSchema
+ BOARD_BATTLE:boardGageParamsSchema,
+ // Bag items (never key items nor HMs): the beneficiary (OWNER) or the target gains / loses random items.
+ ITEM_GIVE:z.object({who:gageWho.default('OWNER'),count:z.number().int().min(1).max(5).default(1)}).strict(),
+ ITEM_TAKE:z.object({who:gageWho.default('TARGET'),count:z.number().int().min(1).max(5).default(1)}).strict(),
+ // GIVE: a Pokémon of the beneficiary goes to the target; TAKE: a Pokémon of the target goes to the beneficiary.
+ POKEMON_TRANSFER:z.object({direction:z.enum(['GIVE','TAKE']).default('GIVE'),selector:pokemonSelector}).strict(),
+ POKEMON_LEVEL:z.object({who:gageWho.default('OWNER'),delta:z.number().int().min(-10).max(10).refine(v=>v!==0,'Écart de niveau nul'),selector:pokemonSelector}).strict(),
+ // Malédiction du Magicarpe: the Pokémon becomes a level 1 Magikarp for good.
+ MAGIKARP_CURSE:z.object({who:gageWho.default('TARGET'),selector:pokemonSelector}).strict()
 } satisfies Record<GageHandler,z.ZodTypeAny>;
 export const gageHandlerInfo:Record<GageHandler,{label:string;target:'none'|'required';help:string}>={
  NOTICE:{label:'Gage à réaliser',target:'none',help:'Aucun effet en jeu : le gage est annoncé à tous.'},
@@ -55,11 +69,18 @@ export const gageHandlerInfo:Record<GageHandler,{label:string;target:'none'|'req
  PASSIVE_GRANT_RARITY:{label:'Passif d’une rareté',target:'none',help:'Le bénéficiaire gagne un passif compatible de cette rareté.'},
  PASSIVE_STEAL:{label:'Vol de passif',target:'required',help:'Choisis une cible puis l’un de ses passifs : il passe au bénéficiaire avec sa progression.'},
  START_BATTLE:{label:'Combat commandité',target:'none',help:'Un vrai combat de dresseur démarre dans la partie du joueur (dès qu’il est libre sur la carte).'},
+ ITEM_GIVE:{label:'Objet aléatoire gagné',target:'none',help:'Un ou plusieurs objets au hasard (tous sauf les objets rares et les CS) arrivent dans le sac.'},
+ ITEM_TAKE:{label:'Objet aléatoire perdu',target:'none',help:'Un ou plusieurs objets au hasard du sac disparaissent (jamais les objets rares ni les CS).'},
+ POKEMON_TRANSFER:{label:'Transfert de Pokémon',target:'required',help:'Un Pokémon passe d’une équipe à l’autre (jamais le dernier, jamais vers une équipe pleine).'},
+ POKEMON_LEVEL:{label:'Niveau ±',target:'none',help:'Un Pokémon gagne ou perd des niveaux (statistiques recalculées, attaques gardées).'},
+ MAGIKARP_CURSE:{label:'Malédiction du Magicarpe',target:'none',help:'Un Pokémon devient définitivement un Magicarpe niveau 1.'},
  BOARD_BATTLE:{label:'Nouveau combat au tableau',target:'none',help:'Une équipe tirée au hasard, de niveau proche du bénéficiaire, apparaît au Tableau des combats : le premier joueur qui l’accepte l’affronte.'}
 };
 // START_BATTLE needs a target when the target fights, or when the opponent team is the target's.
 export const gageNeedsTarget=(handler:GageHandler,params:Record<string,unknown>)=>gageHandlerInfo[handler].target==='required'||
- (handler==='START_BATTLE'&&(params.fighter==='TARGET'||params.builder==='OTHER_PLAYER'));
+ (handler==='START_BATTLE'&&(params.fighter==='TARGET'||params.builder==='OTHER_PLAYER'))||
+ // Read with the defaults (ITEM_TAKE and MAGIKARP_CURSE hit the target unless told otherwise).
+ (gageParamsSchemas[handler].safeParse(params).data as {who?:string}|undefined)?.who==='TARGET';
 
 export const gageInputSchema=z.object({
  id:z.string().min(1).max(64).optional(),
