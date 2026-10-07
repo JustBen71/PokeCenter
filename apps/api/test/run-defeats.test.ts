@@ -11,7 +11,8 @@ test('end of Run in the game: fainted Pokémon boxed, defeat = Run lost + new Ru
  const p=await passivePortal();
  const closers:(()=>void)[]=[];
  try{
-  const {as,admin,ben,lobby,base}=p;
+  const {as,admin,ben,lobby,base,portal}=p;
+  portal.services.passives.grant(lobby.id,ben.id,'second-wind','ADMIN');
   const runs=async()=>((await as(admin.id).get(`/api/lobbies/${lobby.id}/runs`)).body as Run[]).filter(r=>r.accountId===ben.id).sort((a,b)=>a.number-b.number);
   const audit=async()=>((await as(admin.id).get(`/api/lobbies/${lobby.id}/audit?category=RUN`)).body as {action:string;message:string}[]).reverse();
   const watch=client(base+'/dashboard',{path:`/rooms/${lobby.id}/socket.io`,auth:{accountId:ben.id},transports:['websocket'],reconnection:false});closers.push(()=>watch.close());
@@ -50,6 +51,10 @@ test('end of Run in the game: fainted Pokémon boxed, defeat = Run lost + new Ru
   assert.match(log.find(l=>l.action==='run.lost')!.message,/Run #1 de Ben perdue dans le jeu \(équipe K.O., renvoyé au Centre Pokémon\)/);
   assert.match(log.find(l=>l.action==='run.reset')!.message,/lost-1/);
   await until(()=>notes.some(n=>n.includes('Ben a perdu sa Run #1')),'defeat notification');
+  // « Deuxième souffle » pays the new Run in the new game, never in the game about to be erased.
+  await until(()=>game.received.some(c=>c.command==='game.money.add'),'second wind paid');
+  const order=game.received.map(c=>c.command).filter(c=>c==='game.reset'||c==='game.money.add');
+  assert.deepEqual(order,['game.reset','game.money.add']);
   // The player's journal (readable by members): defeat, fallen Pokémon, reset.
   const journal=(await as(p.tim.id).get(`/api/lobbies/${lobby.id}/runs/journal?accountId=${ben.id}`)).body as {action:string}[];
   assert.deepEqual(journal.map(j=>j.action).sort(),['pokemon.boxed','pokemon.boxed','run.lost','run.reset']);

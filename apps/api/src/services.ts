@@ -47,7 +47,7 @@ export function createServices(domain:PortalDomain,courses:Map<string,Course>,op
   notify:(lobbyId,n,accountId)=>accountId?options.emitTo?.(lobbyId,accountId,'notification',n):options.emit(lobbyId,'notification',n)});
  const battles=new BattleEncounterService({domain,currentGame,commands,objectives:()=>objectives,changed:lobbyId=>options.changed(lobbyId,'battles'),
   notify:(lobbyId,n,accountId)=>accountId?options.emitTo?.(lobbyId,accountId,'notification',n):options.emit(lobbyId,'notification',n)});
- const runDefeats=new RunDefeatService({domain,currentGame,commands,runChanged:(lobbyId,run)=>options.runChanged?.(lobbyId,run),resetDelayMs:options.resetDelayMs,
+ const runDefeats=new RunDefeatService({domain,currentGame,commands,changed:lobbyId=>options.changed(lobbyId,'runs'),runChanged:(lobbyId,run)=>options.runChanged?.(lobbyId,run),resetDelayMs:options.resetDelayMs,
   notify:(lobbyId,n)=>options.emit(lobbyId,'notification',n)});
  const services={domain,currentGame,commands,library,pokemon,transactions,objectives,bank,jackpot,auctions,wheels,shop,passives,passiveEngine,battles,runDefeats};
  wheels.attach(services);shop.attach(services);passiveEngine.attach(services);

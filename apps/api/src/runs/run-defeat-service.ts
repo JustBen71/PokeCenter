@@ -15,7 +15,7 @@ type Moved={slot:number;speciesName:string;nickname:string|null;level:number;box
 export class RunDefeatService{
  private readonly boxing=new Set<string>();
  constructor(private readonly deps:{domain:PortalDomain;currentGame:CurrentGameService;commands:GameCommandService;
-  runChanged:(lobbyId:string,run:Run)=>void;notify:(lobbyId:string,n:LobbyNotification)=>void;resetDelayMs?:number}){}
+  changed:(lobbyId:string)=>void;runChanged:(lobbyId:string,run:Run)=>void;notify:(lobbyId:string,n:LobbyNotification)=>void;resetDelayMs?:number}){}
  private name(id:string){return this.deps.domain.accounts.get(id)?.name??id;}
 
  /** Called once per PLAYER_DEFEATED event (deduplicated by eventId before reaching here). */
@@ -28,13 +28,15 @@ export class RunDefeatService{
   const lost=runs.transition(run.id,'LOST');
   audit.record({lobbyId,targetAccountId:accountId,runId:lost.id,category:'RUN',action:'run.lost',status:'INFO',
    message:`Run #${lost.number} de ${who} perdue dans le jeu (${causeLabels[cause]})`,metadata:{cause,automatic:true}});
-  this.deps.runChanged(lobbyId,lost);
   const next=runs.create(lobbyId,accountId,{start:true});
   audit.record({lobbyId,targetAccountId:accountId,runId:next.id,category:'RUN',action:'run.create',status:'SUCCESS',message:`Run #${next.number} de ${who} lancée automatiquement après la défaite`});
-  this.deps.runChanged(lobbyId,next);
+  this.deps.changed(lobbyId);
   this.deps.notify(lobbyId,{kind:'warning',message:`💀 ${who} a perdu sa Run #${lost.number} : le jeu redémarre, Run #${next.number} lancée`});
   // A few seconds so the player sees the defeat in the game before it reboots.
-  setTimeout(()=>void this.reset(lobbyId,accountId,lost,next).catch(error=>console.error('Run reset:',error)),this.deps.resetDelayMs??4000);
+  // The Run events (passives « Run perdue », « Deuxième souffle »…) wait for the reset: a reward written now would
+  // land in the game about to be erased; once reset, it stays pending until the new game can be read.
+  setTimeout(()=>void this.reset(lobbyId,accountId,lost,next).catch(error=>console.error('Run reset:',error))
+   .finally(()=>{this.deps.runChanged(lobbyId,lost);this.deps.runChanged(lobbyId,next);}),this.deps.resetDelayMs??4000);
  }
 
  private async reset(lobbyId:string,accountId:string,lost:Run,next:Run){
