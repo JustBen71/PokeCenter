@@ -4,7 +4,7 @@
 
 ## Types de roue
 
-Un admin crée, modifie et supprime des roues (tables `wheel_types` et `wheel_gages`). Champs : `name`, `description`, `price`, `icon` (un des dix tickets locaux), `tone` (`GOOD`, `BAD` ou `NEUTRAL`), `enabled` et la liste des gages. Les gages ont le même poids par défaut ; un poids de 1 à 100 permet d'ajuster leurs chances. Chaque lobby reçoit deux roues d'exemple, « Bonne étoile » et « Coup bas ».
+Un admin crée, modifie et supprime des roues (tables `wheel_types` et `wheel_gages`). Champs : `name`, `description`, `price`, `icon` (un des dix tickets locaux), `tone` (`GOOD`, `BAD` ou `NEUTRAL`), `enabled` (utilisable), `forSale` (vendue dans la boutique ; une roue hors boutique reste lançable par l'admin, la roue automatique et les passifs) et la liste des gages. Les gages ont le même poids par défaut ; un poids de 1 à 100 permet d'ajuster leurs chances. Chaque lobby reçoit deux roues d'exemple, « Bonne étoile » et « Coup bas ».
 
 La suppression est logique : les tirages passés gardent leur propre copie du gage, si bien que modifier ou supprimer une roue ne change jamais un résultat déjà tiré.
 
@@ -57,6 +57,12 @@ Routes :
 - `POST …/wheel-resolutions/:id/close` : `{status: SUCCESS|FAILED, note?}`.
 
 Statut : `FAKE_GAME_VERIFIED` (`wheels.test.ts`).
+
+## Lancer à tous et roue automatique
+
+- **Lancer à tous** (`POST /api/lobbies/:id/wheels/:wheelId/spin-all`, admin) : un tirage par joueur ayant une Run en cours (l'admin sans Run n'en reçoit pas). Le joueur est le bénéficiaire ; pour une roue hostile, il en est aussi la cible. Les tirages sont espacés de 7 s pour que chaque animation soit vue ; un gage immédiat est appliqué par le lanceur, un gage à choix attend dans « Derniers tirages ».
+- **Roue automatique** (`PUT /api/lobbies/:id/wheels-auto` `{wheelId, everyMinutes}`, admin ; 0 = arrêtée) : toutes les N minutes, la roue choisie est lancée à tous, appliquée au nom du créateur du lobby. Le décompte part de l'enregistrement ; le serveur vérifie toutes les 30 s et note l'heure du dernier lancement (`auto_wheels`), donc un redémarrage ne relance pas deux fois la même période.
+- Les attaques entre joueurs (tickets hostiles achetés en boutique) se résolvent toujours dans **Gestion → Roues en attente**, dans l'ordre de réception.
 
 ## Boutique, tickets et protections (Sprint 8)
 
