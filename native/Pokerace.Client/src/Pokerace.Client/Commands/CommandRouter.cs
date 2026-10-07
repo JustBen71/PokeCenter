@@ -62,6 +62,11 @@ public sealed class CommandRouter(IBridgeClient bridge, ClientConfiguration conf
             if (!configuration.AllowPokemonPurchases || battles == null) throw new ClientException("writes_disabled", "Game writes disabled locally.");
             return await Pokerace.Client.Games.Pokemon.Gen3.Gen3BattleEncounter.StartAsync(bridge, romIdentity, command.Payload, battles, cancellation);
         }
+        if (command.Command is Pokerace.Client.Games.Pokemon.Gen3.Gen3Items.AddCommand or Pokerace.Client.Games.Pokemon.Gen3.Gen3Items.TakeCommand)
+        {
+            if (!configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Game writes disabled locally.");
+            return await Pokerace.Client.Games.Pokemon.Gen3.Gen3Items.ExecuteAsync(command.Command, bridge, romIdentity, command.Payload, cancellation);
+        }
         if (command.Command is Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.BoxCommand or Pokerace.Client.Games.Pokemon.Gen3.Gen3Defeat.ResetCommand)
         {
             if (!configuration.AllowPokemonPurchases) throw new ClientException("writes_disabled", "Game writes disabled locally.");

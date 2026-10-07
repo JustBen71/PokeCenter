@@ -15,7 +15,7 @@ export type GameCommandOutcome={commandId:string;status:'COMPLETED'|'FAILED'|'RE
 // Client refusals emitted before anything is written: the game is known to be unchanged.
 const REFUSED=new Set(['state_changed','invalid_payload','invalid_pokemon','invalid_slot','invalid_money','party_full','last_pokemon','insufficient_money','money_overflow',
  'writes_disabled','profile_read_only','write_unavailable','purchase_unavailable','unknown_command','command_id_reused','command_cache_full','invalid_command','invalid_command_id','protocol_mismatch','bridge_disconnected','invalid_purchase',
- 'not_safe','battle_busy','battle_unavailable','invalid_battle','party_fainted','box_full','box_unavailable','reset_unavailable','archive_failed']);
+ 'not_safe','battle_busy','battle_unavailable','invalid_battle','party_fainted','box_full','box_unavailable','reset_unavailable','archive_failed','invalid_item','bag_full','bag_empty']);
 const domainCode:Record<string,ErrorCode>={state_changed:'GAME_STATE_CHANGED',party_full:'PARTY_FULL',last_pokemon:'LAST_POKEMON',insufficient_money:'INSUFFICIENT_FUNDS',
  writes_disabled:'WRITES_DISABLED',profile_read_only:'WRITES_DISABLED',invalid_pokemon:'INVALID_POKEMON',bridge_disconnected:'GAME_NOT_CONNECTED'};
 const messages:Partial<Record<ErrorCode,string>>={

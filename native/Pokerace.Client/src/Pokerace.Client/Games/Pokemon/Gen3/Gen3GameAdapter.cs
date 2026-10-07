@@ -7,7 +7,7 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
     Runtime.GameEventOutbox? outbox = null) : IGameAdapter
 {
     public static readonly string[] ReadCapabilities = ["trainer.read", "money.read", "party.read", "location.read", "progression.read"];
-    public static readonly string[] WriteCapabilities = ["money.write", "party.write", "pokemon.insert", "pokemon.remove", "pokemon.replace"];
+    public static readonly string[] WriteCapabilities = ["money.write", "party.write", "pokemon.insert", "pokemon.remove", "pokemon.replace", Gen3Items.Capability];
     // Writes are announced only for a write-validated profile, a transactional bridge and local consent.
     private readonly string[] capabilities = writesEnabled && profile.AllowWrites && bridge is ITransactionalBridge
         ? ReadCapabilities.Concat(WriteCapabilities).Concat(profile.Battle != null && battles != null ? [Gen3BattleEncounter.Capability] : [])

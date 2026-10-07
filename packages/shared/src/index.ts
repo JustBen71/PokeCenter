@@ -18,6 +18,7 @@ export * from './shop.js';
 export * from './passives.js';
 export * from './battles.js';
 export * from './battle-board.js';
+export {gen3Items} from './items-gen3.js';
 export {speciesInternal} from './species-internal.js';
 export {characters} from './pokemon-characters.js';
 import { z } from "zod";

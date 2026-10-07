@@ -56,5 +56,10 @@
       "pokemonStoragePointer": "IWRAM pointer next to gSaveBlock2Ptr; currentBox at +0, 14 x 30 BoxPokemon (80 bytes) at +4 (struct PokemonStorage); moves with the save blocks on map loads",
       "boxDeposit": "first 80 bytes of the party struct copied verbatim (same personality/OT id: encryption and checksum stay valid), party compacted, gPlayerPartyCount - 1 (as the PC deposit)"
     }
+  },
+  "bag": {
+    "status": "write-validated",
+    "validatedOn": "2026-10-07, BizHawk 2.11.1 Linux, BPEF v0: Potion ×3, Master Ball, TM01 and Cheri Berry ×2 written by the client appeared in the right bag pockets with the right quantities",
+    "evidence": "struct SaveBlock1 (pret/pokeemerald include/global.h): bagPocket_Items 0x560 ×30, KeyItems 0x5D8 ×30, PokeBalls 0x650 ×16, TMHM 0x690 ×64, Berries 0x790 ×46; ItemSlot {u16 itemId; u16 quantity ^ (u16)SaveBlock2.encryptionKey} (src/item.c GetBagItemQuantity); empty slot = item 0, quantity 0 ^ key (ClearItemSlots)"
   }
 }

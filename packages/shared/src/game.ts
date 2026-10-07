@@ -6,7 +6,7 @@ import type {Run} from './run.js';
 export const gameCapabilitySchema=z.enum([
  'trainer.read','money.read','money.write','party.read','party.write',
  'pokemon.insert','pokemon.remove','pokemon.replace','location.read','progression.read',
- 'battle.trainer.start','party.box_fainted','game.reset'
+ 'battle.trainer.start','party.box_fainted','game.reset','items.write'
 ]);
 export type GameCapability=z.infer<typeof gameCapabilitySchema>;
 
