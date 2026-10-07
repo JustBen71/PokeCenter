@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
@@ -6,8 +7,15 @@ namespace Pokerace.BizHawkBridge.Core;
 
 public sealed class BridgeService
 {
+    // Lost games kept on disk (savestate + in-game save) before an automatic reset; the oldest are deleted.
+    public const int KeptLostGames = 3;
     private readonly IEmulatorHost host;
-    public BridgeService(IEmulatorHost host) => this.host = host;
+    private readonly string lostGamesDirectory;
+    public BridgeService(IEmulatorHost host, string? lostGamesDirectory = null)
+    {
+        this.host = host;
+        this.lostGamesDirectory = lostGamesDirectory ?? Path.Combine(Environment.CurrentDirectory, "PokeraceLostGames");
+    }
 
     public JObject Execute(JObject request)
     {
@@ -55,10 +63,7 @@ public sealed class BridgeService
                 }
                 case "compareWrite":
                 {
-                    RequireGame();
-                    var info = host.GetGameInfo();
-                    if (host.SystemId != "GBA" || info == null || !string.Equals((string?)JObject.FromObject(info)["hash"], Protocol.Text(request, "gameHash"), StringComparison.OrdinalIgnoreCase))
-                        throw new BridgeException("state_changed", "Loaded game changed.");
+                    RequireSameGame(request);
                     var edits = request["edits"] as JArray;
                     if (edits == null || edits.Count < 1 || edits.Count > 12) throw new BridgeException("invalid_data", "Invalid transaction.");
                     var operations = edits.Select(node => {
@@ -93,6 +98,21 @@ public sealed class BridgeService
                     }
                     result = new { verified = true }; break;
                 }
+                case "resetGame":
+                {
+                    // Archive first: if the savestate or the save copy fails, nothing is erased.
+                    RequireSameGame(request);
+                    var folder = Path.Combine(lostGamesDirectory, DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff'Z'"));
+                    Directory.CreateDirectory(folder);
+                    try { host.ArchiveGame(folder); }
+                    catch (Exception) { try { Directory.Delete(folder, true); } catch (Exception) { } throw new BridgeException("archive_failed", "The game could not be archived; nothing was erased."); }
+                    foreach (var old in Directory.GetDirectories(lostGamesDirectory).OrderByDescending(d => Path.GetFileName(d), StringComparer.Ordinal).Skip(KeptLostGames))
+                        try { Directory.Delete(old, true); } catch (Exception) { }
+                    try { host.EraseSaveAndReboot(); }
+                    catch (Exception) { throw new BridgeException("reset_failed", "Game archived but the reset failed; inspect the emulator."); }
+                    result = new { archive = Path.GetFileName(folder), kept = KeptLostGames };
+                    break;
+                }
                 default: throw new BridgeException("unknown_command", "Unknown request type.");
             }
             return Protocol.Ok(id, result);
@@ -104,6 +124,13 @@ public sealed class BridgeService
     private void RequireGame()
     {
         if (!host.IsGameLoaded) throw new BridgeException("no_game", "No game is loaded.");
+    }
+    private void RequireSameGame(JObject request)
+    {
+        RequireGame();
+        var info = host.GetGameInfo();
+        if (host.SystemId != "GBA" || info == null || !string.Equals((string?)JObject.FromObject(info)["hash"], Protocol.Text(request, "gameHash"), StringComparison.OrdinalIgnoreCase))
+            throw new BridgeException("state_changed", "Loaded game changed.");
     }
     private IMemoryDomainAdapter Domain(JObject request)
     {

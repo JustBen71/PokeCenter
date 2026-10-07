@@ -71,6 +71,8 @@ Réponse : `{"id":"1","ok":true,"type":"hello","protocolVersion":1}`. Un handsha
 | `listMemoryDomains` | — | `domains: [{name, size, writable}]` |
 | `readMemory` | `domain`, `address`, `length` | `data` hex minuscule |
 | `writeMemory` | `domain`, `address`, `data` | `written`, `verified: true` |
+| `compareWrite` | `gameHash`, `edits: [{domain, address, expected, data}]` (1 à 12, GBA) | `verified: true` ; `state_changed` si un octet attendu diffère, rien n'est écrit |
+| `resetGame` | `gameHash` (GBA) | `archive` (nom du dossier), `kept: 3` |
 
 Les adresses sur le fil sont des entiers JSON décimaux de 64 bits. Le CLI accepte aussi `0x...`. Les domaines proviennent du core actif, y compris leur taille et leur indicateur d'écriture. Aucun domaine/adresse n'est deviné. Sans jeu, les commandes mémoire retournent `no_game`. Un core sans service mémoire retourne une liste vide. Pause/reprise ne font pas partie de cette version.
 
@@ -89,7 +91,9 @@ Limites : un client actif, requête de 65 536 octets maximum avant le saut de li
 {"id":"4","ok":false,"error":{"code":"invalid_range","message":"Range is outside the domain or exceeds 4096 bytes."}}
 ```
 
-Autres codes : `invalid_json`, `invalid_request`, `invalid_data`, `invalid_utf8`, `truncated_request`, `request_too_large`, `handshake_required`, `unauthorized`, `protocol_mismatch`, `unknown_command`, `unknown_domain`, `read_only`, `no_game`, `write_failed`, `verification_failed`, `host_error`, `timeout`, `internal_error`.
+`resetGame` termine une partie perdue : il écrit d'abord `game.State` (savestate) et `game.SaveRAM` (copie de la sauvegarde du jeu) dans `POKERACE_LOST_GAMES_DIR/<horodatage UTC>/` (par défaut `PokeraceLostGames` dans le dossier de BizHawk), ne garde que les 3 dernières archives, puis efface la mémoire de la cartouche (0xFF, l'horloge temps réel ajoutée par mGBA est conservée) et redémarre le core : le jeu ne propose plus que « Nouvelle partie ». Si l'archive échoue (`archive_failed`), rien n'est effacé. Pour reprendre une partie archivée : BizHawk fermé, copier `game.SaveRAM` sur `GBA/SaveRAM/<nom de la ROM>.SaveRAM`, ou charger `game.State` (Fichier → Charger l'état).
+
+Autres codes : `archive_failed`, `reset_failed`, `state_changed`, `invalid_json`, `invalid_request`, `invalid_data`, `invalid_utf8`, `truncated_request`, `request_too_large`, `handshake_required`, `unauthorized`, `protocol_mismatch`, `unknown_command`, `unknown_domain`, `read_only`, `no_game`, `write_failed`, `verification_failed`, `host_error`, `timeout`, `internal_error`.
 
 Chaque écriture valide la plage avant mutation puis relit immédiatement les octets sur le même thread que l'émulateur. `verified: true` signifie que cette comparaison immédiate a réussi. Une erreur n'annule pas les octets déjà écrits ; la réponse le précise. La mémoire peut évoluer ensuite. Les opérations sont bornées mais un core qui bloque dans son API ne peut pas être interrompu sans risque.
 

@@ -26,8 +26,16 @@ public sealed class FakeEmulatorHost : IEmulatorHost
     public bool IsGameLoaded { get; set; } = true;
     public string? SystemId { get; set; } = "TEST";
     public List<IMemoryDomainAdapter> Domains { get; } = new List<IMemoryDomainAdapter> { new FakeMemoryDomain() };
-    public object? GetGameInfo() => IsGameLoaded ? new { name = "Fixture", systemId = SystemId } : null;
+    public object? GetGameInfo() => IsGameLoaded ? new { name = "Fixture", systemId = SystemId, hash = "ABC123" } : null;
     public IReadOnlyList<IMemoryDomainAdapter> GetMemoryDomains() => Domains;
+    public bool FailArchive { get; set; }
+    public int Resets { get; private set; }
+    public void ArchiveGame(string directory)
+    {
+        if (FailArchive) throw new IOException();
+        File.WriteAllText(Path.Combine(directory, "game.SaveRAM"), "save");
+    }
+    public void EraseSaveAndReboot() => Resets++;
 }
 
 public sealed class ImmediateDispatcher : IEmulatorDispatcher

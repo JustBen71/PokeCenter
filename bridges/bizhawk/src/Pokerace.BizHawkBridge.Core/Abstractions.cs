@@ -21,6 +21,10 @@ public interface IEmulatorHost
     string? SystemId { get; }
     object? GetGameInfo();
     IReadOnlyList<IMemoryDomainAdapter> GetMemoryDomains();
+    /// <summary>Writes a savestate and a copy of the in-game save into <paramref name="directory"/>; throws if either fails.</summary>
+    void ArchiveGame(string directory);
+    /// <summary>Erases the in-game save and reboots the core: the game starts with no save.</summary>
+    void EraseSaveAndReboot();
 }
 
 public interface IEmulatorDispatcher

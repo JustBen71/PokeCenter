@@ -18,6 +18,7 @@ public sealed class BridgeForm : Form, IExternalToolForm
     public ApiContainer? APIs { get; set; }
     [OptionalService] public IMemoryDomains? MemoryDomains { get; set; }
     [RequiredService] public IEmulator Emulator { get; set; } = null!;
+    [OptionalService] public ISaveRam? SaveRam { get; set; }
     private TcpBridgeServer? server;
     private readonly Label status = new Label { Dock = DockStyle.Fill, AutoSize = false };
     public BridgeForm()
@@ -36,7 +37,7 @@ public sealed class BridgeForm : Form, IExternalToolForm
             var token = Environment.GetEnvironmentVariable("POKERACE_BRIDGE_TOKEN") ?? "";
             var rawPort = Environment.GetEnvironmentVariable("POKERACE_BRIDGE_PORT") ?? "43821";
             if (!int.TryParse(rawPort, out var port) || port < 1 || port > 65535) throw new ArgumentException("Invalid port.");
-            server = new TcpBridgeServer(port, token, new BridgeService(new BizHawkHostAdapter(this)), new FormDispatcher(this), log: Log);
+            server = new TcpBridgeServer(port, token, new BridgeService(new BizHawkHostAdapter(this), Environment.GetEnvironmentVariable("POKERACE_LOST_GAMES_DIR")), new FormDispatcher(this), log: Log);
             server.Start();
             status.Text = "Bridge actif sur 127.0.0.1:" + server.Port + "\nProtocole 1 — authentification requise.";
         }
@@ -82,6 +83,25 @@ internal sealed class BizHawkHostAdapter : IEmulatorHost
     public IReadOnlyList<IMemoryDomainAdapter> GetMemoryDomains() => form.MemoryDomains == null
         ? Array.Empty<IMemoryDomainAdapter>()
         : form.MemoryDomains.Select(d => (IMemoryDomainAdapter)new DomainAdapter(d)).ToArray();
+    public void ArchiveGame(string directory)
+    {
+        var save = form.SaveRam?.CloneSaveRam() ?? throw new InvalidOperationException("No in-game save.");
+        File.WriteAllBytes(Path.Combine(directory, "game.SaveRAM"), save);
+        var state = Path.Combine(directory, "game.State");
+        form.APIs!.SaveState.Save(state, true);
+        if (!File.Exists(state)) throw new InvalidOperationException("Savestate not written.");
+    }
+    public void EraseSaveAndReboot()
+    {
+        // Erased flash reads 0xFF: the game sees no save. Only the cartridge memory (largest power of two) is erased:
+        // mGBA appends the real-time clock after it (16 bytes for Emerald), wiping it shows "internal battery dry".
+        // The reboot flushes this save to disk, then reloads it.
+        var save = form.SaveRam?.CloneSaveRam() ?? throw new InvalidOperationException("No in-game save.");
+        var cartridge = 1; while (cartridge * 2 <= save.Length) cartridge *= 2;
+        for (var i = 0; i < cartridge; i++) save[i] = 0xFF;
+        form.SaveRam.StoreSaveRam(save);
+        form.APIs!.EmuClient.RebootCore();
+    }
     private sealed class DomainAdapter : IMemoryDomainAdapter
     {
         private readonly MemoryDomain domain;
