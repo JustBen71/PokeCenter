@@ -68,6 +68,10 @@ test('P1 · sélection initiale : trois cartes privées, choix, départ, badge s
 });
 
 test('P2 · roue bienveillante PASSIVE_GRANT_RARITY(LEGENDARY) : animation, légendaire attribué, badge sous l’équipe',async()=>{
+ // Tom's initial pick (P1, random cards) may already be legendary: the wheel adds one more.
+ const legendaries=async()=>{const s=await call(ids.admin,'GET',`/api/lobbies/${ids.lobby}/passives`);
+  return (s.owned as {accountId:string;passiveId:string}[]).filter(o=>o.accountId===ids.tom&&s.catalog.find((c:{id:string;rarity:string})=>c.id===o.passiveId)?.rarity==='LEGENDARY').length;};
+ const before=await legendaries();
  await call(ids.admin,'POST',`/api/lobbies/${ids.lobby}/wheels`,{name:'Roue divine',price:0,icon:'green-5',tone:'GOOD',gages:[{name:'Passif légendaire',handler:'PASSIVE_GRANT_RARITY',params:{rarity:'LEGENDARY'}}]});
  const {page}=admin;
  await page.goto('/#/roues');
@@ -79,7 +83,7 @@ test('P2 · roue bienveillante PASSIVE_GRANT_RARITY(LEGENDARY) : animation, lég
  await expect(page.locator('.wheel-result .outcome')).toContainText(/Tom obtient le passif « .+ » \(Légendaire\)/,{timeout:15000});
  await page.locator('.wheel-result > .btn').click();await expect(page.locator('.wheel-overlay')).toHaveCount(0);
  await lea.page.goto('/#/course');
- await expect(card(lea.page,'Tom').locator('.passive-badge.legendary')).toBeVisible();
+ await expect(card(lea.page,'Tom').locator('.passive-badge.legendary')).toHaveCount(before+1);
 });
 
 test('P3 · roue PASSIVE_STEAL : cible, choix du passif, transfert, badges des deux joueurs changés en direct',async()=>{
