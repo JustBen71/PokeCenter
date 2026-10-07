@@ -86,7 +86,7 @@ function Portal(){
   {sheet&&pokemon&&<PokemonSheet pokemon={pokemon} owner={sheet.row.name} onClose={()=>setSheet(null)} actions={account.admin?[
    {label:'Sauvegarder dans la bibliothèque',icon:<Save size={15}/>,disabled:!pokemon.raw,title:pokemon.raw?undefined:nativeActionUnavailable,
     onClick:()=>{setCapture({pokemon:structuredClone(pokemon),source:sheet.row.name,capturedAt:sheetView?.display.state.observedAt??new Date().toISOString()});setSheet(null);window.location.hash='/bibliotheque';}},
-   {label:'Plus un Pokémon d’échange',icon:<Handshake size={15}/>,disabled:busy||!pokemon.raw||!nativeReplace||(sheetView?.display.state.party.length??0)<2,
+   {label:'Plus un Pokémon d’échange',icon:<Handshake size={15}/>,disabled:busy||!pokemon.raw||!nativeReplace,
     title:nativeReplace?'Il prend l’ID Dresseur du joueur et obéit (peut changer son chromatisme)':'Le jeu de ce joueur ne permet pas cette écriture',onClick:()=>void adoptPokemon()},
    {label:'Retirer de l’équipe',icon:<Trash2 size={15}/>,danger:true,disabled:busy||!pokemon.raw||!(nativeRemove||sheetView?.legacyActionsAvailable)||(sheetView?.display.state.party.length??0)<2,
     title:nativeRemove||sheetView?.legacyActionsAvailable?undefined:'Le jeu de ce joueur ne permet pas cette écriture',onClick:()=>void removePokemon()}

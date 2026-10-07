@@ -68,7 +68,7 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
         var battle = capabilities.Contains(Gen3BattleEncounter.Capability) ? await Gen3BattleEncounter.TrackAsync(bridge, profile, profile.Battle!, battles!, cancellation) : null;
         var adapter = new GameAdapterState("pokemon.emerald.gen3", "ready", profile.ProfileId, capabilities);
         return new(GameObservation.GameStateVersion, adapter, new("pokemon", 3, "emerald", profile.Language, profile.Revision),
-            new(name, money, hours * 3600 + trainer[16] * 60 + trainer[17], count),
+            new(name, money, hours * 3600 + trainer[16] * 60 + trainer[17], count, Convert.ToHexString([.. trainer.AsSpan(0x0A, 4), .. trainer.AsSpan(0, 7)]).ToLowerInvariant()),
             new(location[0], location[1], data["maps"]![profile.Language]![$"{location[0]}:{location[1]}"]?.GetValue<string>() ?? $"Zone inconnue ({location[0]}:{location[1]})"),
             party, new(1, completed), capabilities, DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"), battle);
     }

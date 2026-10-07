@@ -66,12 +66,12 @@ export function withNature(raw:string,nature:number,stats:PokemonInjection['stat
 }
 
 /**
- * Same Pokémon, original trainer of `trainerRaw` (ID, secret ID, OT name): the game no longer sees it as traded,
- * so it obeys whatever the badges. Everything else stays; shininess may change (it depends on the trainer ID).
+ * Same Pokémon, original trainer `ot` (save's trainer ID 4 bytes + player name 7 bytes, hex): the game no longer
+ * sees it as traded, so it obeys whatever the badges. Everything else stays; shininess may change (it depends on the ID).
  */
-export function withTrainer(raw:string,trainerRaw:string):string{
- const from=Uint8Array.from(trainerRaw.match(/../g)!,v=>parseInt(v,16));
- return rewrite(raw,({bytes})=>{bytes.set(from.subarray(4,8),4);bytes.set(from.subarray(20,27),20);});
+export function withTrainer(raw:string,ot:string):string{
+ const from=Uint8Array.from(ot.match(/../g)!,v=>parseInt(v,16));
+ return rewrite(raw,({bytes})=>{bytes.set(from.subarray(0,4),4);bytes.set(from.subarray(4,11),20);});
 }
 
 const ivNames=['hp','attack','defense','speed','spAttack','spDefense'] as const;

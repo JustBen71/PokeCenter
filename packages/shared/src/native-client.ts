@@ -47,7 +47,8 @@ export const nativeGameStateSchema=z.object({
  gameStateVersion:z.literal(2),
  adapter:adapterSchema.refine(a=>a.status==='ready'&&a.id!==null&&a.profileId!==null),
  game:gameIdentitySchema,
- trainer:z.object({name:z.string().min(1).max(20),money:integer(9999999),playTimeSeconds:integer(35999999),partyCount:integer(6)}).strict(),
+ // ot (Gen III, client ≥ 0.2.2): the save's trainer ID then the player name, as a Pokémon of his own carries them (hex).
+ trainer:z.object({name:z.string().min(1).max(20),money:integer(9999999),playTimeSeconds:integer(35999999),partyCount:integer(6),ot:z.string().regex(/^[a-f0-9]{22}$/).optional()}).strict(),
  location:locationSchema,
  party:z.array(pokemonLiveStateSchema).max(6),
  progression:progressionSchema,

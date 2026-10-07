@@ -4,7 +4,9 @@ import {decodePokemonCopy,encodePokemon,nationalSpecies,type GameEventKind,type 
 
 export type FakeMode='apply'|'timeout'|'ack-lost'|{refuse:string};
 type Command={commandId:string;command:string;payload:Record<string,any>};
-type ConnectOptions={base:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number;
+type ConnectOptions={base:string;
+ // Save's trainer ID + player name (hex, client ≥ 0.2.2); absent for older clients.
+ ot?:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number;
  // Game-event capabilities announced by this fake adapter (none by default, like the real Gen III adapter).
  events?:string[];
  // Commanded battles (battle.trainer.start), as the Gen III adapter with a battle profile.
@@ -57,7 +59,7 @@ export class FakeGameClient{
    ...(this.options.defeats&&this.writes?['events.player_defeated','party.box_fainted','game.reset']:[])];
   const adapter={id:'pokemon.emerald.gen3',status:'ready' as const,profileId:'emerald-fr-bpef-v0',capabilities};
   return {gameStateVersion:2,adapter,game:{family:'pokemon',generation:3,title:'emerald',language:'fr',revision:'BPEF v0'},
-   trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length},location:{...this.location},
+   trainer:{name:'FAKE',money:this.money,playTimeSeconds:60,partyCount:this.party.length,...(this.options.ot?{ot:this.options.ot}:{})},location:{...this.location},
    party:this.party.map((raw,i)=>{const p=decodePokemonCopy(raw);
     return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:nationalSpecies.get(p.internalSpecies)??1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
    progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString(),

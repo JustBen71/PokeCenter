@@ -23,22 +23,17 @@ export class PokemonService{
   return this.execute(lobbyId,accountId,actor,action,raw);
  }
 
- /**
-  * The slot rewritten with the player's own trainer, so the game no longer treats it as traded (it obeys).
-  * The player's trainer is the one most of the other team members carry (the game never sends the save's ID).
-  */
+ /** The slot rewritten with the trainer of the save (ID + name): the game no longer treats it as traded, it obeys. */
  private adopted(lobbyId:string,accountId:string,slot:number){
   const {state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:['pokemon.replace']});
-  const raws=new Map(state.party.map(p=>[p.slot,gen3PartyRaw(p)]));
-  const raw=raws.get(slot);
-  if(!raw)throw new DomainError(raws.has(slot)?'CAPABILITY_MISSING':'VALIDATION_FAILED',raws.has(slot)?'Le client n’envoie pas la copie exacte de ce Pokémon':'Cet emplacement est vide');
-  const trainer=(r:string)=>r.slice(8,16)+r.slice(40,54);// ID + secret ID, OT name
-  const mine=trainer(raw),votes=new Map<string,{raw:string;n:number}>();
-  for(const [s,r] of raws)if(s!==slot&&r){const t=trainer(r),v=votes.get(t);votes.set(t,{raw:r,n:(v?.n??0)+1});}
-  const best=[...votes.entries()].sort((a,b)=>b[1].n-a[1].n)[0];
-  if(!best)throw new DomainError('VALIDATION_FAILED','Impossible de connaître le dresseur du joueur : il faut un autre Pokémon à lui dans l’équipe');
-  if(best[0]===mine)throw new DomainError('CONFLICT',`${decodePokemonCopy(raw).nickname} appartient déjà au dresseur du joueur`);
-  return withTrainer(raw,best[1].raw);
+  const pokemon=state.party.find(p=>p.slot===slot),raw=gen3PartyRaw(pokemon);
+  if(!pokemon)throw new DomainError('VALIDATION_FAILED','Cet emplacement est vide');
+  if(!raw)throw new DomainError('CAPABILITY_MISSING','Le client n’envoie pas la copie exacte de ce Pokémon');
+  // Only the save knows the player's trainer ID (his team may hold received Pokémon only).
+  const ot=state.trainer.ot;
+  if(!ot)throw new DomainError('CAPABILITY_MISSING','Le client du joueur ne lit pas encore son ID Dresseur : mettez-le à jour (0.2.2 ou plus)');
+  if(raw.slice(8,16)+raw.slice(40,54)===ot)throw new DomainError('CONFLICT',`${decodePokemonCopy(raw).nickname} appartient déjà au dresseur du joueur`);
+  return withTrainer(raw,ot);
  }
 
  /** Inserts an exact Gen III copy kept by the server (Âme liée), with the same safety rules as the library. */
