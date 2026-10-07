@@ -23,7 +23,9 @@ function rewrite(raw:string,edit:(b:Blocks)=>number|void):string{
  for(const c of 'GAEM')for(let i=0;i<12;i++)out.setUint8(at(next,c)+i,plain.getUint8(at(pid,c)+i));
  let sum=0;for(let i=0;i<24;i++)sum=(sum+out.getUint16(i*2,true))&0xFFFF;
  view.setUint32(0,next,true);view.setUint16(28,sum,true);
- for(let i=0;i<12;i++)view.setUint32(32+i*4,(out.getUint32(i*4,true)^next^ot)>>>0,true);
+ // `edit` may also change the trainer (withTrainer): encrypt with the key as it is now.
+ const key=(next^view.getUint32(4,true))>>>0;
+ for(let i=0;i<12;i++)view.setUint32(32+i*4,(out.getUint32(i*4,true)^key)>>>0,true);
  const result=hex(bytes);decodePokemonCopy(result);// must still be a valid copy
  return result;
 }
@@ -61,6 +63,15 @@ export function withNature(raw:string,nature:number,stats:PokemonInjection['stat
   }
   throw new Error('Aucune personnalité possible pour cette nature');
  });
+}
+
+/**
+ * Same Pokémon, original trainer of `trainerRaw` (ID, secret ID, OT name): the game no longer sees it as traded,
+ * so it obeys whatever the badges. Everything else stays; shininess may change (it depends on the trainer ID).
+ */
+export function withTrainer(raw:string,trainerRaw:string):string{
+ const from=Uint8Array.from(trainerRaw.match(/../g)!,v=>parseInt(v,16));
+ return rewrite(raw,({bytes})=>{bytes.set(from.subarray(4,8),4);bytes.set(from.subarray(20,27),20);});
 }
 
 const ivNames=['hp','attack','defense','speed','spAttack','spDefense'] as const;

@@ -10,6 +10,8 @@ export type PokemonArtifactMeta={format:PokemonArtifactFormat;gameFamily:string;
 export const pokemonActionSchema=z.discriminatedUnion('action',[
  z.object({action:z.literal('insert'),artifactId:z.string().min(1).max(64),confirmOutOfBattle:z.boolean()}).strict(),
  z.object({action:z.literal('remove'),slot:z.number().int().min(1).max(6),confirmOutOfBattle:z.boolean()}).strict(),
- z.object({action:z.literal('replace'),slot:z.number().int().min(1).max(6),artifactId:z.string().min(1).max(64),confirmOutOfBattle:z.boolean()}).strict()
+ z.object({action:z.literal('replace'),slot:z.number().int().min(1).max(6),artifactId:z.string().min(1).max(64),confirmOutOfBattle:z.boolean()}).strict(),
+ // The Pokémon takes the player's own trainer: no longer « traded », it obeys.
+ z.object({action:z.literal('adopt'),slot:z.number().int().min(1).max(6),confirmOutOfBattle:z.boolean()}).strict()
 ]);
 export type PokemonAction=z.infer<typeof pokemonActionSchema>;
