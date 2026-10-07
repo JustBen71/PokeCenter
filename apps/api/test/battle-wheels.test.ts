@@ -58,3 +58,37 @@ test('wheel gage START_BATTLE: mirror for the beneficiary, chosen player, hostil
   assert.equal(((await as(admin.id).get(battles)).body.encounters as BattleEncounter[]).length,count,'no orphan battle');
  }finally{for(const c of closers)c();await p.close();}
 });
+
+test('START_BATTLE « équipe d’un joueur », the chosen player fights at the average ± N; choosing oneself = mirror',async()=>{
+ const p=await passivePortal();
+ const closers:(()=>void)[]=[];
+ try{
+  const {as,admin,ben,tim,lobby,base,portal}=p,path=`/api/lobbies/${lobby.id}`;
+  const benGame=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Ben',battles:true,party:[encodePokemon(template(4,10,'A')),encodePokemon(template(7,12,'B')),encodePokemon(template(1,14,'C'))]});closers.push(()=>benGame.close());
+  const timGame=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Tim',battles:true,party:[encodePokemon(template(25,30,'D')),encodePokemon(template(6,32,'E'))]});closers.push(()=>timGame.close());
+  await until(()=>!!portal.services.currentGame.resolve(lobby.id,ben.id).game.money&&!!portal.services.currentGame.resolve(lobby.id,tim.id).game.money,'games');
+  for(const id of [ben.id,tim.id])await as(admin.id).post(`${path}/runs`,{accountId:id,start:true});
+  const wheel=(await as(admin.id).post(`${path}/wheels`,{name:'Commandité',price:0,icon:'green-2',tone:'GOOD',
+   gages:[{name:'Combat commandité',handler:'START_BATTLE',params:{builder:'OTHER_PLAYER',fighter:'TARGET',scaling:{mode:'MATCH_PLAYER_AVERAGE',delta:1}}}]})).body as WheelType;
+  const play=async(targetId:string)=>{
+   const r=(await as(admin.id).post(`${path}/wheels/${wheel.id}/spin`,{ownerId:ben.id})).body as WheelResolution;
+   assert.equal(r.status,'AWAITING_CHOICE');
+   // Another player may not choose for Ben; Ben (not admin) chooses the target of his own draw.
+   assert.equal((await as(tim.id).post(`${path}/wheel-resolutions/${r.id}/apply`,{targetId})).body.error.code,'ADMIN_REQUIRED');
+   assert.equal((await as(ben.id).post(`${path}/wheel-resolutions/${r.id}/apply`,{targetId})).status,200);
+   const e=(await as(admin.id).get(`${path}/battles`)).body.encounters[0] as BattleEncounter;
+   p.store.db.prepare("UPDATE battle_encounters SET status='CANCELLED' WHERE id=?").run(e.id);
+   return e;
+  };
+  // Ben (avg 12) spins and picks Tim (avg 31): Tim fights Ben's team moved to 31 + 1.
+  const chosen=await play(tim.id);
+  assert.equal(chosen.accountId,tim.id);assert.equal(chosen.sourceLabel,'Ben');assert.deepEqual(chosen.party.map(m=>m.level),[30,32,34]);
+  // Ben picks himself: he fights a copy of his own team at 12 + 1.
+  const self=await play(ben.id);
+  assert.equal(self.accountId,ben.id);assert.equal(self.sourceLabel,'Miroir de Ben');assert.deepEqual(self.party.map(m=>m.level),[11,13,15]);
+  // A party change stays with the admin, even for the beneficiary.
+  const exile=(await as(admin.id).post(`${path}/wheels`,{name:'Exil',price:0,icon:'purple-2',tone:'GOOD',gages:[{name:'Exil',handler:'REMOVE_POKEMON',params:{selector:'random'}}]})).body as WheelType;
+  const r=(await as(admin.id).post(`${path}/wheels/${exile.id}/spin`,{ownerId:ben.id,targetId:tim.id})).body as WheelResolution;
+  assert.equal((await as(ben.id).post(`${path}/wheel-resolutions/${r.id}/apply`,{confirmOutOfBattle:true})).body.error.code,'ADMIN_REQUIRED');
+ }finally{for(const c of closers)c();await p.close();}
+});

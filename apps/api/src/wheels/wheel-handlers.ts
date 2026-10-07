@@ -135,7 +135,9 @@ export const wheelHandlers:Record<GageHandler,Handler>={
   const p=params(ctx,'START_BATTLE');
   const fighter=p.fighter==='TARGET'?needTarget(ctx):ctx.owner;
   const other=p.fighter==='TARGET'?ctx.owner:ctx.target;
-  const builder=p.builder==='OTHER_PLAYER'?{type:'OTHER_PLAYER' as const,opponentId:(other??needTarget(ctx)).id}:{type:p.builder as 'MIRROR'|'LEADER'};
+  // A player who chooses himself fights his own team (mirror): there is no « other » player then.
+  const opponent=p.builder==='OTHER_PLAYER'?(other??needTarget(ctx)):null;
+  const builder=opponent&&opponent.id!==fighter.id?{type:'OTHER_PLAYER' as const,opponentId:opponent.id}:p.builder==='LEADER'?{type:'LEADER' as const}:{type:'MIRROR' as const};
   const battle=ctx.services.battles.createFrom(ctx.lobbyId,{accountId:fighter.id,builder,scaling:p.scaling,trainer:p.spriteId?{spriteId:p.spriteId}:{}},ctx.actorId);
   return `Combat lancé : ${fighter.name} VS ${battle.trainer.name} (${battle.party.length} Pokémon, niv. ${battle.party.map(m=>m.level).join(' / ')}) — il démarre dès que ${fighter.name} est libre sur la carte`;
  },

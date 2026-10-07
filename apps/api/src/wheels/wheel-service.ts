@@ -202,6 +202,8 @@ export class WheelService{
  async apply(lobbyId:string,id:string,body:unknown,actor:Account):Promise<WheelResolution>{
   const choice=parseBody(applySchema,body);
   const before=this.resolution(lobbyId,id);
+  // The beneficiary chooses the target of his own draw; party changes (out-of-battle confirmation) stay with an admin.
+  if(!actor.admin&&(actor.id!==before.ownerId||PARTY_HANDLERS.includes(before.gage.handler)))throw new DomainError('ADMIN_REQUIRED','Ce gage est appliqué par un administrateur');
   if(before.options)throw new DomainError('CONFLICT',`En attente du choix de ${this.services.domain.accounts.get(before.chooserId??'')?.name??'joueur'} parmi ${before.options.length} gages`);
   const target=choice.targetId?this.member(lobbyId,choice.targetId,'La cible'):before.targetId?this.services.domain.accounts.get(before.targetId)!:null;
   if(before.gage.requiresTarget&&!target)throw new DomainError('VALIDATION_FAILED','Choisissez la cible du gage');

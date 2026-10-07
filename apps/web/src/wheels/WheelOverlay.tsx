@@ -58,6 +58,8 @@ export function WheelOverlay(){
  const canChoose=choosing&&(account.id===live.chooserId||account.admin);
  const choose=async(gageId:string)=>{setBusy(true);try{await api(`/api/lobbies/${lobby.id}/wheel-resolutions/${live.id}/choose`,{method:'POST',body:{gageId}});}catch(e){toast.error(e);}finally{setBusy(false);}};
  const needsConfirm=[...POKEMON_GAGES,'GIVE_LIBRARY_POKEMON'].includes(live.gage.handler);
+ // The player who drew it chooses the target himself; party changes and steals stay with the admin (same rule as the server).
+ const canApply=account.admin||(account.id===live.ownerId&&!needsConfirm&&!steal);
  const done=['SUCCESS','FAILED','REVIEW','BLOCKED'].includes(live.status);
  const translate=rolling?-(winner-Math.floor(VISIBLE/2))*ROW:0;
  return <div className="wheel-overlay" role="dialog" aria-modal="true" aria-label={`Roue ${live.wheelName}`}>
@@ -81,15 +83,15 @@ export function WheelOverlay(){
     {live.result&&live.status!=='BLOCKED'&&<p className={`outcome ${live.status.toLowerCase()}`}>{live.status==='SUCCESS'?'✔':live.status==='REVIEW'?'⚠':'✖'} {live.result}</p>}
     {choosing&&<div className="gage-choice"><p>{canChoose?'Choisis le gage qui s’applique :':`En attente du choix de ${name(live.chooserId)}…`}</p>
      {live.options!.map(g=><button key={g.id} className="btn" disabled={!canChoose||busy} onClick={()=>void choose(g.id)}><strong>{g.name}</strong><small>{g.description||gageHandlerInfo[g.handler]?.help}</small></button>)}</div>}
-    {!choosing&&account.admin&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
-     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL','START_BATTLE','POKEMON_TRANSFER'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
+    {!choosing&&canApply&&(live.status==='AWAITING_CHOICE'||live.status==='DRAWN')&&<form onSubmit={e=>{e.preventDefault();void apply();}}>
+     {live.gage.requiresTarget&&<label>Cible<select className="field" value={target} onChange={e=>{setTarget(e.target.value);setPassiveId('');}}><option value="">Choisir…</option>{members.filter(m=>m.id!==live.ownerId||!['STEAL_MONEY','PASSIVE_STEAL','POKEMON_TRANSFER'].includes(live.gage.handler)).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>}
      {steal&&target&&(stealable.length?<label>Passif à voler<select className="field" value={passiveId} onChange={e=>setPassiveId(e.target.value)}><option value="">Choisir…</option>{stealable.map(o=>{const d=definition(o.passiveId);return <option key={o.id} value={o.passiveId}>{d?.name??o.passiveId}</option>;})}</select></label>
       :<p className="muted">{name(target)} n’a aucun passif volable.</p>)}
      {party&&<label>Emplacement<select className="field" value={slot} onChange={e=>setSlot(Number(e.target.value))}><option value={0}>Choisir…</option>{[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}</select></label>}
      {needsConfirm&&<label className="check"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)}/>Le joueur n’est pas en combat</label>}
      <button className="btn primary" disabled={busy||(live.gage.requiresTarget&&!target)||(party&&!slot)||(needsConfirm&&!confirm)||(steal&&!passiveId)}>Appliquer</button>
     </form>}
-    {!account.admin&&!done&&<p className="muted">En attente de l’administrateur…</p>}
+    {!canApply&&!done&&<p className="muted">En attente de l’administrateur…</p>}
     {/* A refused gage stays pending: the admin may close and reopen or abandon it from the Roues page. */}
     <button className="btn" onClick={()=>setCurrent(null)}>{done||!account.admin?'Fermer':'Fermer (le gage reste en attente)'}</button>
    </section>}
