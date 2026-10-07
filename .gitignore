@@ -22,3 +22,4 @@ deploy/server/secrets/player-tokens.json
 .player-runtime/
 apps/web/e2e-results/
 apps/web/e2e-report/
+deploy/server/downloads/

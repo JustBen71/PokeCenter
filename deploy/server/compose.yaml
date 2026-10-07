@@ -34,6 +34,8 @@ services:
         condition: service_healthy
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Player launchers (Pokerace-vX.Y.Z-*), served at /downloads/.
+      - ./downloads:/srv/downloads:ro
       - caddy_data:/data
       - caddy_config:/config
 volumes:
