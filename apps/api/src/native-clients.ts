@@ -82,19 +82,27 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
    const current=state.bridge??state.hello;
    if(parsed.data.state&&(!current?.bridge.connected||!current.bridge.gameLoaded||!SYSTEMS_BY_GENERATION[parsed.data.state.game.generation]?.includes(current.system??''))){socket.disconnect(true);return;}
    state.game=parsed.data;state.lastSeenAt=new Date().toISOString();changed();
+   if(parsed.data.adapter.status==='ready')for(const event of waiting.splice(0))void handleEvent(event);
   });
+  // Events received while the game is not readable (just connected, read_error at the end of a battle…) wait for
+  // the next readable GAME_STATE: refusing them would drop a defeat for good. Bounded; lost with the connection,
+  // then re-sent by the client (not acknowledged).
+  const waiting:GameEvent[]=[];
+  const handleEvent=async(event:GameEvent)=>{
+   const reply=(ok:boolean,code?:string)=>socket.emit('GAME_EVENT_ACK',{type:'GAME_EVENT_ACK',protocolVersion:VERSION,eventId:event.eventId,ok,...(code?{error:{code}}:{})});
+   if(state.game?.adapter.status!=='ready'){if(waiting.length<50&&!waiting.some(e=>e.eventId===event.eventId))waiting.push(event);return;}
+   // Only an adapter that announces the matching validated capability may report this kind of event.
+   if(!state.game.adapter.capabilities.includes(gameEventKinds[event.kind].capability)){reply(false,'capability_missing');return;}
+   try{await onGameEvent(state.accountId,event);reply(true);}
+   catch{/* not acknowledged: the client keeps it and re-sends it later */}
+  };
   // A game event is acknowledged once processed (or permanently refused); without an ACK the client re-sends the
   // same eventId after reconnecting, and the server deduplicates it.
   socket.on('GAME_EVENT',async(value:unknown)=>{
    if(!state.ready||Buffer.byteLength(JSON.stringify(value)??'')>4096){socket.disconnect(true);return;}
    const parsed=gameEventSchema.safeParse(value);
    if(!parsed.success){socket.disconnect(true);return;}
-   const event=parsed.data as GameEvent;
-   const reply=(ok:boolean,code?:string)=>socket.emit('GAME_EVENT_ACK',{type:'GAME_EVENT_ACK',protocolVersion:VERSION,eventId:event.eventId,ok,...(code?{error:{code}}:{})});
-   // Only an adapter that announces the matching validated capability may report this kind of event.
-   if(!state.game?.adapter.capabilities.includes(gameEventKinds[event.kind].capability)){reply(false,'capability_missing');return;}
-   try{await onGameEvent(state.accountId,event);reply(true);}
-   catch{/* not acknowledged: the client keeps it and re-sends it later */}
+   await handleEvent(parsed.data as GameEvent);
   });
   socket.on('COMMAND_ACK',(value:unknown)=>{
    const parsed=ack.safeParse(value);if(!state.ready||!parsed.success)return;

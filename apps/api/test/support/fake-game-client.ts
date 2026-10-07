@@ -64,6 +64,8 @@ export class FakeGameClient{
    ...((this.options.battles||this.options.defeats)&&this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
  }
  publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});}
+ /** The client could not read the game this time (save blocks moving at the end of a battle…). */
+ unreadable(){this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:{id:'pokemon.emerald.gen3',status:'read_error',profileId:'emerald-fr-bpef-v0',capabilities:[]},state:null});}
  close(){this.socket.close();}
  /** Sends one GAME_EVENT and resolves with the server ACK (or null after the timeout, like a lost ACK). */
  gameEvent(kind:GameEventKind,data:Record<string,unknown>,eventId:string=randomUUID(),timeoutMs=1500):Promise<{eventId:string;ok:boolean;error?:{code:string}}|null>{

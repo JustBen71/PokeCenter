@@ -18,10 +18,24 @@ export class RunDefeatService{
  constructor(private readonly deps:{domain:PortalDomain;currentGame:CurrentGameService;commands:GameCommandService;
   changed:(lobbyId:string)=>void;runChanged:(lobbyId:string,run:Run)=>void;notify:(lobbyId:string,n:LobbyNotification)=>void;resetDelayMs?:number}){}
  private name(id:string){return this.deps.domain.accounts.get(id)?.name??id;}
+ /**
+  * After a defeat, the lost game stays « lost » until a new game is seen (reset done, or the player started one):
+  * the same fainted team must never end the next Run (client restarted, server restarted, reset failed).
+  * Read from the audit trail so it survives a server restart.
+  */
+ private awaitingNewGame(lobbyId:string,accountId:string){
+  const last=this.deps.domain.db.prepare(`SELECT action FROM audit_logs WHERE lobby_id=? AND target_account_id=? AND category='RUN'
+   AND action IN ('run.lost','run.new_game') ORDER BY timestamp DESC,rowid DESC LIMIT 1`).get(lobbyId,accountId) as {action:string}|undefined;
+  return last?.action==='run.lost';
+ }
 
  /** Called once per PLAYER_DEFEATED event (deduplicated by eventId before reaching here). */
  defeated(lobbyId:string,accountId:string,cause:Cause){
   const {runs,audit}=this.deps.domain,who=this.name(accountId),run=runs.running(lobbyId,accountId);
+  if(this.awaitingNewGame(lobbyId,accountId)){
+   audit.record({lobbyId,targetAccountId:accountId,category:'RUN',action:'run.defeat_ignored',status:'INFO',message:`Défaite de ${who} ignorée : c’est encore la partie déjà perdue (en attente d’une nouvelle partie)`,metadata:{cause}});
+   return;
+  }
   if(!run){
    audit.record({lobbyId,targetAccountId:accountId,category:'RUN',action:'run.defeat_ignored',status:'INFO',message:`Défaite de ${who} détectée dans le jeu (${causeLabels[cause]}) hors Run en cours : rien n’est changé`,metadata:{cause}});
    return;
@@ -60,6 +74,9 @@ export class RunDefeatService{
 
  /** Each observation: the fainted members of a party still standing go to the PC box (only on the overworld, during a Run). */
  async observe(lobbyId:string,accountId:string,state:NativeGameState){
+  // A new game: empty party (reset, new save) or a team standing again.
+  if((state.party.length===0||state.party.some(p=>p.currentHp>0))&&this.awaitingNewGame(lobbyId,accountId))
+   this.deps.domain.audit.record({lobbyId,targetAccountId:accountId,category:'RUN',action:'run.new_game',status:'INFO',message:`Partie de ${this.name(accountId)} de nouveau jouable (nouvelle partie ou équipe debout) : une défaite compte de nouveau`});
   const fainted=state.party.filter(p=>p.currentHp===0);
   if(!fainted.length||fainted.length===state.party.length||!state.capabilities.includes('party.box_fainted')||!state.battle?.safe)return;
   const run=this.deps.domain.runs.running(lobbyId,accountId),key=`${lobbyId}:${accountId}`;

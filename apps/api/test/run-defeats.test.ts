@@ -40,9 +40,15 @@ test('end of Run in the game: fainted Pokémon boxed, defeat = Run lost + new Ru
   const before=boxCommands();game.faint(1);await new Promise(r=>setTimeout(r,200));
   assert.equal(boxCommands(),before);
 
-  // In-game defeat: Run #1 lost, Run #2 started, the game is reset without its save.
+  // In-game defeat: Run #1 lost, Run #2 started, the game is reset without its save. Reported while the game is
+  // unreadable (end of a battle): it waits for the next readable state instead of being refused.
   const eventId='6f1c0d6e-3a52-4c55-9d43-0d1c51f0a0aa';
-  assert.equal((await game.defeated('WHITE_OUT',eventId))?.ok,true);
+  game.unreadable();
+  const pending=game.defeated('WHITE_OUT',eventId);
+  await new Promise(r=>setTimeout(r,150));
+  assert.equal(game.resets,0,'not processed while unreadable');
+  game.publish();
+  assert.equal((await pending)?.ok,true);
   await until(()=>game.resets===1,'reset');
   assert.deepEqual((await runs()).map(r=>[r.number,r.status]),[[1,'LOST'],[2,'RUNNING']]);
   await eventually(async()=>(await audit()).some(l=>l.action==='run.reset'),'reset audited');
@@ -81,10 +87,22 @@ test('end of Run without the reset capability: Run lost and new Run, manual rest
   const game=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Ben',events:['events.player_defeated']});
   try{
    await as(admin.id).post(`/api/lobbies/${lobby.id}/runs`,{accountId:ben.id,start:true});
+   game.faint(1);// a lost battle leaves the whole team fainted (no blackout)
    assert.equal((await game.defeated('BATTLE_LOST'))?.ok,true);
    await eventually(async()=>((await as(admin.id).get(`/api/lobbies/${lobby.id}/audit?category=RUN`)).body as {action:string}[]).some(l=>l.action==='run.reset_failed'),'manual restart asked');
    assert.equal(game.received.filter(c=>c.command==='game.reset').length,0);
-   assert.deepEqual(((await as(admin.id).get(`/api/lobbies/${lobby.id}/runs`)).body as Run[]).filter(r=>r.accountId===ben.id).map(r=>r.status).sort(),['LOST','RUNNING']);
+   const statuses=async()=>((await as(admin.id).get(`/api/lobbies/${lobby.id}/runs`)).body as Run[]).filter(r=>r.accountId===ben.id).map(r=>r.status).sort();
+   assert.deepEqual(await statuses(),['LOST','RUNNING']);
+   // Not reset: the same fainted team reported again (client restarted) never ends the new Run.
+   assert.equal((await game.defeated('PARTY_FAINTED'))?.ok,true);
+   const audit=async()=>((await as(admin.id).get(`/api/lobbies/${lobby.id}/audit?category=RUN`)).body as {action:string}[]).map(l=>l.action);
+   await eventually(async()=>(await audit()).includes('run.defeat_ignored'),'old game ignored');
+   assert.deepEqual(await statuses(),['LOST','RUNNING']);
+   // A new game (a team standing again): defeats count again.
+   game.party=[rawPokemon()];game.publish();
+   await eventually(async()=>(await audit()).includes('run.new_game'),'new game seen');
+   assert.equal((await game.defeated('WHITE_OUT'))?.ok,true);
+   await eventually(async()=>(await statuses()).join()==='LOST,LOST,RUNNING','next defeat counted');
   }finally{game.close();}
  }finally{await p.close();}
 });

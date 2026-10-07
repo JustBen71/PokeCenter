@@ -112,7 +112,7 @@ export class BattleBoardService{
    this.set(id,{encounter_id:created.id});
    this.audit(team,'board.challenged',`${who} relève le défi de ${team.trainer.name} (récompense ${fmt(team.reward)})`,{actorId:accountId,targetId:accountId});
    this.deps.notify(lobbyId,{kind:'info',message:`⚔ ${who} relève le défi de ${team.trainer.name} au tableau`});
-   this.deps.battles.queue(lobbyId,created.id,accountId);
+   this.deps.battles.queue(lobbyId,created.id,accountId,{notify:false});// the board already announced it
   }catch(error){this.set(id,{status:'OPEN',challenger_id:null,encounter_id:null},'CHALLENGED');this.deps.changed(lobbyId);throw error;}
   this.deps.changed(lobbyId);
   return this.row(lobbyId,id);

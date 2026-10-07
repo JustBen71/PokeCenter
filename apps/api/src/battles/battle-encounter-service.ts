@@ -101,11 +101,11 @@ export class BattleEncounterService{
  }
 
  /** Queues the battle: it is sent as soon as the player's game reports a safe state. */
- queue(lobbyId:string,id:string,actorId:string|null){
+ queue(lobbyId:string,id:string,actorId:string|null,options:{notify?:boolean}={}){
   const e=this.repository.require(lobbyId,id);
   const {after}=this.repository.transition(e.id,'WAITING_SAFE_STATE');
   this.audit(after,'battle.start_requested',`Combat contre ${after.trainer.name} demandé pour ${this.name(after.accountId)} : il démarrera dès que le jeu sera dans un état sûr`,{actorId});
-  this.deps.notify(lobbyId,{kind:'info',message:`⚔ ${this.name(after.accountId)} va affronter ${after.trainer.name}`});
+  if(options.notify!==false)this.deps.notify(lobbyId,{kind:'info',message:`⚔ ${this.name(after.accountId)} va affronter ${after.trainer.name}`});
   this.deps.changed(lobbyId);
   // Already on a safe overworld? Then it leaves now instead of waiting for the next change of the game.
   this.retry(lobbyId,after.accountId);
