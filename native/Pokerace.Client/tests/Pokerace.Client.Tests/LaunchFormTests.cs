@@ -38,7 +38,7 @@ public sealed class LaunchFormTests
             var form = new LaunchForm(console,
                 (configuration, _) => { checkedRooms.Add(configuration.RoomCode);
                     return configuration.RoomCode == "mauvais" ? throw new ClientException("server_rejected", "refused") : Task.CompletedTask; },
-                (configuration, path, _) => { played.Add((configuration, path)); return Task.CompletedTask; });
+                (configuration, path, _, _) => { played.Add((configuration, path)); return Task.CompletedTask; });
             await form.RunAsync(null, LaunchFields.From(null, null, null), (_, _) => saved++, CancellationToken.None);
 
             Assert.Equal(["mauvais", "bon-code"], checkedRooms);
@@ -76,7 +76,7 @@ public sealed class LaunchFormTests
             var form = new LaunchForm(console,
                 (configuration, _) => { urls.Add(configuration.ServerUrl);
                     return urls.Count == 1 ? throw new HttpRequestException("x", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused)) : Task.CompletedTask; },
-                (_, _, _) => Task.CompletedTask);
+                (_, _, _, _) => Task.CompletedTask);
             var result = await form.RunAsync(existing, LaunchFields.From(existing, rom, null), (_, _) => { }, CancellationToken.None);
             Assert.Equal(["http://localhost:3000", "http://localhost:8080"], urls);
             Assert.Equal(existing.PlayerId, result!.PlayerId);   // the player's identity is kept
@@ -84,6 +84,30 @@ public sealed class LaunchFormTests
             Assert.Contains("Le port doit être un nombre", console.Output);
         }
         finally { File.Delete(rom); }
+    }
+
+    [Fact]
+    public async Task AnAutosaveIsRestartedOnlyAfterConfirmation()
+    {
+        var rom = Path.GetTempFileName(); var save = Path.GetTempFileName();
+        try
+        {
+            var console = new TestConsole().Interactive();
+            console.Profile.Width = 160;
+            var existing = new ClientConfiguration { ServerUrl = "http://localhost:3000", PlayerName = "Ben", RoomCode = "salon" };
+            void Restore() { console.Input.PushKey(ConsoleKey.DownArrow); console.Input.PushKey(ConsoleKey.Enter); console.Input.PushKey(ConsoleKey.Enter); }
+            Restore(); console.Input.PushTextWithEnter("n");         // refused: back to the form
+            Restore(); console.Input.PushTextWithEnter("o");         // confirmed: plays from the copy
+            for (var i = 0; i < 7; i++) console.Input.PushKey(ConsoleKey.DownArrow);
+            console.Input.PushKey(ConsoleKey.Enter);                 // Quitter
+            var states = new List<string?>();
+            var form = new LaunchForm(console, (_, _) => Task.CompletedTask, (_, _, state, _) => { states.Add(state); return Task.CompletedTask; },
+                autosaves: () => [save]);
+            await form.RunAsync(existing, LaunchFields.From(existing, rom, null), (_, _) => { }, CancellationToken.None);
+            Assert.Equal([save], states);
+            Assert.Contains("ce qui a été joué depuis sera perdu", console.Output);
+        }
+        finally { File.Delete(rom); File.Delete(save); }
     }
 
     [Theory]

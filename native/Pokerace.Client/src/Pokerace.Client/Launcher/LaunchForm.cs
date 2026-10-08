@@ -41,9 +41,10 @@ public sealed record LaunchFields(string Address, int? Port, string Player, stri
 
 /// <summary>The connection form: one menu line per field, validation on input, and a server check before anything is launched.</summary>
 public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, CancellationToken, Task> checkRoom,
-    Func<ClientConfiguration, string, CancellationToken, Task> play, Func<string?, CancellationToken, Task<string?>>? pickRom = null)
+    Func<ClientConfiguration, string, string?, CancellationToken, Task> play, Func<string?, CancellationToken, Task<string?>>? pickRom = null,
+    Func<IReadOnlyList<string>>? autosaves = null)
 {
-    private const string Connect = "connect", Quit = "quit";
+    private const string Connect = "connect", Restore = "restore", Quit = "quit";
     private string? romLabel;
 
     /// <summary>Runs until the player quits; returns the last saved configuration.</summary>
@@ -62,6 +63,8 @@ public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, C
             cancellation.ThrowIfCancellationRequested();
             var choice = await console.PromptAsync(Menu(fields, next), cancellation);
             if (choice == Quit) return existing;
+            string? state = null;
+            if (choice == Restore) { state = await PickAutosaveAsync(cancellation); if (state == null) { next = Connect; continue; } choice = Connect; }
             if (choice != Connect) { fields = await EditAsync(choice, fields, cancellation); next = Connect; continue; }
             if (fields.Problem() is { } problem)
             {
@@ -90,11 +93,25 @@ public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, C
             save(configuration, fields.Rom!);
             existing = configuration;
             console.MarkupLine($"[green]✔ Serveur joint et salon accepté[/] ({Markup.Escape(configuration.ServerUrl)})");
-            try { await play(configuration, fields.Rom!, cancellation); }
+            try { await play(configuration, fields.Rom!, state, cancellation); }
             catch (ClientException e) { Problem(e.Message); }
             next = Connect;
             Header();
         }
+    }
+
+    /// <summary>After a crash: one of the copies made every 5 minutes, confirmed because the current progress is replaced.</summary>
+    private async Task<string?> PickAutosaveAsync(CancellationToken cancellation)
+    {
+        var saves = autosaves!();
+        if (saves.Count == 0) { console.MarkupLine("[yellow]Aucune sauvegarde automatique : elles sont faites toutes les 5 minutes pendant le jeu.[/]"); return null; }
+        static string Label(string s) { var at = File.GetLastWriteTime(s); var ago = (int)(DateTime.Now - at).TotalMinutes;
+            return $"{at:dd/MM HH:mm}  (il y a {(ago < 60 ? ago + " min" : ago / 60 + " h " + ago % 60 + " min")})"; }
+        var picked = await console.PromptAsync(new SelectionPrompt<string>().Title("Reprendre la partie à quelle sauvegarde automatique ?")
+            .UseConverter(s => s.Length == 0 ? "Annuler" : Label(s)).AddChoices(saves.Append("")), cancellation);
+        if (picked.Length == 0) return null;
+        var ok = await console.PromptAsync(new ConfirmationPrompt($"[yellow]La partie reprendra au {Markup.Escape(Label(picked))} : ce qui a été joué depuis sera perdu (sauvegarde en jeu comprise). Continuer ?[/]") { DefaultValue = false, Yes = 'o', No = 'n' }, cancellation);
+        return ok ? picked : null;
     }
 
     private void Header() => console.Write(new Rule("[bold yellow]Pokérace[/] — connexion au serveur et lancement du jeu").LeftJustified());
@@ -103,16 +120,17 @@ public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, C
     private SelectionPrompt<string> Menu(LaunchFields f, string? highlighted)
     {
         string Value(string? text, bool ok) => ok ? Markup.Escape(text!) : "[red]à renseigner[/]";
-        var rows = new (string Key, string Label)[]
-        {
+        (string Key, string Label)[] rows =
+        [
             (Connect, "[bold green]▶ Se connecter et lancer le jeu[/]"),
+            .. autosaves == null ? [] : new[] { (Restore, "  ↺ Reprendre une sauvegarde automatique (après un crash)") },
             ("address", "  Serveur        " + Value(f.Address, LaunchFields.AddressError(f.Address) == null)),
             ("port", "  Port           " + Value(f.Port?.ToString(), f.Port != null)),
             ("player", "  Pseudo         " + Value(f.Player, LaunchFields.PlayerError(f.Player) == null)),
             ("room", "  Code du salon  " + Value(f.Room, LaunchFields.RoomError(f.Room) == null)),
             ("rom", "  ROM            " + (LaunchFields.RomError(f.Rom) == null ? Markup.Escape(Path.GetFileName(f.Rom!)) + " " + (romLabel ??= RomLabel(f.Rom!)) : "[red]à choisir[/]")),
             (Quit, "  Quitter"),
-        };
+        ];
         var labels = rows.ToDictionary(r => r.Key, r => r.Label);
         var prompt = new SelectionPrompt<string>()
             .Title("Flèches pour choisir, [bold]Entrée[/] pour valider. Choisissez un champ pour le modifier.")

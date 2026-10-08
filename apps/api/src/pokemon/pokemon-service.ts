@@ -1,4 +1,4 @@
-import {decodePokemonCopy,gen3PartyRaw,pokemonActionSchema,withTrainer,type Account,type GameCapability} from '@pokerace/shared';
+import {decodePokemonCopy,gen3PartyRaw,pokemonActionSchema,withNickname,withTrainer,type Account,type GameCapability} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
 import type {CurrentGameService} from '../game/current-game-service.js';
@@ -19,6 +19,7 @@ export class PokemonService{
   const action=parseBody(pokemonActionSchema,body);
   if(!action.confirmOutOfBattle)throw new DomainError('SAFE_STATE_REQUIRED','Confirmez que le joueur n’est pas en combat : l’équipe de combat est une copie que le jeu réécrit');
   if(action.action==='adopt')return this.execute(lobbyId,accountId,actor,{action:'replace',slot:action.slot},this.adopted(lobbyId,accountId,action.slot));
+  if(action.action==='rename')return this.execute(lobbyId,accountId,actor,{action:'replace',slot:action.slot},this.renamed(lobbyId,accountId,action.slot,action.nickname));
   const raw='artifactId' in action?this.deps.library.gen3Raw(this.deps.library.require(action.artifactId)):null;
   return this.execute(lobbyId,accountId,actor,action,raw);
  }
@@ -34,6 +35,13 @@ export class PokemonService{
   if(!ot)throw new DomainError('CAPABILITY_MISSING','Le client du joueur ne lit pas encore son ID Dresseur : mettez-le à jour (0.2.2 ou plus)');
   if(raw.slice(8,16)+raw.slice(40,54)===ot)throw new DomainError('CONFLICT',`${decodePokemonCopy(raw).nickname} appartient déjà au dresseur du joueur`);
   return withTrainer(raw,ot);
+ }
+
+ private renamed(lobbyId:string,accountId:string,slot:number,nickname:string){
+  const {state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:['pokemon.replace']});
+  const raw=gen3PartyRaw(state.party.find(p=>p.slot===slot));
+  if(!raw)throw new DomainError('VALIDATION_FAILED','Cet emplacement est vide ou le client n’envoie pas sa copie exacte');
+  try{return withNickname(raw,nickname);}catch(e){throw new DomainError('VALIDATION_FAILED',(e as Error).message);}
  }
 
  /** Inserts an exact Gen III copy kept by the server (Âme liée), with the same safety rules as the library. */

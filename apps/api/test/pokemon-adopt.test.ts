@@ -33,3 +33,23 @@ test('party: a traded Pokémon takes the player’s trainer (it obeys), everythi
   assert.equal((await adopt(1)).body.error.code,'CONFLICT','already his');
  }finally{for(const c of closers)c();await p.close();}
 });
+
+test('party: a player renames a Pokémon of his own team, nothing else changes',async()=>{
+ const p=await passivePortal();
+ const closers:(()=>void)[]=[];
+ try{
+  const {as,admin,ben,tim,lobby,base,portal}=p;
+  const mon=rawPokemon(255,12,'POUSSIFEU');
+  const game=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Ben',party:[mon]});closers.push(()=>game.close());
+  await until(()=>!!portal.services.currentGame.resolve(lobby.id,ben.id).game.money,'game');
+  await as(admin.id).post(`/api/lobbies/${lobby.id}/runs`,{accountId:ben.id,start:true});
+  const rename=(who:string,nickname:string)=>as(who).post(`/api/lobbies/${lobby.id}/my-pokemon/rename`,{slot:1,nickname,confirmOutOfBattle:true});
+  assert.equal((await rename(ben.id,'Zizi™')).body.error.code,'VALIDATION_FAILED','not a game character');
+  assert.equal((await rename(tim.id,'Zizi')).body.error.code,'GAME_NOT_CONNECTED','Tim renames his own (absent) game, never Ben’s');
+  const done=await rename(ben.id,'Flammèche');
+  assert.equal(done.body.status,'COMPLETED',JSON.stringify(done.body));
+  const before=decodePokemonCopy(mon),after=decodePokemonCopy(game.party[0]!);
+  assert.equal(after.nickname,'Flammèche');
+  assert.deepEqual({...after,nickname:''},{...before,nickname:''});
+ }finally{for(const c of closers)c();await p.close();}
+});

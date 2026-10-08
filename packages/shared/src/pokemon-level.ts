@@ -1,6 +1,7 @@
 import {calculateStats,type PokemonData} from './pokemon-builder.js';
 import {decodePokemonCopy} from './pokemon-copy.js';
 import {encodePokemon} from './pokemon-encode.js';
+import {characters} from './pokemon-characters.js';
 import type {PokemonInjection} from './index.js';
 
 const ORDERS=['GAEM','GAME','GEAM','GEMA','GMAE','GMEA','AGEM','AGME','AEGM','AEMG','AMGE','AMEG','EGAM','EGMA','EAGM','EAMG','EMGA','EMAG','MGAE','MGEA','MAGE','MAEG','MEGA','MEAG'];
@@ -102,4 +103,15 @@ export function magikarpFrom(raw:string):string{
  return encodePokemon({playerId:'wheel',slot:1,speciesId:129,nickname:'MAGICARPE',level:1,experience:0,currentHp:stats.maxHp,stats,
   moves:[{id:150,pp:40},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:p.nature,friendship:70,
   otName:p.otName,trainerId:p.trainerId,secretId:p.secretId,ivs,evs,shiny:false});
+}
+
+const codes=new Map(Object.entries(characters).map(([code,c])=>[c,Number(code)]));
+/** The nickname (bytes 8..17, outside the encrypted data and the checksum), in the game's own characters. */
+export function withNickname(raw:string,nickname:string):string{
+ const name=[...nickname];
+ if(!name.length||name.length>10||name.some(c=>!codes.has(c)))throw new Error('Surnom invalide : 1 à 10 caractères du jeu (lettres, chiffres, accents, ponctuation simple)');
+ const bytes=Uint8Array.from(raw.match(/../g)!,v=>parseInt(v,16));
+ bytes.fill(255,8,18);name.forEach((c,i)=>bytes[8+i]=codes.get(c)!);
+ const result=hex(bytes);decodePokemonCopy(result);
+ return result;
 }
