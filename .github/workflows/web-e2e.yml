@@ -6,9 +6,20 @@ on:
     branches: [master, main, pokerace-client]
     paths: ['apps/api/**', 'apps/web/**', 'packages/shared/**', 'emulator/profiles/**', 'package*.json', '.github/workflows/web-e2e.yml']
   workflow_dispatch:
+  # Also run by release.yml before any launcher is built (blocking checks); `ref` = the tag being released.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ''
 
 permissions:
   contents: read
+
+# A newer push on the same branch cancels the run it supersedes (Actions minutes are billed).
+concurrency:
+  group: web-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   playwright:
@@ -17,6 +28,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

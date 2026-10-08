@@ -25,9 +25,20 @@ on:
       - '.github/workflows/pokerace-client.yml'
     tags: ['pokerace-client-*']
   workflow_dispatch:
+  # Also run by release.yml before any launcher is built (blocking checks); `ref` = the tag being released.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ''
 
 permissions:
   contents: read
+
+# A newer push on the same branch cancels the run it supersedes (Actions minutes are billed).
+concurrency:
+  group: pokerace-client-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   client:
@@ -40,14 +51,13 @@ jobs:
             rid: win-x64
           - os: ubuntu-24.04
             rid: linux-x64
-          - os: macos-15-intel
-            rid: osx-x64
-          - os: macos-15
-            rid: osx-arm64
+          # No macOS: the launcher supports Windows and Linux only, and a macOS minute is billed ten times.
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'

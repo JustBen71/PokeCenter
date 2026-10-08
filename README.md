@@ -191,27 +191,43 @@ dotnet test native/Pokerace.Client/Pokerace.Client.sln --configuration Release -
 dotnet test bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Pokerace.BizHawkBridge.Tests.csproj --configuration Release
 
 ./bridges/bizhawk/e2e/run-e2e.ps1 -ClientE2E  # vrai BizHawk + ROM homebrew, runner GitHub Windows ou VM jetable (-DisposableCi)
+
+tools/release-check.sh v0.2.6                # avant une release : version cohérente + tout ce qui tourne sous Linux
 ```
 
 L'E2E navigateur démarre lui-même l'API de test et `vite preview` sur des ports libres, attend `/health`, et arrête les processus même en cas d'échec. Il n'a besoin ni de ROM, ni de BizHawk, ni d'internet. Traces, captures et vidéos ne sont conservées qu'en cas d'échec (`apps/web/e2e-results`).
 
-### 9.2 État CI actuel
+### 9.2 État des tests et de la CI
 
-Résultats obtenus le 6 octobre 2026 sur la branche `pokerace-client` (Linux x64, Node 22, .NET 8.0.425), à relire sur GitHub Actions pour le dernier commit poussé :
+**Tests (branche `master`, commit `d9a6470`, exécutés le 8 octobre 2026 sous Linux x64, Node 22.23, .NET 8) :**
 
 ```text
-Shared          PASS   17 tests
-API             PASS   99 tests
-Web             PASS   28 tests
-Pokerace.Client PASS   178 tests
-Bridge Unit     PASS   45 tests
-Web E2E         PASS   15 scénarios Playwright (Chromium, dont 3 pour les passifs et 2 pour les combats commandités), exécutés localement ; workflow web-e2e.yml ajouté, pas encore exécuté sur GitHub
-BizHawk E2E     NON CONFIRMÉ — correctif appliqué et vérifié contre un bridge simulé ; le workflow réel (Windows + BizHawk) doit être relancé
+Shared              PASS    17 tests
+API                 PASS   127 tests
+Web                 PASS    28 tests
+Typecheck           PASS   shared, API, Web
+Web E2E             PASS    20 scénarios Playwright (Chromium)
+Pokerace.Client     PASS   190 tests, publication linux-x64 autonome et --help
+Bridge (unitaires)  PASS    48 tests (projet de tests seul, sans assemblies BizHawk)
+Windows             NON EXÉCUTÉ ici — dernier passage vert sur GitHub le 6 octobre 2026 (voir ci-dessous)
+BizHawk E2E         NON EXÉCUTÉ ici — Windows + vrai BizHawk, workflow bizhawk-bridge.yml
 ```
 
-**Cause du BizHawk E2E rouge** (`server_timeout` puis `Client readiness timeout`) : depuis la découverte de salon, le client appelle `POST /api/rooms/resolve` avant le WebSocket ; le serveur de test (`http.createServer()` sans gestionnaire) ne répondait jamais à cette requête. Ce n'était ni le bridge, ni la normalisation d'adresse du lanceur. Le serveur de test répond désormais à toutes les requêtes ; la non-régression tourne sur les quatre OS du workflow client. Détails : [bridges/bizhawk/e2e/README.md](bridges/bizhawk/e2e/README.md).
+**GitHub Actions : bloqué par la facturation, pas par le code.** Dernier run exécuté : 6 octobre 2026 à 09:12 UTC, les quatre workflows verts sur Windows, Linux et macOS. Depuis le 6 octobre à 11:19 UTC, **aucun job ne démarre** : chaque run échoue en 2 à 10 s avec l'annotation « The job was not started because recent account payments have failed or your spending limit needs to be increased ». Il faut régulariser le paiement ou relever la limite de dépenses Actions dans *Settings → Billing & plans* du compte propriétaire, puis relancer les workflows. Les échecs du 2 au 4 octobre étaient de vrais échecs, corrigés avant le run vert du 6.
 
-Workflows : `pokerace-client.yml` (shared/API/Web + client sur Windows, Linux, macOS Intel et ARM), `bizhawk-bridge.yml` (tests du bridge puis E2E réel BizHawk, aussi déclenché par un push sur `pokerace-client`), `web-e2e.yml` (build, typecheck, tests, Playwright). Aucun n'utilise `continue-on-error`.
+Les minutes Actions d'un dépôt privé sont facturées ×2 sous Windows et ×10 sous macOS. Pour limiter la consommation :
+- le client n'est plus testé sous macOS, que le lanceur ne prend pas en charge ;
+- un nouveau push sur une branche annule le run qu'il remplace.
+
+**Workflows :**
+- `pokerace-client.yml` : shared, API et Web, puis le client sur Windows et Linux.
+- `bizhawk-bridge.yml` : tests du bridge, puis E2E réel BizHawk.
+- `web-e2e.yml` : build, typecheck, tests, puis Playwright.
+- `release.yml`, sur un tag `v*` : vérifie la cohérence de la version (`tools/release-check.sh --version-only`), puis appelle les trois workflows ci-dessus. Il ne construit et ne publie les lanceurs que si tout est vert.
+
+Aucun workflow n'utilise `continue-on-error`.
+
+**Release faite à la main** (lanceurs copiés dans `deploy/server/downloads`) : lancer d'abord `tools/release-check.sh vX.Y.Z`. Il couvre tout sauf Windows et l'E2E BizHawk.
 
 ### 9.3 Niveaux de validation
 

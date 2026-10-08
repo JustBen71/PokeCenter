@@ -7,9 +7,20 @@ on:
     paths: ['bridges/bizhawk/**', 'native/Pokerace.Client/**', 'pokerace.cmd', 'apps/api/**', 'packages/shared/**', 'emulator/profiles/**', 'package*.json', '.github/workflows/bizhawk-bridge.yml']
     tags: ['bizhawk-bridge-*']
   workflow_dispatch:
+  # Also run by release.yml before any launcher is built (blocking checks); `ref` = the tag being released.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ''
 
 permissions:
   contents: read
+
+# A newer push on the same branch cancels the run it supersedes (Actions minutes are billed).
+concurrency:
+  group: bizhawk-bridge-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   unit-and-integration:
@@ -17,6 +28,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -38,6 +51,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
