@@ -157,6 +157,8 @@ export function createPortal(store:Store,config:Config){
  app.use(accounts);
  const legacy=running.get(LEGACY);if(legacy)app.use(legacy.app);
  app.get('/health',(_req,res)=>res.json({ok:true}));
+ // « Lancer à tous » interrupted by a restart: the players not processed yet get their wheel (once).
+ services.wheels.resumeBatches();
  // Automatic wheels (Gestion → Roues): checked every 30 s, each lobby spins its wheel once per period.
  const autoWheels=setInterval(()=>{try{services.wheels.tickAutoWheels();}catch(error){console.error('Auto wheels:',error);}},30000);autoWheels.unref();
  server.once('close',()=>clearInterval(autoWheels));

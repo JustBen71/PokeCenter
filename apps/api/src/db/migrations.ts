@@ -486,6 +486,33 @@ export const migrations:readonly Migration[]=[
    last_at TEXT,
    updated_at TEXT NOT NULL
   );
+ `)},
+ // « Lancer à tous » persisted: one batch per launch, one item per player (once), resumed after a restart.
+ // A resolution carries its batch: the unique index makes a second draw for the same player impossible.
+ {version:18,name:'wheel-batches',scopes:['portal'],up:db=>db.exec(`
+  CREATE TABLE wheel_batches(
+   id TEXT PRIMARY KEY,
+   lobby_id TEXT NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+   wheel_type_id TEXT NOT NULL,
+   created_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+   launcher_account_id TEXT NOT NULL,
+   status TEXT NOT NULL CHECK(status IN ('PENDING','PROCESSING','DONE','FAILED')),
+   created_at TEXT NOT NULL,
+   updated_at TEXT NOT NULL
+  );
+  CREATE INDEX wheel_batches_open ON wheel_batches(lobby_id,status,created_at);
+  CREATE TABLE wheel_batch_items(
+   batch_id TEXT NOT NULL REFERENCES wheel_batches(id) ON DELETE CASCADE,
+   account_id TEXT NOT NULL,
+   position INTEGER NOT NULL,
+   status TEXT NOT NULL CHECK(status IN ('PENDING','PROCESSING','DONE','FAILED')),
+   resolution_id TEXT,
+   error_code TEXT,
+   updated_at TEXT NOT NULL,
+   PRIMARY KEY(batch_id,account_id)
+  );
+  ALTER TABLE wheel_resolutions ADD COLUMN batch_id TEXT;
+  CREATE UNIQUE INDEX wheel_resolutions_batch_owner ON wheel_resolutions(batch_id,owner_account_id) WHERE batch_id IS NOT NULL;
  `)}
 ];
 

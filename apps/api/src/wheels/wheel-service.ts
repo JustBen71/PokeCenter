@@ -8,6 +8,7 @@ import type {Services} from '../services.js';
 import {wheelHandlers} from './wheel-handlers.js';
 
 type WheelRow={id:string;name:string;description:string;price:number;icon:WheelType['icon'];tone:WheelTone;enabled:number;for_sale:number};
+type BatchRow={id:string;lobby_id:string;wheel_type_id:string;launcher_account_id:string;status:string};
 type GageRow={id:string;name:string;description:string;handler:GageHandler;params_json:string;weight:number};
 type ResolutionRow={id:string;lobby_id:string;wheel_type_id:string;gage_json:string;owner_account_id:string;target_account_id:string|null;ticket_id:string|null;status:ResolutionStatus;strip_json:string;result:string|null;created_at:string;applied_at:string|null;options_json:string|null;chooser_account_id:string|null};
 
@@ -94,23 +95,71 @@ export class WheelService{
   this.services.domain.audit.record({lobbyId,actorAccountId:actor?.id??null,category:'WHEEL',action:'wheel.spin_all',status:'SUCCESS',
    message:`${wheel.name} lancée pour tous les joueurs en Run (${players.length})${actor?'':' — roue automatique'}`,metadata:{wheelId,players}});
   this.deps.notify(lobbyId,{kind:'info',message:`🎡 ${wheel.name} : une roue pour chaque joueur (${players.length})${actor?'':' — roue automatique'}`});
+  // Persisted first: the batch survives a restart, each player gets this wheel once (primary key + unique resolution).
+  const batchId=randomUUID(),now=nowIso(),db=this.deps.db;
+  db.transaction(()=>{
+   db.prepare("INSERT INTO wheel_batches(id,lobby_id,wheel_type_id,created_by,launcher_account_id,status,created_at,updated_at) VALUES(?,?,?,?,?,'PENDING',?,?)").run(batchId,lobbyId,wheel.id,actor?.id??null,launcher.id,now,now);
+   const item=db.prepare("INSERT INTO wheel_batch_items(batch_id,account_id,position,status,updated_at) VALUES(?,?,?,'PENDING',?)");
+   players.forEach((player,i)=>item.run(batchId,player,i,now));
+  })();
+  this.runBatches(lobbyId);
+  return {players:players.length};
+ }
+
+ /**
+  * One loop per lobby (spinAllQueue) runs its unfinished batches in creation order: two « Lancer à tous » (or the
+  * automatic wheel) never interleave. The database is the source of truth: after a restart, resumeBatches() starts
+  * the loop again and only the items not DONE/FAILED are processed.
+  */
+ private runBatches(lobbyId:string){
+  if(this.spinAllQueue.has(lobbyId))return;
   const spacing=this.deps.spinAllSpacingMs??7000,wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
-  // Queued per lobby: two « Lancer à tous » (or the automatic wheel) never interleave their animations.
-  const previous=this.spinAllQueue.get(lobbyId);
-  const next=(async()=>{
-   if(previous){await previous;await wait(spacing);}
-   for(const [i,player] of players.entries()){
-    if(i)await wait(spacing);
-    try{
-     const r=this.spin(lobbyId,wheel.id,{ownerId:player,...(wheel.tone==='BAD'?{targetId:player}:{})},launcher);
-     // The result is announced after the animation (about 3 s in the browser).
-     if(r.status==='DRAWN'){await wait(spacing/2);await this.apply(lobbyId,r.id,{},launcher).catch(()=>{});}
-    }catch{/* audited by spin/apply; the other players still get their wheel */}
+  const nextBatch=()=>this.deps.db.prepare("SELECT * FROM wheel_batches WHERE lobby_id=? AND status IN ('PENDING','PROCESSING') ORDER BY created_at,rowid LIMIT 1").get(lobbyId) as BatchRow|undefined;
+  const loop=(async()=>{
+   for(let batch=nextBatch(),first=true;batch;batch=nextBatch(),first=false){
+    if(!first)await wait(spacing);
+    await this.processBatch(batch,spacing,wait);
    }
   })();
-  this.spinAllQueue.set(lobbyId,next);
-  void next.finally(()=>{if(this.spinAllQueue.get(lobbyId)===next)this.spinAllQueue.delete(lobbyId);});
-  return {players:players.length};
+  this.spinAllQueue.set(lobbyId,loop);
+  void loop.catch(error=>console.error('Lancer à tous:',error)).finally(()=>{
+   this.spinAllQueue.delete(lobbyId);
+   if(nextBatch())this.runBatches(lobbyId);
+  });
+ }
+ private async processBatch(batch:BatchRow,spacing:number,wait:(ms:number)=>Promise<unknown>){
+  const db=this.deps.db,lobbyId=batch.lobby_id;
+  const mark=(status:string)=>db.prepare('UPDATE wheel_batches SET status=?,updated_at=? WHERE id=?').run(status,nowIso(),batch.id);
+  const item=(account:string,status:string,resolutionId:string|null,error:string|null=null)=>
+   db.prepare('UPDATE wheel_batch_items SET status=?,resolution_id=COALESCE(?,resolution_id),error_code=?,updated_at=? WHERE batch_id=? AND account_id=?').run(status,resolutionId,error,nowIso(),batch.id,account);
+  mark('PROCESSING');
+  const items=db.prepare("SELECT account_id AS accountId FROM wheel_batch_items WHERE batch_id=? AND status IN ('PENDING','PROCESSING') ORDER BY position").all(batch.id) as {accountId:string}[];
+  const launcher=this.services.domain.accounts.get(batch.launcher_account_id);
+  for(const [i,{accountId}] of items.entries()){
+   if(i)await wait(spacing);
+   item(accountId,'PROCESSING',null);
+   try{
+    if(!launcher)throw new DomainError('CONFLICT','Lanceur introuvable');
+    // Drawn before a restart (the item was not updated yet): never drawn again.
+    const drawn=db.prepare('SELECT id FROM wheel_resolutions WHERE batch_id=? AND owner_account_id=?').get(batch.id,accountId) as {id:string}|undefined;
+    const tone=this.list(lobbyId).find(w=>w.id===batch.wheel_type_id)?.tone;
+    const r=drawn?this.resolution(lobbyId,drawn.id):this.spin(lobbyId,batch.wheel_type_id,{ownerId:accountId,...(tone==='BAD'?{targetId:accountId}:{})},launcher,null,null,batch.id);
+    item(accountId,'PROCESSING',r.id);
+    // The result is announced after the animation (about 3 s in the browser). apply() claims DRAWN once: never applied twice.
+    if(r.status==='DRAWN'){await wait(spacing/2);await this.apply(lobbyId,r.id,{},launcher).catch(()=>{});}
+    item(accountId,'DONE',null);
+   }catch(error){
+    // Audited by spin/apply; the other players still get their wheel.
+    item(accountId,'FAILED',null,error instanceof DomainError?error.code:'INTERNAL_ERROR');
+   }
+  }
+  const failed=(db.prepare("SELECT COUNT(*) AS n FROM wheel_batch_items WHERE batch_id=? AND status='FAILED'").get(batch.id) as {n:number}).n;
+  mark(failed?'FAILED':'DONE');
+ }
+ /** After a restart (and at each automatic-wheel tick): lobbies with an unfinished batch and no running loop. */
+ resumeBatches(){
+  const lobbies=this.deps.db.prepare("SELECT DISTINCT lobby_id AS id FROM wheel_batches WHERE status IN ('PENDING','PROCESSING')").all() as {id:string}[];
+  for(const {id} of lobbies)this.runBatches(id);
  }
 
  autoWheel(lobbyId:string):AutoWheel{
@@ -133,6 +182,7 @@ export class WheelService{
  }
  /** Called periodically: each lobby whose automatic wheel is due spins it for everyone (once per period, even after a restart). */
  tickAutoWheels(now=Date.now()){
+  this.resumeBatches();
   const due=this.deps.db.prepare("SELECT a.lobby_id AS lobbyId,a.wheel_type_id AS wheelId,a.every_minutes AS every,a.last_at AS lastAt FROM auto_wheels a JOIN lobbies l ON l.id=a.lobby_id WHERE a.every_minutes>0 AND a.wheel_type_id IS NOT NULL").all() as {lobbyId:string;wheelId:string;every:number;lastAt:string|null}[];
   for(const a of due){
    if(a.lastAt&&now-Date.parse(a.lastAt)<a.every*60000)continue;
@@ -170,7 +220,7 @@ export class WheelService{
  }
 
  /** Draws the gage now (weighted), stores it, then every dashboard plays the same animation. */
- spin(lobbyId:string,wheelId:string,body:unknown,actor:Account|null,ticketId:string|null=null,ticketReceivedAt:string|null=null):WheelResolution{
+ spin(lobbyId:string,wheelId:string,body:unknown,actor:Account|null,ticketId:string|null=null,ticketReceivedAt:string|null=null,batchId:string|null=null):WheelResolution{
   const {ownerId,targetId}=parseBody(spinSchema,body);
   const wheel=this.require(lobbyId,wheelId);
   if(!wheel.enabled)throw new DomainError('CONFLICT','Cette roue est désactivée');
@@ -190,8 +240,8 @@ export class WheelService{
   const strip=Array.from({length:STRIP_LENGTH},(_,i)=>i===WINNER_INDEX?(options?options.map(g=>g.name).join(' / '):gage.name):wheel.gages[randomInt(wheel.gages.length)].name);
   const status:ResolutionStatus=blocked?'BLOCKED':options||(gage.requiresTarget&&!target)||PARTY_HANDLERS.includes(gage.handler)?'AWAITING_CHOICE':'DRAWN';
   const id=randomUUID();
-  this.deps.db.prepare(`INSERT INTO wheel_resolutions(id,lobby_id,wheel_type_id,gage_json,owner_account_id,target_account_id,ticket_id,status,strip_json,result,created_by,created_at,applied_at,options_json,chooser_account_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-   .run(id,lobbyId,wheel.id,JSON.stringify(gage),owner.id,target?.id??null,ticketId,status,JSON.stringify(strip),blocked,actor?.id??null,nowIso(),blocked?nowIso():null,options?JSON.stringify(options):null,choice?.chooserId??null);
+  this.deps.db.prepare(`INSERT INTO wheel_resolutions(id,lobby_id,wheel_type_id,gage_json,owner_account_id,target_account_id,ticket_id,status,strip_json,result,created_by,created_at,applied_at,options_json,chooser_account_id,batch_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+   .run(id,lobbyId,wheel.id,JSON.stringify(gage),owner.id,target?.id??null,ticketId,status,JSON.stringify(strip),blocked,actor?.id??null,nowIso(),blocked?nowIso():null,options?JSON.stringify(options):null,choice?.chooserId??null,batchId);
   this.services.domain.audit.record({lobbyId,actorAccountId:actor?.id??null,targetAccountId:target?.id??owner.id,category:'WHEEL',action:'wheel.spin',status:blocked?'INFO':'SUCCESS',
    message:blocked??`${wheel.name} : « ${gage.name} » tiré pour ${owner.name}${target?` (cible ${target.name})`:''}`,metadata:{resolutionId:id,gage:gage.name,handler:gage.handler}});
   if(target&&!blocked&&!options)this.suffered(lobbyId,id,wheel.tone,gage,target.id);
