@@ -192,26 +192,49 @@ dotnet test bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Pokerace.BizHawkB
 
 ./bridges/bizhawk/e2e/run-e2e.ps1 -ClientE2E  # vrai BizHawk + ROM homebrew, runner GitHub Windows ou VM jetable (-DisposableCi)
 
-tools/release-check.sh v0.2.6                # avant une release : version cohérente + tout ce qui tourne sous Linux
+tools/release-check.sh v0.2.7                # avant une release : version cohérente + tout ce qui tourne sous Linux
+powershell -File tools/release-check.ps1 v0.2.7  # même chose sous Windows, plus le build du lanceur et son --help
 ```
 
 L'E2E navigateur démarre lui-même l'API de test et `vite preview` sur des ports libres, attend `/health`, et arrête les processus même en cas d'échec. Il n'a besoin ni de ROM, ni de BizHawk, ni d'internet. Traces, captures et vidéos ne sont conservées qu'en cas d'échec (`apps/web/e2e-results`).
 
 ### 9.2 État des tests et de la CI
 
-**Tests (branche `master`, commit `d9a6470`, exécutés le 8 octobre 2026 sous Linux x64, Node 22.23, .NET 8) :**
+**GitHub Actions est indisponible** (facturation, voir ci-dessous) : la v0.2.7 est validée **localement**, pas par la CI. Aucun résultat ci-dessous ne vient de GitHub.
 
-```text
-Shared              PASS    17 tests
-API                 PASS   127 tests
-Web                 PASS    28 tests
-Typecheck           PASS   shared, API, Web
-Web E2E             PASS    20 scénarios Playwright (Chromium)
-Pokerace.Client     PASS   190 tests, publication linux-x64 autonome et --help
-Bridge (unitaires)  PASS    48 tests (projet de tests seul, sans assemblies BizHawk)
-Windows             NON EXÉCUTÉ ici — dernier passage vert sur GitHub le 6 octobre 2026 (voir ci-dessous)
-BizHawk E2E         NON EXÉCUTÉ ici — Windows + vrai BizHawk, workflow bizhawk-bridge.yml
-```
+**v0.2.7 — branche `stabilization/v0.2.7`, commit `ffd984a`, 9 octobre 2026 :**
+
+| Suite | OS | Outils | Résultat |
+|---|---|---|---|
+| `tools/release-check.sh v0.2.7` depuis un checkout propre | Linux x64 (Debian 13) | Node 22.23.3, .NET SDK 8.0.425, Playwright 1.63 (Chromium) | PASS, code de sortie 0 |
+| ↳ Shared | Linux | Node | PASS — 17 tests |
+| ↳ API | Linux | Node | PASS — 134 tests |
+| ↳ Web | Linux | Node | PASS — 28 tests |
+| ↳ Typecheck | Linux | tsc | PASS — shared, API, Web |
+| ↳ Web E2E | Linux | Playwright Chromium | PASS — 20 scénarios |
+| ↳ Pokerace.Client | Linux | .NET 8 | PASS — 202 tests |
+| ↳ Bridge (unitaires) | Linux | .NET 8 | PASS — 50 tests |
+| `tools/release-check.ps1`, lanceur Windows lancé sous Windows | Windows | — | **NOT VERIFIED** (pas de machine Windows) |
+| `run-e2e.ps1 -ClientE2E` (harnais BizHawk homebrew) | Windows | — | **NOT VERIFIED** |
+| E2E réel BizHawk Linux | Linux, Xvfb, Mono | BizHawk 2.11.1, Émeraude FR BPEF v0 (empreinte exacte) | PASS : voir ci-dessous |
+| Redémarrage API pendant « Lancer à tous » (processus réel, même SQLite) | Linux | — | PASS |
+| Recette Émeraude multi-comptes, multi-clients | — | — | **NOT VERIFIED** (un seul client réel) |
+| Soak test de plusieurs heures | — | — | **NOT VERIFIED** |
+
+E2E réel BizHawk Linux (lanceur `play` publié linux-x64 piloté au clavier, vraie API locale, BizHawk 2.11.1, ROM Émeraude FR) :
+- **Formulaire et autosaves.** Reprise d'une ancienne copie sans manifeste, vérifiée par CRC32. Restauration annulée : rien n'est créé. Copie de secours créée dans `restore-backups`.
+- **Connexion et lecture.** Bridge, client et serveur se connectent ; argent, lieu et équipe sont lus. Capabilities d'écriture annoncées pour l'empreinte exacte.
+- **Safe State.** Dialogue et script de l'intro → `SAFE_STATE_REQUIRED`. Libre → renommage réel vérifié (« Flammèche », accent compris). Menu Start → refus. Menu fermé → accepté.
+- **Défaite.** Équipe K.O. → Run perdue, puis `game.reset` archivé et nouvelle Run, deux fois.
+- **Manifeste réel.** SHA-256 de la ROM, révision, version 0.2.7, hash BizHawk.
+- **Crash et restauration.** `kill -9` de BizHawk → retour au formulaire → restauration de la copie à manifeste → bonne sauvegarde chargée (antérieure aux renommages) → portail resynchronisé.
+- **Redémarrage serveur.** Arrêt brutal de l'API → reconnexion automatique du client.
+
+Non couverts sur le vrai jeu : changement de zone et combat sauvage (l'intro bloque la sortie ; couverts par les tests).
+
+Constat : après un arrêt brutal, BizHawk affiche sa propre boîte « Load autosaved SaveRAM? » avant de charger la ROM ; le joueur doit répondre (Oui) dans les 90 s d'attente du lanceur.
+
+**v0.2.6 et avant** (commit `d9a6470`, 8 octobre 2026) : shared 17, API 127, Web 28, E2E 20, client 190, bridge 48 — Linux. Windows : dernier passage vert sur GitHub le 6 octobre 2026.
 
 **GitHub Actions : bloqué par la facturation, pas par le code.** Dernier run exécuté : 6 octobre 2026 à 09:12 UTC, les quatre workflows verts sur Windows, Linux et macOS. Depuis le 6 octobre à 11:19 UTC, **aucun job ne démarre** : chaque run échoue en 2 à 10 s avec l'annotation « The job was not started because recent account payments have failed or your spending limit needs to be increased ». Il faut régulariser le paiement ou relever la limite de dépenses Actions dans *Settings → Billing & plans* du compte propriétaire, puis relancer les workflows. Les échecs du 2 au 4 octobre étaient de vrais échecs, corrigés avant le run vert du 6.
 
@@ -227,7 +250,7 @@ Les minutes Actions d'un dépôt privé sont facturées ×2 sous Windows et ×10
 
 Aucun workflow n'utilise `continue-on-error`.
 
-**Release faite à la main** (lanceurs copiés dans `deploy/server/downloads`) : lancer d'abord `tools/release-check.sh vX.Y.Z`. Il couvre tout sauf Windows et l'E2E BizHawk.
+**Release faite à la main** (lanceurs copiés dans `deploy/server/downloads`) : lancer d'abord `tools/release-check.sh vX.Y.Z` sous Linux et `tools/release-check.ps1 vX.Y.Z` sous Windows ; tous deux s'arrêtent au premier échec avec un code non nul. L'E2E BizHawk reste `run-e2e.ps1 -ClientE2E`.
 
 ### 9.3 Niveaux de validation
 
