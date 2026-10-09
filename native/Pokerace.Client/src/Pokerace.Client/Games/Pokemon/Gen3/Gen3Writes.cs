@@ -18,6 +18,8 @@ public static class Gen3Writes
         var readOnly = command == "game.party.snapshot";
         var tx = await Gen3Transaction.BeginAsync(bridge, identity, cancellation, requireWritableProfile: !readOnly, write: !readOnly);
         if (readOnly) return Result(tx, tx.Money, tx.Count, tx.Party, verified: false);
+        // The battle party is a copy the game writes back: the party only changes in the Safe State.
+        if (command.StartsWith("game.pokemon.")) await Gen3BattleEncounter.RequireSafeAsync(bridge, tx.Profile, cancellation);
         switch (command)
         {
             case "game.money.add":

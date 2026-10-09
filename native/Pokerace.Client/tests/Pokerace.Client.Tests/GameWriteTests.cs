@@ -58,6 +58,31 @@ public sealed class GameWriteTests
         Assert.Equal(before, bridge.Ewram);
     }
 
+    [Fact] public async Task PartyWritesHappenOnlyInTheSafeStateAndNothingIsWrittenOtherwise()
+    {
+        await using var bridge = Bridge(0); var router = Router(bridge);
+        var a = new Gen3ProfileRegistry().Resolve(Identity).Profile!.Battle!;
+        Span<byte> At(long address) => (address >= 0x03000000 ? bridge.Iwram : bridge.Ewram).AsSpan((int)(address & 0xFFFFFF), 1);
+        Task<Pokerace.Client.Commands.CommandResult> Insert(int count) => router.RouteAsync(Command("game.pokemon.insert",
+            new() { ["raw"] = Hex(GameAdapterTests.MemoryBridge.Pokemon(7)), ["expectedCount"] = count }), default);
+        var states = new (string Name, Action Enter)[]
+        {
+            ("battle or map change", () => bridge.Free(false)),                  // main callback is not the overworld one
+            ("script or dialogue", () => At(a.ScriptContextStatus)[0] = 0),      // a script is running
+            ("menu", () => At(a.LockFieldControls)[0] = 1),                      // field controls locked (start menu…)
+        };
+        foreach (var (name, enter) in states)
+        {
+            enter();
+            var before = (byte[])bridge.Ewram.Clone();
+            var refused = await Insert(1);
+            Assert.Equal("not_safe", refused.ErrorCode); Assert.Equal(before, bridge.Ewram);
+            bridge.Free(true); At(a.LockFieldControls)[0] = 0;
+        }
+        Assert.True((await Insert(1)).Ok, "free again: a new attempt is applied");
+        Assert.Equal(2, (await Observe(bridge)).Party.Length);
+    }
+
     [Fact] public async Task MoneyAddRemoveAndSetAreVerifiedAndNeverAppliedTwice()
     {
         await using var bridge = Bridge(0); var router = Router(bridge);

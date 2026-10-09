@@ -198,6 +198,14 @@ public static class Gen3BattleEncounter
         return new() { ["state"] = "STARTING" };
     }
 
+    /// <summary>Safe State for party writes: free on the overworld (no battle, script, dialogue, menu or map change).
+    /// Without validated battle addresses the state is unknown: refused.</summary>
+    public static async Task RequireSafeAsync(IBridgeClient bridge, Gen3MemoryProfile profile, CancellationToken cancellation)
+    {
+        if (profile.Battle is not { } a || !(await ReadFieldAsync(new Gen3Memory(bridge), a, cancellation)).Safe(a))
+            throw new ClientException("not_safe", "The player is not free on the overworld.");
+    }
+
     /// <summary>
     /// Follows the active encounter at each observation: STARTING until the battle screen appears, RUNNING until the
     /// player is back on the overworld, then reads gBattleOutcome, restores the temporary record and var, and keeps

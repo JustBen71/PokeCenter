@@ -3,7 +3,9 @@ import {DomainError} from '../errors.js';
 import type {LobbyRepository} from '../lobbies/lobby-repository.js';
 import type {RunService} from '../runs/run-service.js';
 
-export type RequireGameOptions={capabilities?:GameCapability[];requireRun?:boolean;requireFresh?:boolean};
+export type RequireGameOptions={capabilities?:GameCapability[];requireRun?:boolean;requireFresh?:boolean;
+ /** Party writes: the client's own Safe State (free on the overworld, no commanded battle), never the browser's word. */
+ requireSafeState?:boolean};
 
 /**
  * Resolves account → connected Pokerace.Client → GameAdapter → capabilities → current Run for one lobby.
@@ -56,6 +58,8 @@ export class CurrentGameService{
   const context=this.require(lobbyId,accountId,options);
   const client=this.deps.clients(lobbyId).find(c=>c.accountId===accountId);
   if(!client?.gameState)throw new DomainError('GAME_ADAPTER_NOT_READY','Le jeu chargé n’est pas encore lu');
+  if(options.requireSafeState&&client.gameState.battle?.safe!==true)
+   throw new DomainError('SAFE_STATE_REQUIRED','Le joueur doit être libre sur la carte (hors combat, dialogue, menu ou changement de zone) : rien n’a été envoyé, réessayez dans un instant');
   return {context,playerId:client.playerId,state:client.gameState};
  }
 }

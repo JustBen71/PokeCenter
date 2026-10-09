@@ -136,7 +136,7 @@ export class AuctionService{
     legs:[...(payment>0?[{type:'AUCTION_PAYMENT' as const,amount:payment,source:'GAME' as const,destination:'EXTERNAL' as const,metadata:{auctionId}}]:[]),
      ...(jackpot>0?[{type:'JACKPOT_CONTRIBUTION' as const,amount:jackpot,source:'GAME' as const,destination:'JACKPOT' as const,metadata:{auctionId,reason:'auction'}}]:[])],
     audit:{category:'AUCTION',action:'auction.settle',message:`${best.name} achète ${row.name} pour ${best.amount} ₽`},
-    gameCommand:{capabilities:[...PURCHASE_CAPABILITIES],build:state=>{
+    gameCommand:{capabilities:[...PURCHASE_CAPABILITIES],requireSafeState:true,build:state=>{
      if(state.party.length>=6)throw new DomainError('PARTY_FULL','L’équipe du gagnant est complète');
      return {command:'pokemon.purchase',payload:{price:best.amount,expectedMoney:state.trainer.money,expectedCount:state.party.length,raw:encodePokemon({...template,slot:state.party.length+1})}};
     }}});

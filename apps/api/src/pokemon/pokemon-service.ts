@@ -8,9 +8,11 @@ import type {LibraryService} from '../library/library-service.js';
 const capability:Record<'insert'|'remove'|'replace',GameCapability>={insert:'pokemon.insert',remove:'pokemon.remove',replace:'pokemon.replace'};
 
 /**
- * Admin party edits through the GameAdapter: the server sends what it observed (count, exact 100 bytes of the
- * slot) and the client refuses if the game moved. The adapter cannot tell whether a battle is in progress
- * (no validated battle address), so the admin must confirm it explicitly for every structural change.
+ * Party edits through the GameAdapter: the server sends what it observed (count, exact 100 bytes of the slot) and
+ * the client refuses if the game moved. Every party write (insert, remove, replace, rename, adoption, wheels,
+ * passives) goes through execute(): the client must report the Safe State (battle.safe), otherwise the command is
+ * refused before anything is sent (SAFE_STATE_REQUIRED, never queued, never REVIEW). The client checks it again
+ * just before writing. confirmOutOfBattle stays as the user's confirmation only.
  */
 export class PokemonService{
  constructor(private readonly deps:{currentGame:CurrentGameService;commands:GameCommandService;library:LibraryService}){}
@@ -62,7 +64,7 @@ export class PokemonService{
 
  private execute(lobbyId:string,accountId:string,actor:Account,action:{action:'insert'|'remove'|'replace';slot?:number;confirmOutOfBattle?:boolean},raw:string|null){
   return this.deps.commands.withPlayerLock(lobbyId,accountId,async()=>{
-   const {context,playerId,state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:[capability[action.action]]});
+   const {context,playerId,state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:[capability[action.action]],requireSafeState:true});
    const expectedCount=state.party.length;
    const slotRaw=(slot:number)=>{
     const pokemon=state.party.find(p=>p.slot===slot);

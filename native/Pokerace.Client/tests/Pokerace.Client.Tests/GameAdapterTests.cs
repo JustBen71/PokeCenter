@@ -149,6 +149,14 @@ public sealed class GameAdapterTests
         {
             Ewram[(int)Profile.PartyCountAddress - 0x02000000] = (byte)count;
             for (var i = 0; i < count; i++) Pokemon(0).CopyTo(Ewram, (int)Profile.PartyAddress - 0x02000000 + i * 100);
+            Free(true);
+        }
+        /// <summary>Safe State: free on the overworld (main callback, script context shut down, controls not locked) or not.</summary>
+        public void Free(bool free)
+        {
+            var a = Profile.Battle!;
+            Put32(a.GMain + 4, free ? (uint)a.Callback2Overworld : 0x08000001u);
+            (a.ScriptContextStatus >= 0x03000000 ? Iwram : Ewram)[(int)(a.ScriptContextStatus & 0xFFFFFF)] = 2;
         }
         public static byte[] Pokemon(uint pid)
         {

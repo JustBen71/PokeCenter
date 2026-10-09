@@ -17,11 +17,12 @@ const REFUSED=new Set(['state_changed','invalid_payload','invalid_pokemon','inva
  'writes_disabled','profile_read_only','write_unavailable','purchase_unavailable','unknown_command','command_id_reused','command_cache_full','invalid_command','invalid_command_id','protocol_mismatch','bridge_disconnected','invalid_purchase',
  'not_safe','battle_busy','battle_unavailable','invalid_battle','party_fainted','box_full','box_unavailable','reset_unavailable','archive_failed','invalid_item','bag_full','bag_empty']);
 const domainCode:Record<string,ErrorCode>={state_changed:'GAME_STATE_CHANGED',party_full:'PARTY_FULL',last_pokemon:'LAST_POKEMON',insufficient_money:'INSUFFICIENT_FUNDS',
- writes_disabled:'WRITES_DISABLED',profile_read_only:'WRITES_DISABLED',invalid_pokemon:'INVALID_POKEMON',bridge_disconnected:'GAME_NOT_CONNECTED'};
+ writes_disabled:'WRITES_DISABLED',profile_read_only:'WRITES_DISABLED',invalid_pokemon:'INVALID_POKEMON',bridge_disconnected:'GAME_NOT_CONNECTED',not_safe:'SAFE_STATE_REQUIRED'};
 const messages:Partial<Record<ErrorCode,string>>={
  GAME_STATE_CHANGED:'Le jeu a changé depuis la dernière observation : rien n’a été modifié, réessayez.',
  PARTY_FULL:'L’équipe est déjà complète.',LAST_POKEMON:'Le joueur doit garder au moins un Pokémon.',INSUFFICIENT_FUNDS:'Pas assez de Pokédollars dans le jeu.',
- WRITES_DISABLED:'Les écritures sont désactivées sur le client de ce joueur.',INVALID_POKEMON:'Copie Pokémon refusée par le client.',GAME_NOT_CONNECTED:'BizHawk n’est plus relié au client.'
+ WRITES_DISABLED:'Les écritures sont désactivées sur le client de ce joueur.',INVALID_POKEMON:'Copie Pokémon refusée par le client.',GAME_NOT_CONNECTED:'BizHawk n’est plus relié au client.',
+ SAFE_STATE_REQUIRED:'Le joueur n’était plus libre sur la carte au moment d’écrire : rien n’a été modifié, réessayez.'
 };
 type Row={id:string;lobby_id:string;account_id:string;run_id:string|null;actor_account_id:string|null;command:GameCommandName;status:GameCommandStatus;error_code:string|null;result_json:string|null;created_at:string;updated_at:string};
 const toRecord=(r:Row):GameCommandRecord=>({id:r.id,lobbyId:r.lobby_id,accountId:r.account_id,runId:r.run_id,actorAccountId:r.actor_account_id,command:r.command,status:r.status,errorCode:r.error_code,result:r.result_json?JSON.parse(r.result_json):null,createdAt:r.created_at,updatedAt:r.updated_at});

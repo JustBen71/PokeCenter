@@ -5,6 +5,8 @@ import {decodePokemonCopy,encodePokemon,nationalSpecies,type GameEventKind,type 
 export type FakeMode='apply'|'timeout'|'ack-lost'|{refuse:string};
 type Command={commandId:string;command:string;payload:Record<string,any>};
 type ConnectOptions={base:string;
+ // Connected but nothing read yet (a reconnection before the first fresh GAME_STATE).
+ silent?:boolean;
  // Save's trainer ID + player name (hex, client ≥ 0.2.2); absent for older clients.
  ot?:string;lobbyId:string;inviteCode:string;playerName:string;playerId?:string;money?:number;party?:string[];writes?:boolean;location?:{mapGroup:number;mapNumber:number;label:string};heartbeatMs?:number;
  // Game-event capabilities announced by this fake adapter (none by default, like the real Gen III adapter).
@@ -50,7 +52,7 @@ export class FakeGameClient{
   const bridge={type:'bizhawk' as const,connected:true,protocolVersion:1 as const,gameLoaded:true};
   socket.emit('HELLO',{type:'HELLO',protocolVersion:1,clientVersion:'fake',playerId,platform:'test',bridge,emulator:{name:'BizHawk'},system:'GBA'});
   socket.emit('CLIENT_STATUS',{type:'CLIENT_STATUS',protocolVersion:1,connected:true,allowMemoryWrites:false,canPurchase:true});
-  client.publish();
+  if(!options.silent)client.publish();
   return client;
  }
 
@@ -63,7 +65,8 @@ export class FakeGameClient{
    party:this.party.map((raw,i)=>{const p=decodePokemonCopy(raw);
     return {artifact:{format:'gen3-party-v1',raw},slot:i+1,speciesId:nationalSpecies.get(p.internalSpecies)??1,speciesName:'Bulbizarre',nickname:p.nickname||null,level:p.level,currentHp:p.currentHp,maxHp:p.stats.maxHp,shiny:false};}),
    progression:{version:1,completed:this.completed},capabilities,observedAt:new Date().toISOString(),
-   ...((this.options.battles||this.options.defeats)&&this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
+   // Like the real client (battle-encounters store always present), the Safe State is published with writes.
+   ...(this.writes?{battle:{safe:this.safe&&!this.battle.active,inBattle:this.battle.state==='RUNNING',activeEncounterId:this.battle.active,last:this.battle.last}}:{})};
  }
  publish(){const state=this.state();this.socket.emit('GAME_STATE',{type:'GAME_STATE',protocolVersion:1,gameStateVersion:2,adapter:state.adapter,state});}
  /** The client could not read the game this time (save blocks moving at the end of a battle…). */
@@ -112,6 +115,8 @@ export class FakeGameClient{
   const p=command.payload;
   // Same preconditions as the real adapter: the observed state must still match.
   if('expectedMoney' in p&&p.expectedMoney!==this.money||'expectedCount' in p&&p.expectedCount!==this.party.length)return this.ack(command,false,{error:{code:'state_changed'}});
+  // The real client reads its Safe State again just before a party write.
+  if(/^game\.pokemon\.|^pokemon\.purchase$/.test(command.command)&&!this.safe)return this.ack(command,false,{error:{code:'not_safe'}});
   switch(command.command){
    case 'game.money.add':this.money+=p.amount;break;
    case 'game.money.remove':if(this.money<p.amount)return this.ack(command,false,{error:{code:'insufficient_money'}});this.money-=p.amount;break;

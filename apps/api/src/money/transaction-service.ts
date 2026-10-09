@@ -14,7 +14,7 @@ export type MoneyOperation={
  // Extra lock keys, e.g. the lobby jackpot so two payouts cannot both pass the balance check.
  lockKeys?:string[];
  // Replaces the default game.money.add/remove, e.g. an auction purchase that debits and inserts in one write.
- gameCommand?:{capabilities:GameCapability[];build:(state:NativeGameState)=>{command:GameCommandName|'pokemon.purchase';payload:Record<string,unknown>}};
+ gameCommand?:{capabilities:GameCapability[];requireSafeState?:boolean;build:(state:NativeGameState)=>{command:GameCommandName|'pokemon.purchase';payload:Record<string,unknown>}};
 };
 export type MoneyResult={status:'CONFIRMED'|'FAILED'|'REVIEW';commandId:string|null;transactions:MoneyTransaction[]};
 
@@ -37,7 +37,7 @@ export class TransactionService{
   const gameDelta=net(op.legs,'GAME');
   if(gameDelta===0)return this.serverOnly(op);
   return this.locked(op,async()=>{
-   const {context,playerId,state}=this.deps.currentGame.requireState(op.lobbyId,op.accountId,{capabilities:op.gameCommand?.capabilities??['money.read','money.write']});
+   const {context,playerId,state}=this.deps.currentGame.requireState(op.lobbyId,op.accountId,{capabilities:op.gameCommand?.capabilities??['money.read','money.write'],requireSafeState:op.gameCommand?.requireSafeState});
    const money=state.trainer.money;
    if(money+gameDelta<0)throw new DomainError('INSUFFICIENT_FUNDS','Pas assez de Pokédollars dans le jeu',{money,required:-gameDelta});
    if(money+gameDelta>MAX_GAME_MONEY)throw new DomainError('VALIDATION_FAILED','Le portefeuille en jeu est limité à 999 999 ₽',{money,delta:gameDelta});
