@@ -7,5 +7,11 @@
     "language": "fr",
     "revision": "BPEF v0",
     "validated": true
+  }, {
+    "sha256": "0a326524d8ac012af5a5978ca1b447453d338452e56b86364093a7466942aca5",
+    "profileId": "emerald-fr-bpef-v0",
+    "language": "fr",
+    "revision": "BPEF v0",
+    "validated": true
   }]
 }

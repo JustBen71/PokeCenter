@@ -13,7 +13,25 @@ Le registre reconnaît désormais l’empreinte exacte de la ROM française BPEF
 | En-tête inconnu ou révision non validée | `unknown_rom` / `profile_not_validated` | aucune |
 | ROM chargée dans BizHawk différente de la ROM sélectionnée | `rom_identity_unavailable` | aucune |
 
-Avec `REVISION_FALLBACK`, le profil est rendu avec `AllowWrites = false` : le client n’annonce aucune capability d’écriture. Le client refuse aussi toute écriture avec `rom_not_validated`, même si un serveur l’envoie quand même : argent, `game.pokemon.*`, `pokemon.purchase`, objets, combat commandité, boîte, reset (`reset_unavailable`), `bridge.writeMemory`. Seul `game.party.snapshot` (lecture) reste permis. Une ROM randomisée retrouvera les écritures quand son empreinte exacte sera validée et ajoutée au manifeste. Les adresses viennent de la révision, aucune n’est inventée. Tests : `GameWriteTests.ExactHashKeepsWritesButARevisionFallbackIsReadOnly`, `GameAdapterTests`.
+Avec `REVISION_FALLBACK`, le profil est rendu avec `AllowWrites = false` : le client n’annonce aucune capability d’écriture. Le client refuse aussi toute écriture avec `rom_not_validated`, même si un serveur l’envoie quand même : argent, `game.pokemon.*`, `pokemon.purchase`, objets, combat commandité, boîte, reset (`reset_unavailable`), `bridge.writeMemory`. Seul `game.party.snapshot` (lecture) reste permis. Une ROM randomisée retrouve les écritures quand son empreinte exacte est validée et ajoutée au manifeste (voir « ROM randomisées validées »). Les adresses viennent de la révision, aucune n’est inventée. Tests : `GameWriteTests.ExactHashKeepsWritesButARevisionFallbackIsReadOnly`, `GameAdapterTests`.
+
+## ROM randomisées validées
+
+| Fichier | SHA-256 | Révision | Validée |
+|---|---|---|---|
+| `PokeraceEmeraud.gba` | `0a326524d8ac012af5a5978ca1b447453d338452e56b86364093a7466942aca5` | BPEF v0 | 9 octobre 2026 (client 0.2.8) |
+
+`PokeraceEmeraud.gba` diffère de la ROM officielle sur 12 657 octets : tables de données (zones 0x310000, 0x550000, 0xE40000), starters, et quelques petits patches de code en place (0x030B0C, 0x031924, 0x045C70, 0x161869). Aucun code n'est déplacé, donc les adresses RAM du profil `emerald-fr-bpef-v0` restent valables. Cela a été vérifié sur le vrai jeu :
+
+- BizHawk 2.11.1 (mGBA) sous Linux, partie réelle chargée par « Continuer » ;
+- client 0.2.7 publié : `REVISION_FALLBACK`, 9 capabilities, lecture correcte (Poussifeu N.5 20/20, Bourg-en-Vol, 3000 ₽) ;
+- client avec l’empreinte ajoutée (code de la 0.2.8, numéro de version encore 0.2.7 pendant le test) : `EXACT_HASH`, 19 capabilities, `battle.safe = true` sur la carte ;
+- écritures COMPLETED et relues : renommage « Aléatoire », ajout d'un Pikachu N.5, +1234 ₽ (3000 → 4234), retrait du Pikachu ;
+- le jeu lui-même affiche l'équipe modifiée (menu POKéMON) ;
+- menu Start ouvert : renommage refusé (`SAFE_STATE_REQUIRED`) ;
+- sauvegarde en jeu, fermeture de BizHawk, relance et « Continuer » : « Aléatoire », Pikachu et 4234 ₽ relus à l'identique.
+
+Non vérifié sur cette ROM : combat commandité, défaite puis reset, objets, boîte, achat aux enchères. Ces fonctions utilisent les mêmes adresses de profil que la ROM officielle, où elles ont été testées. Aucun fichier ROM n'est ajouté au dépôt.
 
 ## Validation du 26 septembre 2026
 

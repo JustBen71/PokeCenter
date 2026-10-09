@@ -35,6 +35,9 @@ public sealed class GameWriteTests
     [Fact] public async Task ExactHashKeepsWritesButARevisionFallbackIsReadOnly()
     {
         Assert.Equal(Gen3ProfileRegistry.ExactHash, new Gen3ProfileRegistry().Resolve(Identity).Profile!.Match);
+        // PokeraceEmeraud.gba, a randomized BPEF v0 validated in BizHawk 2.11.1 (docs/rom-compatibility.md): exact hash, writes kept.
+        var validated = new Gen3ProfileRegistry().Resolve(Identity with { Sha256 = "0a326524d8ac012af5a5978ca1b447453d338452e56b86364093a7466942aca5", Revision = "BPEF v0" }).Profile!;
+        Assert.Equal(Gen3ProfileRegistry.ExactHash, validated.Match); Assert.True(validated.AllowWrites);
         // Unknown SHA-256 (randomized ROM) with the header of the validated BPEF v0: read, never written.
         var randomized = Identity with { Sha256 = new string('0', 64), Revision = "BPEF v0" };
         var (status, profile) = new Gen3ProfileRegistry().Resolve(randomized);
