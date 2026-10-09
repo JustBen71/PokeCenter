@@ -101,6 +101,15 @@ export class ShopService{
  // Paradoxe: a hostile ticket still waiting is cancelled, a consumed protection becomes usable again.
  cancelQueuedTicket(lobbyId:string,ticketId:string){const ok=this.deps.db.prepare("UPDATE wheel_tickets SET status='CANCELLED' WHERE id=? AND lobby_id=? AND status='QUEUED'").run(ticketId,lobbyId).changes>0;this.deps.changed(lobbyId);return ok;}
  restoreProtection(lobbyId:string,protectionId:string){const ok=this.deps.db.prepare("UPDATE protections SET status='ACTIVE',used_at=NULL,used_on_ticket_id=NULL WHERE id=? AND lobby_id=? AND status='USED'").run(protectionId,lobbyId).changes>0;this.deps.changed(lobbyId);return ok;}
+ // Admin cancels a wheel still waiting in the queue (nothing drawn, nothing refunded).
+ cancelTicket(lobbyId:string,ticketId:string,admin:Account){
+  const ticket=this.tickets('t.id=? AND t.lobby_id=?',ticketId,lobbyId)[0];
+  if(!ticket)throw new DomainError('NOT_FOUND','Ticket introuvable');
+  if(!this.cancelQueuedTicket(lobbyId,ticketId))throw new DomainError('CONFLICT','Ce ticket n’est plus en attente');
+  this.services.domain.audit.record({lobbyId,actorAccountId:admin.id,targetAccountId:ticket.recipientId,category:'TICKET',action:'ticket.cancel',status:'SUCCESS',
+   message:`${admin.name} annule la roue « ${ticket.wheelName} » en attente`,metadata:{ticketId}});
+  return this.tickets('t.id=?',ticketId)[0];
+ }
  private queue(ticketId:string){this.deps.db.prepare("UPDATE wheel_tickets SET status='QUEUED',queued_at=? WHERE id=?").run(nowIso(),ticketId);}
 
  async buyProtection(lobbyId:string,buyer:Account,body:unknown):Promise<Protection>{

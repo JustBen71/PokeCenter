@@ -14,11 +14,14 @@ public sealed class Gen3ProfileRegistry(Func<string, JsonObject>? resource = nul
             ?? throw new InvalidDataException("Missing bundled game data.");
         return JsonNode.Parse(stream)!.AsObject();
     }
-    public (string Status, Gen3MemoryProfile? Profile) Resolve(string sha256)
+    public (string Status, Gen3MemoryProfile? Profile) Resolve(LocalRomIdentity identity) => Resolve(identity.Sha256, identity.Revision);
+    // Exact hash first; otherwise a header match (randomized ROM of a known revision, same RAM layout).
+    public (string Status, Gen3MemoryProfile? Profile) Resolve(string sha256, string? revision = null)
     {
         var load = resource ?? Resource;
-        var entry = load("rom-manifest")["roms"]!.AsArray().FirstOrDefault(r =>
-            string.Equals(r!["sha256"]!.GetValue<string>(), sha256, StringComparison.OrdinalIgnoreCase));
+        var roms = load("rom-manifest")["roms"]!.AsArray();
+        var entry = roms.FirstOrDefault(r => string.Equals(r!["sha256"]!.GetValue<string>(), sha256, StringComparison.OrdinalIgnoreCase))
+            ?? (revision == null ? null : roms.FirstOrDefault(r => r!["revision"]?.GetValue<string>() == revision && r["validated"]?.GetValue<bool>() == true));
         if (entry == null) return ("unknown_rom", null);
         if (entry["validated"]?.GetValue<bool>() != true) return ("profile_not_validated", null);
         var id = entry["profileId"]!.GetValue<string>();

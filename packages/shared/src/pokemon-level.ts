@@ -1,6 +1,7 @@
 import {calculateStats,type PokemonData} from './pokemon-builder.js';
 import {decodePokemonCopy} from './pokemon-copy.js';
 import {encodePokemon} from './pokemon-encode.js';
+import {characters} from './pokemon-characters.js';
 import type {PokemonInjection} from './index.js';
 
 const ORDERS=['GAEM','GAME','GEAM','GEMA','GMAE','GMEA','AGEM','AGME','AEGM','AEMG','AMGE','AMEG','EGAM','EGMA','EAGM','EAMG','EMGA','EMAG','MGAE','MGEA','MAGE','MAEG','MEGA','MEAG'];
@@ -23,7 +24,9 @@ function rewrite(raw:string,edit:(b:Blocks)=>number|void):string{
  for(const c of 'GAEM')for(let i=0;i<12;i++)out.setUint8(at(next,c)+i,plain.getUint8(at(pid,c)+i));
  let sum=0;for(let i=0;i<24;i++)sum=(sum+out.getUint16(i*2,true))&0xFFFF;
  view.setUint32(0,next,true);view.setUint16(28,sum,true);
- for(let i=0;i<12;i++)view.setUint32(32+i*4,(out.getUint32(i*4,true)^next^ot)>>>0,true);
+ // `edit` may also change the trainer (withTrainer): encrypt with the key as it is now.
+ const key=(next^view.getUint32(4,true))>>>0;
+ for(let i=0;i<12;i++)view.setUint32(32+i*4,(out.getUint32(i*4,true)^key)>>>0,true);
  const result=hex(bytes);decodePokemonCopy(result);// must still be a valid copy
  return result;
 }
@@ -63,6 +66,15 @@ export function withNature(raw:string,nature:number,stats:PokemonInjection['stat
  });
 }
 
+/**
+ * Same Pokémon, original trainer `ot` (save's trainer ID 4 bytes + player name 7 bytes, hex): the game no longer
+ * sees it as traded, so it obeys whatever the badges. Everything else stays; shininess may change (it depends on the ID).
+ */
+export function withTrainer(raw:string,ot:string):string{
+ const from=Uint8Array.from(ot.match(/../g)!,v=>parseInt(v,16));
+ return rewrite(raw,({bytes})=>{bytes.set(from.subarray(0,4),4);bytes.set(from.subarray(4,11),20);});
+}
+
 const ivNames=['hp','attack','defense','speed','spAttack','spDefense'] as const;
 /** One IV set (0–31), stats recomputed by the caller. */
 export function withIv(raw:string,stat:typeof ivNames[number],value:number,stats:PokemonInjection['stats']):string{
@@ -91,4 +103,15 @@ export function magikarpFrom(raw:string):string{
  return encodePokemon({playerId:'wheel',slot:1,speciesId:129,nickname:'MAGICARPE',level:1,experience:0,currentHp:stats.maxHp,stats,
   moves:[{id:150,pp:40},{id:0,pp:0},{id:0,pp:0},{id:0,pp:0}],heldItem:0,abilitySlot:0,nature:p.nature,friendship:70,
   otName:p.otName,trainerId:p.trainerId,secretId:p.secretId,ivs,evs,shiny:false});
+}
+
+const codes=new Map(Object.entries(characters).map(([code,c])=>[c,Number(code)]));
+/** The nickname (bytes 8..17, outside the encrypted data and the checksum), in the game's own characters. */
+export function withNickname(raw:string,nickname:string):string{
+ const name=[...nickname];
+ if(!name.length||name.length>10||name.some(c=>!codes.has(c)))throw new Error('Surnom invalide : 1 à 10 caractères du jeu (lettres, chiffres, accents, ponctuation simple)');
+ const bytes=Uint8Array.from(raw.match(/../g)!,v=>parseInt(v,16));
+ bytes.fill(255,8,18);name.forEach((c,i)=>bytes[8+i]=codes.get(c)!);
+ const result=hex(bytes);decodePokemonCopy(result);
+ return result;
 }

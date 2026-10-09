@@ -26,6 +26,10 @@ test('GAME_EVENT: capability required, ACK, same eventId after reconnection proc
   const refusedId=randomUUID();
   assert.deepEqual(await plain.gameEvent('TRAINER_VICTORY',{moneyBefore:1000,moneyAfter:2200,baseReward:1200},refusedId),
    {type:'GAME_EVENT_ACK',protocolVersion:1,eventId:refusedId,ok:false,error:{code:'capability_missing'}});
+  // An invalid event (garbage step counter) is refused for good instead of disconnecting: otherwise the client re-sends it forever.
+  const invalidId=randomUUID();
+  assert.deepEqual(await plain.gameEvent('STEPS_CHANGED',{absolute:4294967295},invalidId),
+   {type:'GAME_EVENT_ACK',protocolVersion:1,eventId:invalidId,ok:false,error:{code:'invalid_event'}});
   assert.deepEqual(seen,[]);plain.close();
   await new Promise(r=>setTimeout(r,100));
 

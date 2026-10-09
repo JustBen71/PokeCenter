@@ -101,7 +101,13 @@ export function registerNativeClients(io:Server, config:Config, findAccount:(nam
   socket.on('GAME_EVENT',async(value:unknown)=>{
    if(!state.ready||Buffer.byteLength(JSON.stringify(value)??'')>4096){socket.disconnect(true);return;}
    const parsed=gameEventSchema.safeParse(value);
-   if(!parsed.success){socket.disconnect(true);return;}
+   if(!parsed.success){
+    // Refused for good (ok:false) so the client drops it from its outbox; disconnecting made it re-send forever.
+    const eventId=z.object({eventId:z.string().uuid()}).safeParse(value);
+    if(!eventId.success){socket.disconnect(true);return;}
+    console.warn('GAME_EVENT refusé',state.playerId,parsed.error.issues.map(i=>i.path.join('.')+': '+i.message).join('; '));
+    socket.emit('GAME_EVENT_ACK',{type:'GAME_EVENT_ACK',protocolVersion:VERSION,eventId:eventId.data.eventId,ok:false,error:{code:'invalid_event'}});return;
+   }
    await handleEvent(parsed.data as GameEvent);
   });
   socket.on('COMMAND_ACK',(value:unknown)=>{

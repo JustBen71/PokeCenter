@@ -27,6 +27,20 @@ public sealed class ResetTests : IDisposable
         Assert.Equal(0, host.Resets);
         Assert.Empty(Directory.GetDirectories(root));
     }
+    [Fact] public void AutosavesKeepTheLastThreeWithoutResetting()
+    {
+        var service = new BridgeService(host, root + "-lost", root);
+        var saves = new List<string>();
+        for (var i = 0; i < 5; i++) { saves.Add(Path.GetFileName(service.Autosave()!)); Thread.Sleep(5); }
+        Assert.Equal(0, host.Resets);
+        Assert.Equal(saves.Skip(2), Directory.GetDirectories(root).Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal));
+        // A failed copy keeps the previous ones; no game, no copy.
+        host.FailArchive = true;
+        Assert.Throws<BridgeException>(() => service.Autosave());
+        Assert.Equal(3, Directory.GetDirectories(root).Length);
+        host.IsGameLoaded = false;
+        Assert.Null(service.Autosave());
+    }
     [Fact] public void RefusesAnotherGame()
     {
         Assert.Equal("state_changed", (string?)Reset("other")["error"]?["code"]);

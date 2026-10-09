@@ -72,8 +72,8 @@ public static class PlayerLauncher
         var romFile = Path.Combine(directory, "rom.txt");
         var rom = options.Rom ?? (File.Exists(romFile) ? File.ReadAllText(romFile).Trim() : null);
         var form = new LaunchForm(console, (configuration, token) => ServerConnection.ResolveRoomAsync(configuration, token),
-            (configuration, path, token) => PlayAsync(console, configuration, path, directory, token),
-            RomPicker.Available ? RomPicker.ChooseAsync : null);
+            (configuration, path, state, token) => PlayAsync(console, configuration, path, state, directory, token),
+            RomPicker.Available ? RomPicker.ChooseAsync : null, () => EmulatorSession.Autosaves(directory));
         await form.RunAsync(existing, LaunchFields.From(existing, rom, options.Port), (configuration, path) =>
         {
             ConfigurationStore.Save(options.ConfigPath, configuration);
@@ -82,14 +82,14 @@ public static class PlayerLauncher
         return 0;
     }
 
-    private static async Task PlayAsync(IAnsiConsole console, ClientConfiguration configuration, string rom, string directory, CancellationToken cancellation)
+    private static async Task PlayAsync(IAnsiConsole console, ClientConfiguration configuration, string rom, string? state, string directory, CancellationToken cancellation)
     {
         EmulatorSession? session = null;
         await console.Status().Spinner(Spinner.Known.Dots).StartAsync("Préparation…", async context =>
         {
             var step = new Progress<string>(text => { context.Status(Markup.Escape(text) + "…"); });
             var download = new Progress<double>(f => { if (f < 1) context.Status($"Téléchargement de BizHawk… {f:P0}"); });
-            session = await EmulatorSession.StartAsync(configuration, rom, directory, step, download, cancellation);
+            session = await EmulatorSession.StartAsync(configuration, rom, directory, step, download, cancellation, state);
         });
         await using (session!)
         {

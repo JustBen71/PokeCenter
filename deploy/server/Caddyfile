@@ -9,6 +9,12 @@
   handle /socket.io/* {
     reverse_proxy api:3000
   }
+  # Launchers: force a download instead of opening the file in the tab; a missing file is a 404, never the site's HTML.
+  handle /downloads/* {
+    header /downloads/Pokerace-* Content-Disposition attachment
+    root * /srv
+    file_server
+  }
   handle {
     root * /srv
     try_files {path} /index.html

@@ -29,6 +29,18 @@ public sealed class GameAdapterTests
         var candidate = new Gen3ProfileRegistry(name => { var data = Gen3ProfileRegistry.Resource(name); if (name == Profile.ProfileId) data["status"] = "candidate"; return data; });
         Assert.Equal("profile_not_validated", candidate.Resolve(KnownHash).Status);
     }
+    [Fact] public async Task RandomizedRomIsRecognizedByHeader()
+    {
+        var rom = new byte[0x200];
+        "BPEF"u8.CopyTo(rom.AsSpan(0xAC));
+        var identity = await LocalRomIdentity.FromStreamAsync(new MemoryStream(rom), default);
+        Assert.Equal("BPEF v0", identity.Revision);
+        Assert.Equal("ready", new Gen3ProfileRegistry().Resolve(identity).Status);
+        rom[0xBC] = 1;
+        Assert.Equal("unknown_rom", new Gen3ProfileRegistry().Resolve(await LocalRomIdentity.FromStreamAsync(new MemoryStream(rom), default)).Status);
+        "BPEE"u8.CopyTo(rom.AsSpan(0xAC)); rom[0xBC] = 0;
+        Assert.Equal("unknown_rom", new Gen3ProfileRegistry().Resolve(await LocalRomIdentity.FromStreamAsync(new MemoryStream(rom), default)).Status);
+    }
     [Theory]
     [InlineData("no_game")][InlineData("unsupported_system")][InlineData("rom_identity_unavailable")][InlineData("unknown_rom")][InlineData("memory_domain_unavailable")]
     public async Task UnsupportedStatesNeverReadProfileMemory(string expected)
@@ -59,6 +71,8 @@ public sealed class GameAdapterTests
         var result = (await new GameAdapterManager(bridge, Identity).ObserveAsync(Loaded, default)).State!;
         Assert.Equal("A", result.Trainer.Name); Assert.Equal(12500u, result.Trainer.Money);
         Assert.Equal(3723, result.Trainer.PlayTimeSeconds); Assert.Equal(count, result.Trainer.PartyCount);
+        // Trainer ID (SaveBlock2 + 0x0A, ID 0x0201 / secret 0x0403) then the 7 name bytes, as a Pokémon of his own carries them.
+        Assert.Equal("01020304bbffffffffffff", result.Trainer.Ot);
         Assert.Equal(count, result.Party.Length); Assert.Equal(9, result.Location.MapNumber);
         Assert.Contains("starter", result.Progression.Completed);
         Assert.All(result.Capabilities, c => Assert.EndsWith(".read", c));
@@ -124,7 +138,7 @@ public sealed class GameAdapterTests
         {
             Put32(Profile.SaveBlock1Pointer, 0x02001000); Put32(Profile.SaveBlock2Pointer, 0x02003000);
             Array.Fill(Ewram, (byte)255, 0x3000, 7); Ewram[0x3000] = 0xBB;
-            Ewram[0x300E] = 1; Ewram[0x3010] = 2; Ewram[0x3011] = 3;
+            Ewram[0x300A] = 1; Ewram[0x300B] = 2; Ewram[0x300C] = 3; Ewram[0x300D] = 4; Ewram[0x300E] = 1; Ewram[0x3010] = 2; Ewram[0x3011] = 3;
             Put32(0x020030AC, 0x12345678); Put32(0x02001490, 12500 ^ 0x12345678);
             Ewram[0x1005] = 9;
             var progression = Gen3ProfileRegistry.Resource("progression"); var flag = (int)progression["objectives"]![0]!["flags"]![0]!;

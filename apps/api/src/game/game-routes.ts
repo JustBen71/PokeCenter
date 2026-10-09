@@ -2,7 +2,7 @@ import type {Express} from 'express';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import {DomainError} from '../errors.js';
-import {currentAccount,parseBody,requireAdminAccount,route} from '../http.js';
+import {currentAccount,parseBody,requireAccount,requireAdminAccount,route} from '../http.js';
 import type {Services} from '../services.js';
 
 const moneyAdjustSchema=z.object({operation:z.enum(['add','remove']),amount:z.number().int().min(1).max(999999),reason:z.string().trim().max(200).optional()}).strict();
@@ -11,6 +11,12 @@ const resolveSchema=z.object({applied:z.boolean()}).strict();
 /** Admin game actions (Sprint 3): library, party edits, money corrections and REVIEW reconciliation. */
 export function registerGameRoutes(app:Express,s:Services,changed:(lobbyId:string,topic:string)=>void){
  const {accounts,lobbies,ledger,audit}=s.domain;
+ // A player renames the Pokémon of his own team (same checks as the admin edits, through his game).
+ app.post('/api/lobbies/:id/my-pokemon/rename',requireAccount(id=>accounts.get(id)),route(async(req,res)=>{
+  const lobbyId=lobbies.require(String(req.params.id)).id,me=currentAccount(res);
+  if(!lobbies.isMember(lobbyId,me.id))throw new DomainError('NOT_LOBBY_MEMBER','Rejoignez ce lobby avec son code');
+  return s.pokemon.apply(lobbyId,me.id,me,{...req.body,action:'rename'});
+ }));
  for(const path of ['/api/library','/api/lobbies/:id/players','/api/lobbies/:id/game-commands'])app.use(path,requireAdminAccount(id=>accounts.get(id)));
  const target=(lobbyId:string,accountId:string)=>{
   lobbies.require(lobbyId);

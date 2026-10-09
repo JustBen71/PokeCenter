@@ -6,7 +6,7 @@ import type {PlayerViewModel} from '../native-clients';
 export const nativeCan=(view:PlayerViewModel|undefined,capability:GameCapability)=>
  !!view?.native?.ready&&view.native.adapter.status==='ready'&&(view.native.adapter.capabilities as string[]).includes(capability);
 
-export type PartyAction={action:'insert';artifactId:string}|{action:'remove';slot:number}|{action:'replace';slot:number;artifactId:string};
+export type PartyAction={action:'insert';artifactId:string}|{action:'remove';slot:number}|{action:'replace';slot:number;artifactId:string}|{action:'adopt';slot:number}|{action:'rename';slot:number;nickname:string};
 export const partyAction=(lobbyId:string,accountId:string,action:PartyAction)=>
  api<{commandId:string;status:string}>(`/api/lobbies/${lobbyId}/players/${accountId}/pokemon`,{method:'POST',body:{...action,confirmOutOfBattle:true}});
 

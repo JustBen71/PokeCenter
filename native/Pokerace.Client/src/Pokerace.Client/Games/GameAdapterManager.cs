@@ -14,7 +14,7 @@ public sealed class GameAdapterManager(IBridgeClient bridge, LocalRomIdentity? i
         if (!status.Connected || !status.GameLoaded) return GameObservation.Unavailable("no_game");
         if (status.SystemId != "GBA") return GameObservation.Unavailable("unsupported_system");
         if (identity == null) return GameObservation.Unavailable("rom_identity_unavailable");
-        var (result, profile) = new Gen3ProfileRegistry().Resolve(identity.Sha256);
+        var (result, profile) = new Gen3ProfileRegistry().Resolve(identity);
         if (profile == null) return GameObservation.Unavailable(result);
         if (!identity.MatchesLoadedGame(await bridge.GetGameInfoAsync(cancellation))) return GameObservation.Unavailable("rom_identity_unavailable");
         if (!Gen3Memory.HasDomains(await bridge.GetMemoryDomainsAsync(cancellation))) return GameObservation.Unavailable("memory_domain_unavailable", profile.ProfileId);

@@ -220,7 +220,7 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 .wheel-window{position:relative;overflow:hidden;margin:18px 0;border-radius:14px;background:#0a0d18;border:1px solid var(--line);mask-image:linear-gradient(transparent,#000 22%,#000 78%,transparent)}
 .wheel-window::after{content:"";position:absolute;left:0;right:0;top:50%;height:56px;transform:translateY(-50%);border-top:2px solid #f2ce82;border-bottom:2px solid #f2ce82;background:#f2ce8214;pointer-events:none}
 .pointer{position:absolute;top:50%;transform:translateY(-50%);z-index:2;color:#f2ce82;font-size:20px}.pointer.left{left:8px}.pointer.right{right:8px}
-.wheel-strip{list-style:none;margin:0;padding:0;transition-property:transform;transition-timing-function:cubic-bezier(.12,.75,.14,1)}
+.wheel-strip{list-style:none;margin:0;padding:0}.wheel-strip.rolling{animation-name:wheel-roll;animation-timing-function:cubic-bezier(.12,.75,.14,1);animation-fill-mode:both}@keyframes wheel-roll{from{transform:translateY(0)}}
 .wheel-strip li{display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#c9cde0;padding:0 40px;text-align:center}
 .wheel-strip li.winner{color:#fff;font-size:22px;text-shadow:0 0 18px #f2ce8299}
 .wheel-result h3{margin:0 0 6px;font-size:22px}.wheel-result p{color:#c9cde0}

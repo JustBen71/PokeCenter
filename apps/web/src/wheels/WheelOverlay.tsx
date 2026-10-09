@@ -20,19 +20,17 @@ import {launchedHere} from './launched';
 export function WheelOverlay(){
  const {socket,members}=useLive();const {account}=useSession();const {lobby}=useLobby();const toast=useToast();
  const {resolutions}=useLiveTopic<WheelsSnapshot>('wheels',{wheels:[],resolutions:[]});
- const [current,setCurrent]=useState<WheelResolution|null>(null),[phase,setPhase]=useState<'spinning'|'stopped'>('spinning'),[rolling,setRolling]=useState(false);
+ const [current,setCurrent]=useState<WheelResolution|null>(null),[phase,setPhase]=useState<'spinning'|'stopped'>('spinning'),[animate,setAnimate]=useState(false);
  const passives=usePassives();const battles=useBattles();
  const [passiveId,setPassiveId]=useState('');
  const [target,setTarget]=useState(''),[slot,setSlot]=useState(0),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false);
  const timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
  useEffect(()=>{
   if(!socket)return;
-  const onSpin=(r:WheelResolution)=>{clearTimeout(timer.current);setCurrent(r);setPhase('spinning');setRolling(false);setTarget(r.targetId??'');setSlot(0);setConfirm(false);setPassiveId('');
-   // Start from the top of the strip, then slide to the drawn gage on the next frames.
-   setTimeout(()=>setRolling(true),40);
+  const onSpin=(r:WheelResolution)=>{clearTimeout(timer.current);setCurrent(r);setPhase('spinning');setAnimate(true);setTarget(r.targetId??'');setSlot(0);setConfirm(false);setPassiveId('');
    timer.current=setTimeout(()=>setPhase('stopped'),DURATION+150);};
   // The admin page reopens a pending gage directly on its result.
-  const onReopen=(e:Event)=>{const r=(e as CustomEvent<WheelResolution>).detail;setCurrent(r);setPhase('stopped');setRolling(true);setTarget(r.targetId??'');setSlot(0);setConfirm(false);setPassiveId('');};
+  const onReopen=(e:Event)=>{const r=(e as CustomEvent<WheelResolution>).detail;setCurrent(r);clearTimeout(timer.current);setPhase('stopped');setAnimate(false);setTarget(r.targetId??'');setSlot(0);setConfirm(false);setPassiveId('');};
   socket.on('wheel-spin',onSpin);document.addEventListener('wheel-reopen',onReopen);
   return()=>{socket.off('wheel-spin',onSpin);document.removeEventListener('wheel-reopen',onReopen);clearTimeout(timer.current);};
  },[socket]);
@@ -61,13 +59,14 @@ export function WheelOverlay(){
  // The player who drew it chooses the target himself; party changes and steals stay with the admin (same rule as the server).
  const canApply=account.admin||(account.id===live.ownerId&&!needsConfirm&&!steal);
  const done=['SUCCESS','FAILED','REVIEW','BLOCKED'].includes(live.status);
- const translate=rolling?-(winner-Math.floor(VISIBLE/2))*ROW:0;
+ const translate=-(winner-Math.floor(VISIBLE/2))*ROW;
  return <div className="wheel-overlay" role="dialog" aria-modal="true" aria-label={`Roue ${live.wheelName}`}>
   <div className={`wheel-card tone-${live.tone.toLowerCase()}`}>
    <header><TicketIcon tone={live.tone}/><div><p className="eyebrow">{live.wheelName}</p><h2>{name(live.ownerId)}{live.targetId?` → ${name(live.targetId)}`:''}</h2></div></header>
    <div className="wheel-window" style={{height:ROW*VISIBLE}}>
     <span className="pointer left">▶</span><span className="pointer right">◀</span>
-    <ul className={`wheel-strip ${phase}`} style={{transform:`translateY(${translate}px)`,transitionDuration:rolling?`${DURATION}ms`:'0ms'}}>
+    {/* Keyed by draw: each wheel mounts a new strip whose CSS animation starts from the top, even when draws follow each other. */}
+    <ul key={live.id} className={`wheel-strip ${phase}${animate?' rolling':''}`} style={{transform:`translateY(${translate}px)`,animationDuration:`${DURATION}ms`}}>
      {live.strip.map((g,i)=><li key={i} className={i===winner&&phase==='stopped'?'winner':''} style={{height:ROW}}>{g}</li>)}
     </ul>
    </div>

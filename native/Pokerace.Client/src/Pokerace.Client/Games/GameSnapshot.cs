@@ -6,7 +6,10 @@ namespace Pokerace.Client.Games;
 
 public sealed record GameAdapterState(string? Id, string Status, string? ProfileId, string[] Capabilities);
 public sealed record GameIdentity(string Family, int Generation, string Title, string Language, string Revision);
-public sealed record TrainerSnapshot(string Name, uint Money, int PlayTimeSeconds, int PartyCount);
+// Ot (Gen III): the save's trainer ID (4 bytes) then the player name as the game stores it (7 bytes), in hex.
+// A Pokémon carrying exactly these is the player's own (not traded: it obeys).
+public sealed record TrainerSnapshot(string Name, uint Money, int PlayTimeSeconds, int PartyCount,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Ot = null);
 public sealed record LocationSnapshot(int MapGroup, int MapNumber, string Label);
 // Common fields for every generation; Artifact carries the generation-specific copy used by writes (e.g. gen3-party-v1).
 public sealed record PokemonArtifactSnapshot(string Format, string Raw)

@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Save,Trash2} from 'lucide-react';
+import {Handshake,Save,Trash2,Pencil} from 'lucide-react';
 import {ToastProvider} from './components/Toasts';
 import {useToast} from './components/toast-context';
 import {SessionProvider} from './auth/SessionProvider';
@@ -60,6 +60,28 @@ function Portal(){
    toast.success('Suppression confirmée par le jeu. Sauvegardez dans le jeu pour la conserver.');setSheet(null);
   }catch(e){toast.error(e);}finally{setBusy(false);}
  };
+ // The Pokémon takes the player's trainer: no longer seen as traded by the game, it obeys.
+ const nativeReplace=nativeCan(sheetView??undefined,'pokemon.replace');
+ const adoptPokemon=async()=>{
+  if(!sheet||!pokemon||!confirmOutOfBattle(sheet.row.name,`${pokemon.nickname||pokemon.speciesName} ne sera plus un Pokémon d’échange : il prend l’ID Dresseur de ${sheet.row.name} et obéit.`))return;
+  setBusy(true);
+  try{await partyAction(lobby.id,sheet.row.accountId,{action:'adopt',slot:pokemon.slot});toast.success('Pokémon adopté : il obéit. Sauvegardez dans le jeu pour le conserver.');}
+  catch(e){toast.error(e);}finally{setBusy(false);}
+ };
+ // The player renames his own team (the admin any team), written in the game like the other edits.
+ const renamePokemon=async()=>{
+  if(!sheet||!pokemon)return;
+  const nickname=window.prompt(`Nouveau surnom pour ${pokemon.nickname||pokemon.speciesName} (10 caractères max) :`,pokemon.nickname??'')?.trim();
+  if(!nickname||nickname===pokemon.nickname||!confirmOutOfBattle(sheet.row.name,`Renommer ${pokemon.nickname||pokemon.speciesName} en ${nickname} ?`))return;
+  setBusy(true);
+  try{
+   if(sheet.row.accountId===account.id)await api(`/api/lobbies/${lobby.id}/my-pokemon/rename`,{method:'POST',body:{slot:pokemon.slot,nickname,confirmOutOfBattle:true}});
+   else await partyAction(lobby.id,sheet.row.accountId,{action:'rename',slot:pokemon.slot,nickname});
+   toast.success(`Renommé ${nickname}. Sauvegardez dans le jeu pour le conserver.`);
+  }catch(e){toast.error(e);}finally{setBusy(false);}
+ };
+ const rename={label:'Renommer',icon:<Pencil size={15}/>,disabled:busy||!pokemon?.raw||!nativeReplace,
+  title:nativeReplace?undefined:'Le jeu de ce joueur ne permet pas cette écriture',onClick:()=>void renamePokemon()};
  return <Shell route={route}>
   {route==='course'&&<CoursePage onPokemon={(row,p)=>setSheet({row,slot:p.slot})}/>}
   {route==='map'&&<MapRoute/>}
@@ -75,11 +97,13 @@ function Portal(){
   {route==='library'&&<PokemonLibrary capture={capture} clearCapture={()=>setCapture(null)}/>}
   <WheelOverlay/>
   <PassiveSelection/>
-  {sheet&&pokemon&&<PokemonSheet pokemon={pokemon} owner={sheet.row.name} onClose={()=>setSheet(null)} actions={account.admin?[
+  {sheet&&pokemon&&<PokemonSheet pokemon={pokemon} owner={sheet.row.name} onClose={()=>setSheet(null)} actions={account.admin?[rename,
    {label:'Sauvegarder dans la bibliothèque',icon:<Save size={15}/>,disabled:!pokemon.raw,title:pokemon.raw?undefined:nativeActionUnavailable,
     onClick:()=>{setCapture({pokemon:structuredClone(pokemon),source:sheet.row.name,capturedAt:sheetView?.display.state.observedAt??new Date().toISOString()});setSheet(null);window.location.hash='/bibliotheque';}},
+   {label:'Plus un Pokémon d’échange',icon:<Handshake size={15}/>,disabled:busy||!pokemon.raw||!nativeReplace,
+    title:nativeReplace?'Il prend l’ID Dresseur du joueur et obéit (peut changer son chromatisme)':'Le jeu de ce joueur ne permet pas cette écriture',onClick:()=>void adoptPokemon()},
    {label:'Retirer de l’équipe',icon:<Trash2 size={15}/>,danger:true,disabled:busy||!pokemon.raw||!(nativeRemove||sheetView?.legacyActionsAvailable)||(sheetView?.display.state.party.length??0)<2,
     title:nativeRemove||sheetView?.legacyActionsAvailable?undefined:'Le jeu de ce joueur ne permet pas cette écriture',onClick:()=>void removePokemon()}
-  ]:[]}/>}
+  ]:sheet.row.accountId===account.id?[rename]:[]}/>}
  </Shell>;
 }

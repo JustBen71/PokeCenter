@@ -1,4 +1,4 @@
-import {gen3PartyRaw,pokemonActionSchema,type Account,type GameCapability} from '@pokerace/shared';
+import {decodePokemonCopy,gen3PartyRaw,pokemonActionSchema,withNickname,withTrainer,type Account,type GameCapability} from '@pokerace/shared';
 import {DomainError} from '../errors.js';
 import {parseBody} from '../http.js';
 import type {CurrentGameService} from '../game/current-game-service.js';
@@ -18,8 +18,30 @@ export class PokemonService{
  async apply(lobbyId:string,accountId:string,actor:Account,body:unknown):Promise<GameCommandOutcome>{
   const action=parseBody(pokemonActionSchema,body);
   if(!action.confirmOutOfBattle)throw new DomainError('SAFE_STATE_REQUIRED','Confirmez que le joueur n’est pas en combat : l’équipe de combat est une copie que le jeu réécrit');
+  if(action.action==='adopt')return this.execute(lobbyId,accountId,actor,{action:'replace',slot:action.slot},this.adopted(lobbyId,accountId,action.slot));
+  if(action.action==='rename')return this.execute(lobbyId,accountId,actor,{action:'replace',slot:action.slot},this.renamed(lobbyId,accountId,action.slot,action.nickname));
   const raw='artifactId' in action?this.deps.library.gen3Raw(this.deps.library.require(action.artifactId)):null;
   return this.execute(lobbyId,accountId,actor,action,raw);
+ }
+
+ /** The slot rewritten with the trainer of the save (ID + name): the game no longer treats it as traded, it obeys. */
+ private adopted(lobbyId:string,accountId:string,slot:number){
+  const {state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:['pokemon.replace']});
+  const pokemon=state.party.find(p=>p.slot===slot),raw=gen3PartyRaw(pokemon);
+  if(!pokemon)throw new DomainError('VALIDATION_FAILED','Cet emplacement est vide');
+  if(!raw)throw new DomainError('CAPABILITY_MISSING','Le client n’envoie pas la copie exacte de ce Pokémon');
+  // Only the save knows the player's trainer ID (his team may hold received Pokémon only).
+  const ot=state.trainer.ot;
+  if(!ot)throw new DomainError('CAPABILITY_MISSING','Le client du joueur ne lit pas encore son ID Dresseur : mettez-le à jour (0.2.2 ou plus)');
+  if(raw.slice(8,16)+raw.slice(40,54)===ot)throw new DomainError('CONFLICT',`${decodePokemonCopy(raw).nickname} appartient déjà au dresseur du joueur`);
+  return withTrainer(raw,ot);
+ }
+
+ private renamed(lobbyId:string,accountId:string,slot:number,nickname:string){
+  const {state}=this.deps.currentGame.requireState(lobbyId,accountId,{capabilities:['pokemon.replace']});
+  const raw=gen3PartyRaw(state.party.find(p=>p.slot===slot));
+  if(!raw)throw new DomainError('VALIDATION_FAILED','Cet emplacement est vide ou le client n’envoie pas sa copie exacte');
+  try{return withNickname(raw,nickname);}catch(e){throw new DomainError('VALIDATION_FAILED',(e as Error).message);}
  }
 
  /** Inserts an exact Gen III copy kept by the server (Âme liée), with the same safety rules as the library. */

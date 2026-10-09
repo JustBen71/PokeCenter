@@ -34,7 +34,7 @@ public sealed class EmulatorSession : IAsyncDisposable
     public Task Ended => Task.WhenAny(emulator.WaitForExitAsync(), client);
 
     public static async Task<EmulatorSession> StartAsync(ClientConfiguration configuration, string rom, string directory,
-        IProgress<string> step, IProgress<double>? download, CancellationToken cancellation)
+        IProgress<string> step, IProgress<double>? download, CancellationToken cancellation, string? state = null)
     {
         if (!File.Exists(rom)) throw new ClientException("rom_missing", "Le fichier ROM sélectionné est introuvable.");
         LocalRomIdentity identity;
@@ -49,7 +49,10 @@ public sealed class EmulatorSession : IAsyncDisposable
         var start = BizHawkInstaller.StartInfo(folder);
         start.ArgumentList.Add("--config=" + await PrepareEmulatorConfigAsync(directory, folder, cancellation));
         start.ArgumentList.Add("--open-ext-tool-dll=Pokerace.BizHawkBridge");
+        // Restart from an automatic copy (after a crash): its savestate also holds the in-game save.
+        if (state != null) start.ArgumentList.Add("--load-state=" + Path.GetFullPath(state));
         start.ArgumentList.Add(Path.GetFullPath(rom));
+        start.Environment["POKERACE_AUTOSAVES_DIR"] = AutosavesDirectory(directory);
         start.Environment["POKERACE_BRIDGE_TOKEN"] = token;
         start.Environment["POKERACE_BRIDGE_PORT"] = port.ToString();
         start.Environment["POKERACE_BRIDGE_LOG"] = Path.Combine(directory, "bridge.log");
@@ -112,6 +115,13 @@ public sealed class EmulatorSession : IAsyncDisposable
         }
     }
 
+    public static string AutosavesDirectory(string directory) => Path.Combine(directory, "autosaves");
+    /// <summary>The bridge's copies every 5 minutes (game.State), newest first; also those kept by 0.2.3–0.2.5 in the BizHawk folder.</summary>
+    public static IReadOnlyList<string> Autosaves(string directory) =>
+        (Directory.Exists(directory) ? Directory.GetDirectories(directory, "BizHawk-*").Select(d => Path.Combine(d, "PokeraceAutosaves")) : [])
+        .Append(AutosavesDirectory(directory)).Where(Directory.Exists).SelectMany(Directory.GetDirectories)
+        .Select(d => Path.Combine(d, "game.State")).Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).ToList();
+
     private static async Task<string> PrepareEmulatorConfigAsync(string directory, string folder, CancellationToken cancellation)
     {
         var path = Path.Combine(directory, "bizhawk.config.json");
@@ -119,6 +129,10 @@ public sealed class EmulatorSession : IAsyncDisposable
         { ["LastWrittenFrom"] = "2.11.1", ["FirstBoot"] = false, ["SkipOutdatedOsCheck"] = true, ["SkipSuperuserPrivsCheck"] = true };
         // Windows: GDI+. Linux: OpenGL; GDI+ under Mono can freeze BizHawk waiting for an X event (libgdiplus/cairo, MIT-SHM).
         config["DispMethod"] = OperatingSystem.IsWindows() ? 1 : 0;
+        // The in-game save is written to disk every minute, not only when BizHawk closes (a crash would lose it).
+        config["AutosaveSaveRAM"] = true; config["FlushSaveRamFrames"] = 60 * 60;
+        // BizHawk 2.11.1 crashes on ROM load with « Auto-load last slot » and SaveSlot 0 (its default): slots are 1–10.
+        if (config["SaveSlot"]?.GetValue<int>() is not (>= 1 and <= 10)) config["SaveSlot"] = 1;
         var dll = Path.GetFullPath(Path.Combine(folder, "ExternalTools", "Pokerace.BizHawkBridge.dll"));
         var trust = config["TrustedExtTools"] as JsonObject ?? new JsonObject();
         trust[dll] = "SHA512:" + Convert.ToHexString(SHA512.HashData(await File.ReadAllBytesAsync(dll, cancellation)));

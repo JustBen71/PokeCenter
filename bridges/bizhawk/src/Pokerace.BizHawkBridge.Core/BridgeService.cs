@@ -9,12 +9,30 @@ public sealed class BridgeService
 {
     // Lost games kept on disk (savestate + in-game save) before an automatic reset; the oldest are deleted.
     public const int KeptLostGames = 3;
+    // Safety copies of the running game (savestate + in-game save) taken every few minutes; the oldest are deleted.
+    public const int KeptAutosaves = 3;
     private readonly IEmulatorHost host;
-    private readonly string lostGamesDirectory;
-    public BridgeService(IEmulatorHost host, string? lostGamesDirectory = null)
+    private readonly string lostGamesDirectory, autosavesDirectory;
+    public BridgeService(IEmulatorHost host, string? lostGamesDirectory = null, string? autosavesDirectory = null)
     {
         this.host = host;
         this.lostGamesDirectory = lostGamesDirectory ?? Path.Combine(Environment.CurrentDirectory, "PokeraceLostGames");
+        this.autosavesDirectory = autosavesDirectory ?? Path.Combine(Environment.CurrentDirectory, "PokeraceAutosaves");
+    }
+
+    /// <summary>Copies the running GBA game into a new autosave folder (null without a game); throws BridgeException if it fails.</summary>
+    public string? Autosave() => host.IsGameLoaded && host.SystemId == "GBA" ? Archive(autosavesDirectory, KeptAutosaves) : null;
+
+    // A new copy is complete before an old one is deleted: a failure leaves the previous copies untouched.
+    private string Archive(string root, int keep)
+    {
+        var folder = Path.Combine(root, DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff'Z'"));
+        Directory.CreateDirectory(folder);
+        try { host.ArchiveGame(folder); }
+        catch (Exception) { try { Directory.Delete(folder, true); } catch (Exception) { } throw new BridgeException("archive_failed", "The game could not be archived; nothing was erased."); }
+        foreach (var old in Directory.GetDirectories(root).OrderByDescending(d => Path.GetFileName(d), StringComparer.Ordinal).Skip(keep))
+            try { Directory.Delete(old, true); } catch (Exception) { }
+        return folder;
     }
 
     public JObject Execute(JObject request)
@@ -102,12 +120,7 @@ public sealed class BridgeService
                 {
                     // Archive first: if the savestate or the save copy fails, nothing is erased.
                     RequireSameGame(request);
-                    var folder = Path.Combine(lostGamesDirectory, DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff'Z'"));
-                    Directory.CreateDirectory(folder);
-                    try { host.ArchiveGame(folder); }
-                    catch (Exception) { try { Directory.Delete(folder, true); } catch (Exception) { } throw new BridgeException("archive_failed", "The game could not be archived; nothing was erased."); }
-                    foreach (var old in Directory.GetDirectories(lostGamesDirectory).OrderByDescending(d => Path.GetFileName(d), StringComparer.Ordinal).Skip(KeptLostGames))
-                        try { Directory.Delete(old, true); } catch (Exception) { }
+                    var folder = Archive(lostGamesDirectory, KeptLostGames);
                     try { host.EraseSaveAndReboot(); }
                     catch (Exception) { throw new BridgeException("reset_failed", "Game archived but the reset failed; inspect the emulator."); }
                     result = new { archive = Path.GetFileName(folder), kept = KeptLostGames };

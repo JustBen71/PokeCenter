@@ -35,6 +35,7 @@ const defaults:WheelInput[]=[
  */
 export class WheelService{
  private services!:Services;
+ private readonly spinAllQueue=new Map<string,Promise<void>>();
  // Hook for protections (Sprint 8): may block a hostile wheel before it is drawn.
  beforeSpin:(input:{lobbyId:string;wheel:WheelType;owner:Account;target:Account|null;ticketId:string|null;ticketReceivedAt:string|null})=>string|null=()=>null;
  // spinAllSpacingMs: time between two players' spins of « Lancer à tous » (each animation is seen); tests use 0.
@@ -94,7 +95,10 @@ export class WheelService{
    message:`${wheel.name} lancée pour tous les joueurs en Run (${players.length})${actor?'':' — roue automatique'}`,metadata:{wheelId,players}});
   this.deps.notify(lobbyId,{kind:'info',message:`🎡 ${wheel.name} : une roue pour chaque joueur (${players.length})${actor?'':' — roue automatique'}`});
   const spacing=this.deps.spinAllSpacingMs??7000,wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
-  void (async()=>{
+  // Queued per lobby: two « Lancer à tous » (or the automatic wheel) never interleave their animations.
+  const previous=this.spinAllQueue.get(lobbyId);
+  const next=(async()=>{
+   if(previous){await previous;await wait(spacing);}
    for(const [i,player] of players.entries()){
     if(i)await wait(spacing);
     try{
@@ -104,6 +108,8 @@ export class WheelService{
     }catch{/* audited by spin/apply; the other players still get their wheel */}
    }
   })();
+  this.spinAllQueue.set(lobbyId,next);
+  void next.finally(()=>{if(this.spinAllQueue.get(lobbyId)===next)this.spinAllQueue.delete(lobbyId);});
   return {players:players.length};
  }
 
@@ -216,7 +222,9 @@ export class WheelService{
    this.deps.changed(lobbyId);
   };
   try{
-   const message=await wheelHandlers[before.gage.handler]({lobbyId,resolutionId:id,actorId:actor.id,gage:before.gage,owner,target,choice,services:this.services});
+   // A hostile wheel hits its target: a gage without a target (battle, level ±, items…) applies to the victim, never to the sender.
+   const subject=before.tone==='BAD'&&target&&!before.gage.requiresTarget?target:owner;
+   const message=await wheelHandlers[before.gage.handler]({lobbyId,resolutionId:id,actorId:actor.id,gage:before.gage,owner:subject,target,choice,services:this.services});
    finish('SUCCESS',message);
    if(target)this.suffered(lobbyId,id,before.tone,before.gage,target.id);
    this.services.domain.audit.record({lobbyId,actorAccountId:actor.id,targetAccountId:target?.id??owner.id,category:'WHEEL',action:'wheel.apply',status:'SUCCESS',message,metadata:{resolutionId:id}});

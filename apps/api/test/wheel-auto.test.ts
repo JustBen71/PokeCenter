@@ -41,6 +41,10 @@ test('Lancer à tous: one wheel per player in a Run, immediate gages applied, ho
   await t.as(t.admin.id).post(`${t.path}/wheels/${bad.id}/spin-all`);
   await until(()=>t.resolutions().filter(r=>r.wheel===bad.id&&r.status==='SUCCESS').length===2,'hostile applied');
   assert.ok(t.resolutions().filter(r=>r.wheel===bad.id).every(r=>r.target===r.owner));
+  // Two launches in a row are queued: the second wheel starts once every player had the first one.
+  t.portal.services.wheels.spinAll(t.lobby.id,good.id,t.admin);t.portal.services.wheels.spinAll(t.lobby.id,bad.id,t.admin);
+  await until(()=>t.resolutions().length===8,'both launches');
+  assert.deepEqual(t.resolutions().slice(4).map(r=>r.wheel),[good.id,good.id,bad.id,bad.id]);
  }finally{await t.close();}
 });
 
