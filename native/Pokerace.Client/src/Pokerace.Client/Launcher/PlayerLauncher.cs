@@ -73,7 +73,11 @@ public static class PlayerLauncher
         var rom = options.Rom ?? (File.Exists(romFile) ? File.ReadAllText(romFile).Trim() : null);
         var form = new LaunchForm(console, (configuration, token) => ServerConnection.ResolveRoomAsync(configuration, token),
             (configuration, path, state, token) => PlayAsync(console, configuration, path, state, directory, token),
-            RomPicker.Available ? RomPicker.ChooseAsync : null, () => EmulatorSession.Autosaves(directory));
+            RomPicker.Available ? RomPicker.ChooseAsync : null, async (path, token) =>
+            {
+                await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                return Autosaves.List(directory, await Games.LocalRomIdentity.FromStreamAsync(file, token));
+            });
         await form.RunAsync(existing, LaunchFields.From(existing, rom, options.Port), (configuration, path) =>
         {
             ConfigurationStore.Save(options.ConfigPath, configuration);
@@ -82,7 +86,7 @@ public static class PlayerLauncher
         return 0;
     }
 
-    private static async Task PlayAsync(IAnsiConsole console, ClientConfiguration configuration, string rom, string? state, string directory, CancellationToken cancellation)
+    private static async Task PlayAsync(IAnsiConsole console, ClientConfiguration configuration, string rom, Autosave? state, string directory, CancellationToken cancellation)
     {
         EmulatorSession? session = null;
         await console.Status().Spinner(Spinner.Known.Dots).StartAsync("Préparation…", async context =>

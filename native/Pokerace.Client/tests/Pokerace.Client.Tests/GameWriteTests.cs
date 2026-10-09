@@ -32,6 +32,32 @@ public sealed class GameWriteTests
         Assert.Contains("money.write", state.Capabilities); Assert.Contains("pokemon.insert", state.Capabilities); Assert.Equal(state.Capabilities, state.Adapter.Capabilities);
     }
 
+    [Fact] public async Task ExactHashKeepsWritesButARevisionFallbackIsReadOnly()
+    {
+        Assert.Equal(Gen3ProfileRegistry.ExactHash, new Gen3ProfileRegistry().Resolve(Identity).Profile!.Match);
+        // Unknown SHA-256 (randomized ROM) with the header of the validated BPEF v0: read, never written.
+        var randomized = Identity with { Sha256 = new string('0', 64), Revision = "BPEF v0" };
+        var (status, profile) = new Gen3ProfileRegistry().Resolve(randomized);
+        Assert.Equal("ready", status); Assert.Equal(Gen3ProfileRegistry.RevisionFallback, profile!.Match); Assert.False(profile.AllowWrites);
+        await using var bridge = Bridge(0);
+        var state = (await new GameAdapterManager(bridge, randomized, true, new BattleEncounterStore(null), new Pokerace.Client.Runtime.GameEventOutbox(null)).ObserveAsync(new(true, true, "GBA", 1), default)).State!;
+        Assert.Single(state.Party);
+        Assert.Equal(Gen3GameAdapter.ReadCapabilities.Concat(Gen3BattleEvents.Capabilities), state.Capabilities);
+        Assert.DoesNotContain(state.Capabilities, c => c.EndsWith(".write") || c.Contains("insert") || c.Contains("remove") || c.Contains("replace") || c.Contains("reset") || c.Contains("battle.trainer") || c.Contains("box"));
+        var before = (byte[])bridge.Ewram.Clone();
+        var router = new CommandRouter(bridge, new ClientConfiguration { AllowPokemonPurchases = true, AllowMemoryWrites = true }, romIdentity: randomized);
+        foreach (var (name, payload) in new (string, JsonObject)[] {
+            ("game.money.add", new() { ["amount"] = 500, ["expectedMoney"] = 12500 }),
+            ("game.pokemon.remove", new() { ["slot"] = 1, ["expectedCount"] = 1 }),
+            ("pokemon.purchase", new() { ["price"] = 100, ["expectedMoney"] = 12500, ["expectedCount"] = 1, ["raw"] = Convert.ToHexString(GameAdapterTests.MemoryBridge.Pokemon(0)) }),
+            (Gen3Items.AddCommand, new() { ["itemId"] = 13 }),
+            ("bridge.writeMemory", new() { ["domain"] = "EWRAM", ["address"] = 0, ["data"] = "01" }) })
+            Assert.Equal("rom_not_validated", (await router.RouteAsync(Command(name, payload), default)).ErrorCode);
+        Assert.Equal("reset_unavailable", (await router.RouteAsync(Command(Gen3Defeat.ResetCommand, new()), default)).ErrorCode);
+        Assert.True((await router.RouteAsync(Command("game.party.snapshot", new()), default)).Ok, "reading stays available");
+        Assert.Equal(before, bridge.Ewram);
+    }
+
     [Fact] public async Task MoneyAddRemoveAndSetAreVerifiedAndNeverAppliedTwice()
     {
         await using var bridge = Bridge(0); var router = Router(bridge);

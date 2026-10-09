@@ -12,23 +12,41 @@ public sealed class BridgeService
     // Safety copies of the running game (savestate + in-game save) taken every few minutes; the oldest are deleted.
     public const int KeptAutosaves = 3;
     private readonly IEmulatorHost host;
+    public const int ManifestFormat = 1;
     private readonly string lostGamesDirectory, autosavesDirectory;
-    public BridgeService(IEmulatorHost host, string? lostGamesDirectory = null, string? autosavesDirectory = null)
+    private readonly JObject? launch;
+    /// <param name="launch">What the launcher knows of this game (clientVersion, romSha256, romRevision), copied into each autosave manifest.</param>
+    public BridgeService(IEmulatorHost host, string? lostGamesDirectory = null, string? autosavesDirectory = null, JObject? launch = null)
     {
-        this.host = host;
+        this.host = host; this.launch = launch;
         this.lostGamesDirectory = lostGamesDirectory ?? Path.Combine(Environment.CurrentDirectory, "PokeraceLostGames");
         this.autosavesDirectory = autosavesDirectory ?? Path.Combine(Environment.CurrentDirectory, "PokeraceAutosaves");
     }
 
     /// <summary>Copies the running GBA game into a new autosave folder (null without a game); throws BridgeException if it fails.</summary>
-    public string? Autosave() => host.IsGameLoaded && host.SystemId == "GBA" ? Archive(autosavesDirectory, KeptAutosaves) : null;
+    public string? Autosave() => host.IsGameLoaded && host.SystemId == "GBA" ? Archive(autosavesDirectory, KeptAutosaves, WriteManifest) : null;
+
+    // manifest.json next to game.State and game.SaveRAM: the launcher only offers a copy made from the selected ROM.
+    private void WriteManifest(string folder, DateTime created)
+    {
+        var game = host.GetGameInfo() is { } info ? JObject.FromObject(info) : null;
+        var manifest = new JObject
+        {
+            ["format"] = ManifestFormat, ["createdUtc"] = created.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"),
+            ["clientVersion"] = launch?["clientVersion"],
+            ["rom"] = new JObject { ["sha256"] = launch?["romSha256"], ["revision"] = launch?["romRevision"] },
+            ["bizhawk"] = new JObject { ["hash"] = game?["hash"], ["name"] = game?["name"] },
+        };
+        File.WriteAllText(Path.Combine(folder, "manifest.json"), manifest.ToString());
+    }
 
     // A new copy is complete before an old one is deleted: a failure leaves the previous copies untouched.
-    private string Archive(string root, int keep)
+    private string Archive(string root, int keep, Action<string, DateTime>? describe = null)
     {
-        var folder = Path.Combine(root, DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff'Z'"));
+        var created = DateTime.UtcNow;
+        var folder = Path.Combine(root, created.ToString("yyyyMMdd'T'HHmmssfff'Z'"));
         Directory.CreateDirectory(folder);
-        try { host.ArchiveGame(folder); }
+        try { host.ArchiveGame(folder); describe?.Invoke(folder, created); }
         catch (Exception) { try { Directory.Delete(folder, true); } catch (Exception) { } throw new BridgeException("archive_failed", "The game could not be archived; nothing was erased."); }
         foreach (var old in Directory.GetDirectories(root).OrderByDescending(d => Path.GetFileName(d), StringComparer.Ordinal).Skip(keep))
             try { Directory.Delete(old, true); } catch (Exception) { }

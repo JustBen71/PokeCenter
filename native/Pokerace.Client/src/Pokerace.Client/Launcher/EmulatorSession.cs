@@ -34,7 +34,7 @@ public sealed class EmulatorSession : IAsyncDisposable
     public Task Ended => Task.WhenAny(emulator.WaitForExitAsync(), client);
 
     public static async Task<EmulatorSession> StartAsync(ClientConfiguration configuration, string rom, string directory,
-        IProgress<string> step, IProgress<double>? download, CancellationToken cancellation, string? state = null)
+        IProgress<string> step, IProgress<double>? download, CancellationToken cancellation, Autosave? restore = null)
     {
         if (!File.Exists(rom)) throw new ClientException("rom_missing", "Le fichier ROM sélectionné est introuvable.");
         LocalRomIdentity identity;
@@ -50,9 +50,12 @@ public sealed class EmulatorSession : IAsyncDisposable
         start.ArgumentList.Add("--config=" + await PrepareEmulatorConfigAsync(directory, folder, cancellation));
         start.ArgumentList.Add("--open-ext-tool-dll=Pokerace.BizHawkBridge");
         // Restart from an automatic copy (after a crash): its savestate also holds the in-game save.
-        if (state != null) start.ArgumentList.Add("--load-state=" + Path.GetFullPath(state));
+        if (restore != null) start.ArgumentList.Add("--load-state=" + Path.GetFullPath(Autosaves.PrepareRestore(directory, folder, restore, rom, identity)));
         start.ArgumentList.Add(Path.GetFullPath(rom));
         start.Environment["POKERACE_AUTOSAVES_DIR"] = AutosavesDirectory(directory);
+        start.Environment["POKERACE_CLIENT_VERSION"] = Server.ServerProtocol.ClientVersion;
+        start.Environment["POKERACE_ROM_SHA256"] = identity.Sha256;
+        start.Environment["POKERACE_ROM_REVISION"] = identity.Revision ?? "";
         start.Environment["POKERACE_BRIDGE_TOKEN"] = token;
         start.Environment["POKERACE_BRIDGE_PORT"] = port.ToString();
         start.Environment["POKERACE_BRIDGE_LOG"] = Path.Combine(directory, "bridge.log");
@@ -116,12 +119,6 @@ public sealed class EmulatorSession : IAsyncDisposable
     }
 
     public static string AutosavesDirectory(string directory) => Path.Combine(directory, "autosaves");
-    /// <summary>The bridge's copies every 5 minutes (game.State), newest first; also those kept by 0.2.3–0.2.5 in the BizHawk folder.</summary>
-    public static IReadOnlyList<string> Autosaves(string directory) =>
-        (Directory.Exists(directory) ? Directory.GetDirectories(directory, "BizHawk-*").Select(d => Path.Combine(d, "PokeraceAutosaves")) : [])
-        .Append(AutosavesDirectory(directory)).Where(Directory.Exists).SelectMany(Directory.GetDirectories)
-        .Select(d => Path.Combine(d, "game.State")).Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).ToList();
-
     private static async Task<string> PrepareEmulatorConfigAsync(string directory, string folder, CancellationToken cancellation)
     {
         var path = Path.Combine(directory, "bizhawk.config.json");

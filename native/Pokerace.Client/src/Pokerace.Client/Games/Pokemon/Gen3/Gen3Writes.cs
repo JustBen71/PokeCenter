@@ -16,7 +16,7 @@ public static class Gen3Writes
     public static async Task<JsonObject> ExecuteAsync(string command, IBridgeClient bridge, LocalRomIdentity? identity, JsonObject payload, CancellationToken cancellation)
     {
         var readOnly = command == "game.party.snapshot";
-        var tx = await Gen3Transaction.BeginAsync(bridge, identity, cancellation, requireWritableProfile: !readOnly);
+        var tx = await Gen3Transaction.BeginAsync(bridge, identity, cancellation, requireWritableProfile: !readOnly, write: !readOnly);
         if (readOnly) return Result(tx, tx.Money, tx.Count, tx.Party, verified: false);
         switch (command)
         {

@@ -39,7 +39,9 @@ public sealed class BridgeForm : Form, IExternalToolForm
             var token = Environment.GetEnvironmentVariable("POKERACE_BRIDGE_TOKEN") ?? "";
             var rawPort = Environment.GetEnvironmentVariable("POKERACE_BRIDGE_PORT") ?? "43821";
             if (!int.TryParse(rawPort, out var port) || port < 1 || port > 65535) throw new ArgumentException("Invalid port.");
-            var service = new BridgeService(new BizHawkHostAdapter(this), Environment.GetEnvironmentVariable("POKERACE_LOST_GAMES_DIR"), Environment.GetEnvironmentVariable("POKERACE_AUTOSAVES_DIR"));
+            var service = new BridgeService(new BizHawkHostAdapter(this), Environment.GetEnvironmentVariable("POKERACE_LOST_GAMES_DIR"), Environment.GetEnvironmentVariable("POKERACE_AUTOSAVES_DIR"),
+                new Newtonsoft.Json.Linq.JObject { ["clientVersion"] = Environment.GetEnvironmentVariable("POKERACE_CLIENT_VERSION"),
+                    ["romSha256"] = Environment.GetEnvironmentVariable("POKERACE_ROM_SHA256"), ["romRevision"] = Environment.GetEnvironmentVariable("POKERACE_ROM_REVISION") });
             server = new TcpBridgeServer(port, token, service, new FormDispatcher(this), log: Log);
             server.Start();
             autosave.Tick += (_, _) => { try { service.Autosave(); } catch (Exception) { Log("Autosave failed; the previous copies are kept."); } };

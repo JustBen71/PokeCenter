@@ -100,11 +100,11 @@ public sealed class LaunchFormTests
             Restore(); console.Input.PushTextWithEnter("o");         // confirmed: plays from the copy
             for (var i = 0; i < 7; i++) console.Input.PushKey(ConsoleKey.DownArrow);
             console.Input.PushKey(ConsoleKey.Enter);                 // Quitter
-            var states = new List<string?>();
+            var states = new List<Autosave?>();
             var form = new LaunchForm(console, (_, _) => Task.CompletedTask, (_, _, state, _) => { states.Add(state); return Task.CompletedTask; },
-                autosaves: () => [save]);
+                autosaves: (path, _) => Task.FromResult<IReadOnlyList<Autosave>>([new(save, DateTime.UtcNow, false)]));
             await form.RunAsync(existing, LaunchFields.From(existing, rom, null), (_, _) => { }, CancellationToken.None);
-            Assert.Equal([save], states);
+            Assert.Equal(save, Assert.Single(states)!.State);
             Assert.Contains("ce qui a été joué depuis sera perdu", console.Output);
         }
         finally { File.Delete(rom); File.Delete(save); }

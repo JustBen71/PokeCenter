@@ -82,6 +82,9 @@ public sealed class CommandRouter(IBridgeClient bridge, ClientConfiguration conf
         }
         if (command.Command == "bridge.writeMemory" && !configuration.AllowMemoryWrites)
             throw new ClientException("writes_disabled", "Memory writes are disabled locally.");
+        if (command.Command == "bridge.writeMemory" && romIdentity != null &&
+            new Pokerace.Client.Games.Pokemon.Gen3.Gen3ProfileRegistry().Resolve(romIdentity).Profile?.Match == Pokerace.Client.Games.Pokemon.Gen3.Gen3ProfileRegistry.RevisionFallback)
+            throw new ClientException("rom_not_validated", "This exact ROM is not validated: read only.");
         if (!new[] { "bridge.ping", "bridge.getStatus", "bridge.getSystem", "bridge.getGameInfo", "bridge.listMemoryDomains", "bridge.readMemory", "bridge.writeMemory" }.Contains(command.Command))
             throw new ClientException("unknown_command", "Unknown generic command.");
         if (!bridge.IsConnected) throw new ClientException("bridge_disconnected", "Bridge disconnected.");

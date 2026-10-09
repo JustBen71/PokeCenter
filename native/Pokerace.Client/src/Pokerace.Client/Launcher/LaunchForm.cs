@@ -41,8 +41,8 @@ public sealed record LaunchFields(string Address, int? Port, string Player, stri
 
 /// <summary>The connection form: one menu line per field, validation on input, and a server check before anything is launched.</summary>
 public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, CancellationToken, Task> checkRoom,
-    Func<ClientConfiguration, string, string?, CancellationToken, Task> play, Func<string?, CancellationToken, Task<string?>>? pickRom = null,
-    Func<IReadOnlyList<string>>? autosaves = null)
+    Func<ClientConfiguration, string, Autosave?, CancellationToken, Task> play, Func<string?, CancellationToken, Task<string?>>? pickRom = null,
+    Func<string, CancellationToken, Task<IReadOnlyList<Autosave>>>? autosaves = null)
 {
     private const string Connect = "connect", Restore = "restore", Quit = "quit";
     private string? romLabel;
@@ -63,8 +63,12 @@ public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, C
             cancellation.ThrowIfCancellationRequested();
             var choice = await console.PromptAsync(Menu(fields, next), cancellation);
             if (choice == Quit) return existing;
-            string? state = null;
-            if (choice == Restore) { state = await PickAutosaveAsync(cancellation); if (state == null) { next = Connect; continue; } choice = Connect; }
+            Autosave? state = null;
+            if (choice == Restore)
+            {
+                if (LaunchFields.RomError(fields.Rom) is { } romError) { console.MarkupLine("[red]✖ " + Markup.Escape(romError) + "[/]"); next = "rom"; continue; }
+                state = await PickAutosaveAsync(fields.Rom!, cancellation); if (state == null) { next = Connect; continue; } choice = Connect;
+            }
             if (choice != Connect) { fields = await EditAsync(choice, fields, cancellation); next = Connect; continue; }
             if (fields.Problem() is { } problem)
             {
@@ -101,16 +105,18 @@ public sealed class LaunchForm(IAnsiConsole console, Func<ClientConfiguration, C
     }
 
     /// <summary>After a crash: one of the copies made every 5 minutes, confirmed because the current progress is replaced.</summary>
-    private async Task<string?> PickAutosaveAsync(CancellationToken cancellation)
+    // Only copies of the selected ROM are listed; the current in-game save is backed up before BizHawk loads the copy.
+    private async Task<Autosave?> PickAutosaveAsync(string rom, CancellationToken cancellation)
     {
-        var saves = autosaves!();
-        if (saves.Count == 0) { console.MarkupLine("[yellow]Aucune sauvegarde automatique : elles sont faites toutes les 5 minutes pendant le jeu.[/]"); return null; }
-        static string Label(string s) { var at = File.GetLastWriteTime(s); var ago = (int)(DateTime.Now - at).TotalMinutes;
-            return $"{at:dd/MM HH:mm}  (il y a {(ago < 60 ? ago + " min" : ago / 60 + " h " + ago % 60 + " min")})"; }
-        var picked = await console.PromptAsync(new SelectionPrompt<string>().Title("Reprendre la partie à quelle sauvegarde automatique ?")
-            .UseConverter(s => s.Length == 0 ? "Annuler" : Label(s)).AddChoices(saves.Append("")), cancellation);
-        if (picked.Length == 0) return null;
-        var ok = await console.PromptAsync(new ConfirmationPrompt($"[yellow]La partie reprendra au {Markup.Escape(Label(picked))} : ce qui a été joué depuis sera perdu (sauvegarde en jeu comprise). Continuer ?[/]") { DefaultValue = false, Yes = 'o', No = 'n' }, cancellation);
+        var saves = await autosaves!(rom, cancellation);
+        if (saves.Count == 0) { console.MarkupLine("[yellow]Aucune sauvegarde automatique pour cette ROM : elles sont faites toutes les 5 minutes pendant le jeu.[/]"); return null; }
+        static string Label(Autosave s) { var at = s.CreatedUtc.ToLocalTime(); var ago = (int)(DateTime.Now - at).TotalMinutes;
+            return $"{at:dd/MM HH:mm}  (il y a {(ago < 60 ? ago + " min" : ago / 60 + " h " + ago % 60 + " min")})" + (s.Legacy ? "  — ancienne copie, vérifiée au lancement" : ""); }
+        var cancel = new Autosave("", default, false);
+        var picked = await console.PromptAsync(new SelectionPrompt<Autosave>().Title("Reprendre la partie à quelle sauvegarde automatique ?")
+            .UseConverter(s => s == cancel ? "Annuler" : Label(s)).AddChoices(saves.Append(cancel)), cancellation);
+        if (picked == cancel) return null;
+        var ok = await console.PromptAsync(new ConfirmationPrompt($"[yellow]La partie reprendra au {Markup.Escape(Label(picked))} : ce qui a été joué depuis sera perdu (sauvegarde en jeu comprise). La sauvegarde actuelle est d'abord copiée dans restore-backups. Continuer ?[/]") { DefaultValue = false, Yes = 'o', No = 'n' }, cancellation);
         return ok ? picked : null;
     }
 

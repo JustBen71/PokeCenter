@@ -41,6 +41,18 @@ public sealed class ResetTests : IDisposable
         host.IsGameLoaded = false;
         Assert.Null(service.Autosave());
     }
+    [Fact] public void EachAutosaveHasAManifestOfTheLaunchedRom()
+    {
+        host.SystemId = "GBA";
+        var service = new BridgeService(host, root + "-lost", root, JObject.FromObject(new { clientVersion = "0.2.7", romSha256 = "aa11", romRevision = "BPEF v0" }));
+        var folder = service.Autosave()!;
+        var manifest = JObject.Load(new Newtonsoft.Json.JsonTextReader(new StringReader(File.ReadAllText(Path.Combine(folder, "manifest.json")))) { DateParseHandling = Newtonsoft.Json.DateParseHandling.None });
+        Assert.Equal(1, (int)manifest["format"]!);
+        Assert.Equal("0.2.7", (string?)manifest["clientVersion"]);
+        Assert.Equal("aa11", (string?)manifest["rom"]!["sha256"]); Assert.Equal("BPEF v0", (string?)manifest["rom"]!["revision"]);
+        Assert.Equal("ABC123", (string?)manifest["bizhawk"]!["hash"]);
+        Assert.Equal(Path.GetFileName(folder), ((string)manifest["createdUtc"]!).Replace("-", "").Replace(":", "").Replace(".", ""));
+    }
     [Fact] public void RefusesAnotherGame()
     {
         Assert.Equal("state_changed", (string?)Reset("other")["error"]?["code"]);

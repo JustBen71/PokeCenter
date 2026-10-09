@@ -33,13 +33,15 @@ public sealed class Gen3Transaction
         Decoder = new Gen3PokemonDecoder(Gen3ProfileRegistry.Resource("game-data"), profile.Language);
     }
 
-    public static async Task<Gen3Transaction> BeginAsync(IBridgeClient bridge, LocalRomIdentity? identity, CancellationToken cancellation, string unavailableCode = "write_unavailable", bool requireWritableProfile = true)
+    public static async Task<Gen3Transaction> BeginAsync(IBridgeClient bridge, LocalRomIdentity? identity, CancellationToken cancellation, string unavailableCode = "write_unavailable", bool requireWritableProfile = true, bool write = true)
     {
         if (identity == null || bridge is not ITransactionalBridge transaction) throw new ClientException(unavailableCode, "Launch a recognized ROM with the updated bridge.");
         var (_, profile) = new Gen3ProfileRegistry().Resolve(identity);
         var game = await bridge.GetGameInfoAsync(cancellation);
         if (profile == null || !identity.MatchesLoadedGame(game) || await bridge.GetSystemAsync(cancellation) != "GBA" || !Gen3Memory.HasDomains(await bridge.GetMemoryDomainsAsync(cancellation)))
             throw new ClientException(unavailableCode, "ROM identity or memory domains unavailable.");
+        // Purchases predate write-validated profiles (requireWritableProfile: false) but still never write a fallback ROM.
+        if (write && profile.Match != Gen3ProfileRegistry.ExactHash) throw new ClientException("rom_not_validated", "This exact ROM is not validated: read only.");
         if (requireWritableProfile && !profile.AllowWrites) throw new ClientException("profile_read_only", "This ROM profile is validated for reading only.");
         var memory = new Gen3Memory(bridge);
         var ptr1 = await memory.ReadAsync(profile.SaveBlock1Pointer, 4, cancellation);
