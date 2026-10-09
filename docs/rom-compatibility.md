@@ -1,6 +1,19 @@
 # Compatibilité ROM
 
-Le registre reconnaît désormais l’empreinte exacte de la ROM française BPEF v0 testée. Les autres empreintes restent inconnues, sans accès RAM. Le profil anglais reste candidat.
+Le registre reconnaît désormais l’empreinte exacte de la ROM française BPEF v0 testée. Le profil anglais reste candidat.
+
+## ROM randomisées (0.2.1, lecture seule depuis 0.2.7)
+
+`Gen3ProfileRegistry.Resolve` renvoie le profil avec l’un de ces deux modes de reconnaissance (`Gen3MemoryProfile.Match`) :
+
+| Cas | Statut | Capabilities |
+|---|---|---|
+| SHA-256 exact listé dans `rom-manifest.json` (`validated: true`) | `ready`, `EXACT_HASH` | toutes celles du profil (lecture, argent, équipe, objets, combats commandités, reset…) |
+| SHA-256 inconnu, mais en-tête GBA (code + version, ex. `BPEF v0`) d’une révision validée : ROM randomisée | `ready`, `REVISION_FALLBACK` | lecture seule (`trainer/money/party/location/progression.read` et événements de combat) |
+| En-tête inconnu ou révision non validée | `unknown_rom` / `profile_not_validated` | aucune |
+| ROM chargée dans BizHawk différente de la ROM sélectionnée | `rom_identity_unavailable` | aucune |
+
+Avec `REVISION_FALLBACK`, le profil est rendu avec `AllowWrites = false` : le client n’annonce aucune capability d’écriture. Le client refuse aussi toute écriture avec `rom_not_validated`, même si un serveur l’envoie quand même : argent, `game.pokemon.*`, `pokemon.purchase`, objets, combat commandité, boîte, reset (`reset_unavailable`), `bridge.writeMemory`. Seul `game.party.snapshot` (lecture) reste permis. Une ROM randomisée retrouvera les écritures quand son empreinte exacte sera validée et ajoutée au manifeste. Les adresses viennent de la révision, aucune n’est inventée. Tests : `GameWriteTests.ExactHashKeepsWritesButARevisionFallbackIsReadOnly`, `GameAdapterTests`.
 
 ## Validation du 26 septembre 2026
 

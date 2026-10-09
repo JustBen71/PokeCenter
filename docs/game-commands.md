@@ -32,7 +32,15 @@ Le client renvoie `{verified, money, partyCount, party[]}`.
 
 **Capabilities.** Les écritures (`money.write`, `party.write`, `pokemon.insert/remove/replace`) ne sont annoncées que si trois conditions sont réunies : le profil ROM a `allowWrites: true` (actuellement BPEF v0 seulement), le bridge est transactionnel et `allowPokemonPurchases` est actif dans `client.json`. Ce réglage local coupe désormais **toutes** les écritures métier.
 
-**Combat.** Aucun profil ne contient d'adresse validée indiquant un combat en cours, et aucune n'a été inventée. Toute modification de l'équipe exige donc `confirmOutOfBattle: true` : l'admin confirme que le joueur n'est pas en combat, sinon l'API répond `SAFE_STATE_REQUIRED`. Modifier l'argent est sans risque en combat.
+**Safe State (0.2.7).** L'équipe de combat est une copie que le jeu réécrit : modifier l'équipe hors d'un moment sûr peut être perdu ou corrompre la partie. Le client natif calcule l'état sûr avec le détecteur déjà utilisé par les combats commandités (`Gen3BattleEncounter.Field.Safe`) : le callback principal est celui de l'overworld (donc ni combat, ni changement de zone), le contexte de script est arrêté (ni dialogue, ni script) et les contrôles ne sont pas verrouillés (ni menu). Il ne faut pas non plus de combat commandité en cours. Il publie le résultat dans `GAME_STATE.battle.safe`. Le serveur ne connaît aucune adresse.
+
+- `CurrentGameService.requireState(…, {requireSafeState: true})` refuse avec `SAFE_STATE_REQUIRED` (428), **avant tout envoi**, si l'état observé n'a pas `battle.safe === true`. Même chose sans état frais : un client reconnecté qui n'a encore rien publié est refusé (`GAME_ADAPTER_NOT_READY`).
+- Toutes les écritures d'équipe passent par là, via `PokemonService.execute` : insert, remove, replace, renommage, adoption, effets de roues (retrait, Pokémon de la bibliothèque, transfert, niveau, Magicarpe) et passifs (`insertRaw`). L'achat aux enchères (`pokemon.purchase`) aussi.
+- Le client relit l'état juste avant d'écrire (`game.pokemon.*`, `pokemon.purchase`). S'il n'est plus sûr, il refuse avec `not_safe` sans rien écrire : `FAILED` côté serveur, jamais `REVIEW`. Sans adresses de combat validées dans le profil, l'état est inconnu et refusé.
+- Une commande refusée n'est ni mise en attente ni rejouée plus tard : il suffit de réessayer. `confirmOutOfBattle: true` reste demandé par l'interface comme confirmation de l'utilisateur, mais ce n'est plus la preuve que l'écriture est sûre.
+- Modifier l'argent ne touche pas l'équipe : pas de Safe State exigé.
+
+Tests : `apps/api/test/safe-state.test.ts` (overworld libre, combat, dialogue, changement de zone, menu, combat commandité, refus tardif du client, reconnexion sans état, retour à l'état sûr, ACK perdu → REVIEW jamais rejoué) et `GameWriteTests.PartyWritesHappenOnlyInTheSafeStateAndNothingIsWrittenOtherwise`.
 
 ## Issues d'une commande
 

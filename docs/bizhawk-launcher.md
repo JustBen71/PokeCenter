@@ -17,6 +17,22 @@ Le téléchargement officiel de BizHawk 2.11.1 est contrôlé par SHA-256. Les d
 
 Le client autonome ne nécessite pas de SDK, Node, Python ou Docker. Windows x64 avec .NET Framework 4.8, ou Linux x64 avec Mono, est nécessaire à BizHawk. La première préparation depuis les **sources** peut télécharger un SDK .NET portable vérifié dans `.work`, puis compiler ; les lancements suivants utilisent le binaire déjà préparé. Si le code a été mis à jour, reconstruire avec la commande ci-dessous.
 
+### Sauvegardes automatiques et restauration (0.2.7)
+
+| Dossier (à côté du lanceur) | Contenu | Rotation |
+|---|---|---|
+| `launcher/autosaves/<UTC>/` | copie faite par le bridge toutes les 5 minutes : `game.State` (savestate, sauvegarde en jeu comprise), `game.SaveRAM`, `manifest.json` | 3 gardées |
+| `launcher/BizHawk-*/PokeraceAutosaves/<UTC>/` | anciennes copies 0.2.3–0.2.5 (sans manifeste) | plus alimenté |
+| `launcher/restore-backups/<UTC>/` | avant chaque restauration : `SaveRAM/` (les sauvegardes en jeu de `BizHawk-*/GBA/SaveRAM` à cet instant) et `autosave/` (la copie choisie, celle que BizHawk charge) | jamais effacé |
+| `launcher/BizHawk-*/GBA/SaveRAM/` | sauvegarde en jeu courante de BizHawk | — |
+| `launcher/BizHawk-*/PokeraceLostGames/<UTC>/` | partie archivée avant un reset après défaite | 3 gardées |
+
+`manifest.json` (format 1) : `{format, createdUtc, clientVersion, rom: {sha256, revision}, bizhawk: {hash, name}}`. Le lanceur transmet l'empreinte de la ROM au bridge par l'environnement de BizHawk.
+
+« Reprendre une sauvegarde automatique » ne liste que les copies de la ROM sélectionnée, de la plus récente à la plus ancienne. Un manifeste d'une autre ROM, d'un format inconnu ou illisible écarte la copie sans erreur. Une copie sans manifeste (0.2.3–0.2.6) apparaît comme « ancienne copie, vérifiée au lancement ». Elle n'est chargée que si le CRC32 de la ROM inscrit par mGBA dans le savestate (`Core.bin`, offset 0x0C après le préfixe BizHawk) est celui de la ROM sélectionnée. Ce format a été vérifié sur des savestates réels de BizHawk 2.11.1. Sinon, le lanceur refuse avec un message clair et ne modifie rien. Si la copie a disparu entre le choix et le lancement : refus, rien n'est modifié.
+
+Après confirmation, la sauvegarde en jeu actuelle et la copie choisie sont copiées dans `restore-backups/<UTC>/`, puis BizHawk démarre avec `--load-state` sur cette copie. La rotation du bridge ne peut donc pas l'effacer. Pour revenir en arrière, BizHawk fermé, il suffit de recopier `restore-backups/<UTC>/SaveRAM/*` dans `BizHawk-*/GBA/SaveRAM/`.
+
 Les ROM, BIOS éventuellement requis par un système et sauvegardes ne sont pas fournis. Le lanceur n'explore pas les dossiers personnels et n'envoie pas la ROM au serveur. Les sauvegardes et réglages de BizHawk restent dans sa copie portable et ne sont pas supprimés au lancement suivant. Si aucun périphérique audio n'est disponible, la sortie sans périphérique est utilisée ; le son reste disponible sur un poste équipé.
 
 ## Réglages et commandes

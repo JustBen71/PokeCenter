@@ -8,7 +8,7 @@ namespace Pokerace.Client.Launcher;
 public sealed record Autosave(string State, DateTime CreatedUtc, bool Legacy);
 
 /// <summary>
-/// Autosaves: &lt;launcher&gt;/autosaves/&lt;UTC&gt;/{game.State, game.SaveRAM, manifest.json} (0.2.6+),
+/// Autosaves: &lt;launcher&gt;/autosaves/&lt;UTC&gt;/{game.State, game.SaveRAM} (0.2.6+), plus manifest.json since 0.2.7;
 /// legacy ones in &lt;launcher&gt;/BizHawk-*/PokeraceAutosaves/&lt;UTC&gt;/ (0.2.3–0.2.5).
 /// Before a restore, &lt;launcher&gt;/restore-backups/&lt;UTC&gt;/ receives the current in-game saves (SaveRAM/) and the chosen copy (autosave/),
 /// which BizHawk then loads: the bridge's rotation of 3 copies can never delete it. Nothing there is ever deleted by Pokérace.

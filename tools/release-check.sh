@@ -26,4 +26,4 @@ npm test
 CI=true npm run test:e2e -w @pokerace/web
 "$dotnet" test native/Pokerace.Client/Pokerace.Client.sln --configuration Release
 "$dotnet" test bridges/bizhawk/tests/Pokerace.BizHawkBridge.Tests/Pokerace.BizHawkBridge.Tests.csproj --configuration Release
-echo "✔ $tag : toutes les vérifications Linux sont vertes (Windows et l'E2E BizHawk : workflow Release)"
+echo "✔ $tag : toutes les vérifications Linux sont vertes (Windows : tools/release-check.ps1 ; E2E BizHawk : run-e2e.ps1 -ClientE2E)"
