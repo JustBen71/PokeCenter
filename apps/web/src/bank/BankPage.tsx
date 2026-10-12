@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {depositSplit,moneyTypeLabels,type BankSnapshot} from '@pokerace/shared';
 import {ArrowDownToLine,ArrowUpFromLine,Gamepad2,Landmark,Trophy} from 'lucide-react';
-import {api} from '../api/client';
+import {api,requestId} from '../api/client';
 import {useSession} from '../auth/session-context';
 import {useLobby} from '../lobby/lobby-context';
 import {useLive,useLiveTopic} from '../realtime/live-context';
@@ -24,7 +24,7 @@ export function BankPage(){
  const split=depositSplit(Number(deposit)||0,bank?.taxPercent??0);
  const send=async(kind:'deposit'|'withdraw',amount:number,reset:()=>void)=>{
   setBusy(true);
-  try{await api(`/api/lobbies/${lobby.id}/bank/${kind}`,{method:'POST',body:{amount,requestId:crypto.randomUUID()}});
+  try{await api(`/api/lobbies/${lobby.id}/bank/${kind}`,{method:'POST',body:{amount,requestId:requestId()}});
    toast.success(kind==='deposit'?`${fmt(amount)} ₽ déposés`:`${fmt(amount)} ₽ retirés vers le jeu`);reset();}
   catch(e){toast.error(e);}finally{setBusy(false);}
  };

@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {ticketStatusLabels,wheelToneLabels,type ShopSnapshot,type WheelType} from '@pokerace/shared';
 import {Shield,ShoppingBag} from 'lucide-react';
-import {api} from '../api/client';
+import {api,requestId} from '../api/client';
 import {useSession} from '../auth/session-context';
 import {useLobby} from '../lobby/lobby-context';
 import {useLive,useLiveTopic} from '../realtime/live-context';
@@ -22,7 +22,7 @@ export function ShopPage(){
  const name=(id:string|null)=>members.find(m=>m.id===id)?.name??'—';
  const run=async(work:()=>Promise<unknown>,ok:string)=>{setBusy(true);try{await work();toast.success(ok);return true;}catch(e){toast.error(e);return false;}finally{setBusy(false);}};
  const buy=async()=>{if(!buying)return;
-  if(await run(()=>api(`/api/lobbies/${lobby.id}/shop/tickets`,{method:'POST',body:{wheelId:buying.id,...(target?{targetId:target}:{}),requestId:crypto.randomUUID()}}),`Ticket « ${buying.name} » acheté : il rejoint la file d’attente`))setBuying(null);};
+  if(await run(()=>api(`/api/lobbies/${lobby.id}/shop/tickets`,{method:'POST',body:{wheelId:buying.id,...(target?{targetId:target}:{}),requestId:requestId()}}),`Ticket « ${buying.name} » acheté : il rejoint la file d’attente`))setBuying(null);};
  const active=shop?.protections.filter(p=>p.status==='ACTIVE').length??0;
  if(!shop)return <p className="muted">Chargement de la boutique…</p>;
  return <section className="shop-page">
@@ -41,7 +41,7 @@ export function ShopPage(){
     <Shield size={56}/>
     <h2>Protection</h2><small>Annule la prochaine roue hostile reçue</small>
     <p className="muted">Elle ne bloque que les attaques reçues <strong>après</strong> son achat.</p>
-    <button className="btn primary" disabled={busy||!!blocked||(money!==null&&shop.protectionPrice>money)} onClick={()=>window.confirm(`Acheter une protection pour ${fmt(shop.protectionPrice)} ₽ ?`)&&void run(()=>api(`/api/lobbies/${lobby.id}/shop/protections`,{method:'POST',body:{requestId:crypto.randomUUID()}}),'Protection active')}><Shield size={15}/>{fmt(shop.protectionPrice)} ₽</button>
+    <button className="btn primary" disabled={busy||!!blocked||(money!==null&&shop.protectionPrice>money)} onClick={()=>window.confirm(`Acheter une protection pour ${fmt(shop.protectionPrice)} ₽ ?`)&&void run(()=>api(`/api/lobbies/${lobby.id}/shop/protections`,{method:'POST',body:{requestId:requestId()}}),'Protection active')}><Shield size={15}/>{fmt(shop.protectionPrice)} ₽</button>
    </article>
   </div>
   <section className="panel"><header className="panel-head"><h2>Mes tickets</h2></header>
