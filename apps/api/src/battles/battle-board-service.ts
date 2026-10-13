@@ -1,5 +1,5 @@
 import {randomInt,randomUUID} from 'node:crypto';
-import {battleSpriteIds,boardReward,boardRewardSchema,boardTeamCreateSchema,isLegendary,type BattleEncounter,type BattlePokemonSpec,type BoardRewardStatus,
+import {battleSpriteIds,boardAverageLevel,boardBatchSchema,boardReward,boardRewardSchema,boardTeamCreateSchema,isLegendary,type BoardTeamCreateInput,type BattleEncounter,type BattlePokemonSpec,type BoardRewardStatus,
  type BoardSlot,type BoardSnapshot,type BoardTeam,type BoardTeamStatus,type LobbyNotification} from '@pokerace/shared';
 import type Database from 'better-sqlite3';
 import {nowIso} from '../db/database.js';
@@ -10,19 +10,26 @@ import type {CurrentGameService} from '../game/current-game-service.js';
 import type {TransactionService} from '../money/transaction-service.js';
 import type {BattleEncounterService} from './battle-encounter-service.js';
 import {validateBattleSpec} from './battle-validator.js';
-import {drawParty,type MovesProvider} from './board-draw.js';
+import {batchSlots,drawParty,type MovesProvider} from './board-draw.js';
 
 type Row={id:string;lobby_id:string;trainer_name:string;trainer_sprite:string;slots_json:string;party_json:string;reward:number;status:BoardTeamStatus;origin:'ADMIN'|'WHEEL';
- created_by:string|null;created_at:string;challenger_id:string|null;encounter_id:string|null;winner_id:string|null;won_at:string|null;reward_status:BoardRewardStatus;reward_attempts:number;reward_command_id:string|null};
+ created_by:string|null;created_at:string;blind:number;challenger_id:string|null;encounter_id:string|null;winner_id:string|null;won_at:string|null;reward_status:BoardRewardStatus;reward_attempts:number;reward_command_id:string|null};
 const toTeam=(r:Row):BoardTeam=>{
  const party=JSON.parse(r.party_json) as BattlePokemonSpec[];
  return {id:r.id,lobbyId:r.lobby_id,trainer:{name:r.trainer_name,spriteId:r.trainer_sprite as BoardTeam['trainer']['spriteId']},party,slots:JSON.parse(r.slots_json) as BoardSlot[],
-  reward:r.reward,suggestedReward:boardReward(party),legendaries:party.filter(p=>isLegendary(p.speciesId)).length,status:r.status,origin:r.origin,createdBy:r.created_by,createdAt:r.created_at,
+  reward:r.reward,suggestedReward:boardReward(party,!!r.blind),blind:!!r.blind,averageLevel:boardAverageLevel(party),legendaries:party.filter(p=>isLegendary(p.speciesId)).length,status:r.status,origin:r.origin,createdBy:r.created_by,createdAt:r.created_at,
   challengerId:r.challenger_id,encounterId:r.encounter_id,winnerId:r.winner_id,wonAt:r.won_at,rewardStatus:r.reward_status,attempts:r.reward_attempts};
 };
 const MAX_REWARD_ATTEMPTS=5;
 const fmt=(n:number)=>`${n.toLocaleString('fr-FR')} ₽`;
+/** What a player may see: never the moves (spoiler) nor the slot rules; a blind team only shows its average level until it is won. */
+export function playerView(t:BoardTeam):BoardTeam{
+ const hidden=t.blind&&t.status!=='WON';
+ return {...t,slots:[],legendaries:hidden?0:t.legendaries,party:hidden?[]:t.party.map(p=>({...p,moves:[]}))};
+}
 const levels=(party:BattlePokemonSpec[])=>{const l=party.map(p=>p.level);return Math.min(...l)===Math.max(...l)?`niv. ${l[0]}`:`niv. ${Math.min(...l)}–${Math.max(...l)}`;};
+// Public wording: a blind team gives away nothing but its average level.
+const describe=(t:BoardTeam)=>t.blind?`à l’aveugle, niv. moyen ${t.averageLevel}`:`${t.party.length} Pokémon, ${levels(t.party)}`;
 
 /**
  * Tableau des combats. First come, first served: the first player who accepts reserves the team (atomic) and fights it
@@ -49,25 +56,45 @@ export class BattleBoardService{
    .run(...keys.map(k=>fields[k]),id,...(whereStatus?[whereStatus]:[])).changes;
  }
 
- snapshot(lobbyId:string):BoardSnapshot{
-  return {teams:(this.deps.db.prepare('SELECT * FROM battle_board_teams WHERE lobby_id=? ORDER BY created_at DESC,rowid DESC LIMIT 200').all(lobbyId) as Row[]).map(toTeam)};
+ snapshot(lobbyId:string,admin:boolean):BoardSnapshot{
+  const teams=(this.deps.db.prepare('SELECT * FROM battle_board_teams WHERE lobby_id=? ORDER BY created_at DESC,rowid DESC LIMIT 200').all(lobbyId) as Row[]).map(toTeam);
+  return {teams:admin?teams:teams.map(playerView)};
  }
  get(lobbyId:string,id:string){return this.row(lobbyId,id);}
 
  /** Admin (or wheel): draws the team once, so what everybody sees is exactly what will be fought. */
  async create(lobbyId:string,body:unknown,actorId:string|null,origin:'ADMIN'|'WHEEL'='ADMIN'){
   this.deps.domain.lobbies.require(lobbyId);
-  const input=parseBody(boardTeamCreateSchema,body);
+  const team=await this.insert(lobbyId,parseBody(boardTeamCreateSchema,body),actorId,origin);
+  this.deps.notify(lobbyId,{kind:'info',message:`🗡 Nouveau combat au tableau : ${team.trainer.name} (${describe(team)}) — ${fmt(team.reward)}`});
+  this.deps.changed(lobbyId);
+  return team;
+ }
+ /** Admin: many teams at once (see boardBatchSchema), announced once. */
+ async batch(lobbyId:string,body:unknown,actorId:string){
+  this.deps.domain.lobbies.require(lobbyId);
+  const input=parseBody(boardBatchSchema,body),teams:BoardTeam[]=[];
+  // Blind teams spread evenly: blindPercent of count, rounded.
+  const blind=Math.round(input.count*input.blindPercent/100);
+  try{
+   for(let i=0;i<input.count;i++)teams.push(await this.insert(lobbyId,{trainer:{},slots:batchSlots(input),blind:i<blind},actorId,'ADMIN'));
+  }finally{
+   if(teams.length){
+    this.deps.notify(lobbyId,{kind:'info',message:`🗡 ${teams.length} nouveaux combats au tableau (niv. ${input.minLevel}–${input.maxLevel}${blind?`, dont ${Math.min(blind,teams.length)} à l’aveugle`:''})`});
+    this.deps.changed(lobbyId);
+   }
+  }
+  return teams;
+ }
+ private async insert(lobbyId:string,input:BoardTeamCreateInput,actorId:string|null,origin:'ADMIN'|'WHEEL'){
   const party=await drawParty(input.slots,this.deps.moves);
   const trainer={name:input.trainer.name??'DÉFI',spriteId:input.trainer.spriteId??battleSpriteIds[randomInt(battleSpriteIds.length)]!};
   validateBattleSpec({encounterId:randomUUID(),trainer,party});
   const id=randomUUID();
-  this.deps.db.prepare(`INSERT INTO battle_board_teams(id,lobby_id,trainer_name,trainer_sprite,slots_json,party_json,reward,status,origin,created_by,created_at)
-   VALUES(?,?,?,?,?,?,?,'OPEN',?,?,?)`).run(id,lobbyId,trainer.name,trainer.spriteId,JSON.stringify(input.slots),JSON.stringify(party),input.reward??boardReward(party),origin,actorId,nowIso());
+  this.deps.db.prepare(`INSERT INTO battle_board_teams(id,lobby_id,trainer_name,trainer_sprite,slots_json,party_json,reward,status,origin,created_by,created_at,blind)
+   VALUES(?,?,?,?,?,?,?,'OPEN',?,?,?,?)`).run(id,lobbyId,trainer.name,trainer.spriteId,JSON.stringify(input.slots),JSON.stringify(party),input.reward??boardReward(party,input.blind),origin,actorId,nowIso(),input.blind?1:0);
   const team=this.row(lobbyId,id);
-  this.audit(team,'board.created',`Tableau : ${team.trainer.name} (${party.length} Pokémon, ${levels(party)}${team.legendaries?`, ${team.legendaries} légendaire(s)`:''}) — récompense ${fmt(team.reward)}`,{actorId});
-  this.deps.notify(lobbyId,{kind:'info',message:`🗡 Nouveau combat au tableau : ${team.trainer.name} (${party.length} Pokémon, ${levels(party)}) — ${fmt(team.reward)}`});
-  this.deps.changed(lobbyId);
+  this.audit(team,'board.created',`Tableau : ${team.trainer.name} (${team.blind?'à l’aveugle, ':''}${party.length} Pokémon, ${levels(party)}${team.legendaries?`, ${team.legendaries} légendaire(s)`:''}) — récompense ${fmt(team.reward)}`,{actorId});
   return team;
  }
 
@@ -76,10 +103,10 @@ export class BattleBoardService{
   const team=this.row(lobbyId,id);
   if(team.status!=='OPEN')throw new DomainError('CONFLICT','Seule une équipe disponible peut être tirée à nouveau');
   const party=await drawParty(team.slots,this.deps.moves);
-  const reward=team.reward===team.suggestedReward?boardReward(party):team.reward;
+  const reward=team.reward===team.suggestedReward?boardReward(party,team.blind):team.reward;
   if(!this.set(id,{party_json:JSON.stringify(party),reward},'OPEN'))throw new DomainError('CONFLICT','L’équipe vient d’être prise');
   const after=this.row(lobbyId,id);
-  this.audit(after,'board.rerolled',`Tableau : ${after.trainer.name} tirée à nouveau (${levels(party)}) — récompense ${fmt(after.reward)}`,{actorId});
+  this.audit(after,'board.rerolled',`Tableau : ${after.trainer.name} tirée à nouveau (${after.blind?'à l’aveugle, ':''}${levels(party)}) — récompense ${fmt(after.reward)}`,{actorId});
   this.deps.changed(lobbyId);
   return after;
  }

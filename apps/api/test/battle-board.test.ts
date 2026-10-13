@@ -134,3 +134,36 @@ test('Tableau des combats: lost confirmation of the reward = to check; the admin
   assert.equal(game.money,before+400);
  }finally{for(const c of closers)c();await p.close();}
 });
+
+test('Tableau des combats: many teams at once around a drawn level, held items in the reward, blind teams and hidden moves for players',async()=>{
+ const p=await passivePortal();
+ try{
+  const {as,admin,ben,lobby}=p;
+  const board=`/api/lobbies/${lobby.id}/board`;
+  const batch={count:8,minLevel:10,maxLevel:20,spread:2,minSize:2,maxSize:4,blindPercent:50};
+  assert.equal((await as(ben.id).post(`${board}/batch`,batch)).status,403);
+  assert.equal((await as(admin.id).post(`${board}/batch`,{...batch,minLevel:30})).body.error.code,'VALIDATION_FAILED');
+  const {teams}=(await as(admin.id).post(`${board}/batch`,batch)).body as {teams:BoardTeam[]};
+  assert.equal(teams.length,8);
+  assert.equal(teams.filter(t=>t.blind).length,4);
+  for(const t of teams){
+   const lead=t.party[0]!.level;
+   assert.ok(lead>=10&&lead<=20,'lead level between min and max');
+   assert.ok(t.party.length>=2&&t.party.length<=4,'team size');
+   assert.ok(t.party.every(p=>Math.abs(p.level-lead)<=2&&p.heldItem>0),'± spread around the lead, every drawn Pokémon holds an item');
+   assert.equal(t.reward,boardReward(t.party,t.blind));
+  }
+  // Items and blind count in the reward.
+  const one=[{speciesId:25,level:10}];
+  assert.equal(boardReward([{...one[0]!,heldItem:200}]),boardReward(one)+1500);
+  assert.equal(boardReward(one,true),Math.round(400*1.5/100)*100);
+  // Players: no moves, no slot rules; a blind team is only its average level. Admins see everything.
+  const seen=((await as(ben.id).get(board)).body as BoardSnapshot).teams;
+  assert.ok(seen.every(t=>t.slots.length===0&&t.party.every(p=>p.moves.length===0)));
+  for(const t of seen.filter(t=>t.blind)){
+   const full=teams.find(x=>x.id===t.id)!;
+   assert.deepEqual([t.party,t.legendaries,t.averageLevel],[[],0,full.averageLevel]);
+  }
+  assert.ok(((await as(admin.id).get(board)).body as BoardSnapshot).teams.every(t=>t.party.length>0&&t.party.every(p=>p.moves.length>0)));
+ }finally{await p.close();}
+});

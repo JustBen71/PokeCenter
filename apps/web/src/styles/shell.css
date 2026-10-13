@@ -344,6 +344,7 @@ main.page{max-width:none;margin:0;padding:36px 32px 60px;min-width:0}
 /* Tableau des combats */
 .board-page{display:grid;gap:16px}.board-page h2{margin:8px 0 0;font-size:18px}
 .board-new form{display:grid;gap:10px}
+.form-row{display:flex;flex-wrap:wrap;gap:12px}.form-row>label{flex:1 1 120px}.board-dialog{display:grid;gap:12px}
 .board-grid{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .board-team{display:grid;gap:6px;align-content:start}.board-team.won,.board-team.withdrawn{opacity:.75}
 .board-team-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.board-team-head small{display:block}

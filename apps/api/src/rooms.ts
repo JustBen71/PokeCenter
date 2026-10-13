@@ -67,7 +67,7 @@ export function createPortal(store:Store,config:Config){
  // Owned passives are public; each viewer only receives their own pending offer.
  events.provide('passives',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)||store.portal!.accounts.get(accountId)?.admin?services.passives.snapshot(lobbyId,accountId):null);
  // Commanded battles of the lobby (teams are normalised data, no memory address).
- events.provide('board',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)||store.portal!.accounts.get(accountId)?.admin?services.board.snapshot(lobbyId):null);
+ events.provide('board',(lobbyId,accountId)=>{const admin=!!store.portal!.accounts.get(accountId)?.admin;return lobbies.isMember(lobbyId,accountId)||admin?services.board.snapshot(lobbyId,admin):null;});
  events.provide('battles',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)||store.portal!.accounts.get(accountId)?.admin?services.battles.snapshot(lobbyId):null);
  events.provide('shop',(lobbyId,accountId)=>lobbies.isMember(lobbyId,accountId)?services.shop.snapshot(lobbyId,accountId):null);
  const refreshMoney=(lobbyId:string)=>{for(const topic of ['bank','jackpot','settings'])void events.refresh(lobbyId,topic);};
