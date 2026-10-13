@@ -64,7 +64,8 @@ test('GAME_EVENT: capability required, ACK, same eventId after reconnection proc
   await until(()=>!!portal.services.currentGame.resolve(lobby.id,ben.id).game.money,'game again');
   for(let i=0;i<2;i++)assert.equal((await plainControl(game,ffId))?.ok,true);
   assert.equal((await game.gameEvent('EMULATOR_CONTROL',{action:'STATE_LOADED'}))?.ok,true);
-  const logs=portal.services.domain.audit.list({lobbyId:lobby.id,category:'CONTROL'});
+  const logs=portal.services.domain.audit.list({lobbyId:lobby.id,category:'CONTROL'}).filter(l=>l.action.startsWith('control.'));
+  assert.ok(portal.services.domain.audit.list({lobbyId:lobby.id,category:'CONTROL'}).some(l=>l.action==='controls.not_reported'),'client without control reporting flagged');
   assert.deepEqual(logs.map(l=>[l.action,l.message,l.actorAccountId]).sort(),[['control.fast_forward','⏩ Accéléré jusqu’à ×4,2 pendant 12 s',ben.id],['control.state_loaded','💾 Savestate chargé',ben.id]]);
  }finally{for(const c of closers)c();await p.close();}
 });

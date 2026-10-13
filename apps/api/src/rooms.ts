@@ -22,6 +22,7 @@ import {registerPassiveRoutes} from './passives/passive-routes.js';
 import {registerBattleRoutes} from './battles/battle-routes.js';
 import {LobbyEvents} from './realtime/lobby-events.js';
 import type {DomainEvent} from './passives/passive-events.js';
+import {SpeedWatch} from './audit/speed-watch.js';
 
 const controlMessage=(c:Extract<GameEvent,{kind:'EMULATOR_CONTROL'}>['data'])=>c.action==='FAST_FORWARD'?`⏩ Accéléré jusqu’à ×${((c.maxSpeedPercent??0)/100).toFixed(1).replace('.',',')} pendant ${c.seconds??0} s`
  :c.action==='REWIND'?`⏪ Rembobinage pendant ${c.seconds??0} s`:c.action==='STATE_LOADED'?'💾 Savestate chargé':'🔄 Jeu redémarré par le joueur';
@@ -41,6 +42,7 @@ export function createPortal(store:Store,config:Config){
  const events=new LobbyEvents();
  // Each new game observation may complete objectives, move passive progressions and pay pending rewards;
  // a Run change retries them.
+ const speed=new SpeedWatch(),silent=new Set<string>();
  const observe=(lobbyId:string,clients=running.get(lobbyId)?.nativeClients.publicSnapshot()??[])=>{
   for(const c of clients)if(c.gameState&&c.adapter.status==='ready'&&lobbies.isMember(lobbyId,c.accountId)){
    void services.objectives.observe(lobbyId,c.accountId,c.gameState.progression.completed).catch(error=>console.error('Objectives:',error));
@@ -48,6 +50,13 @@ export function createPortal(store:Store,config:Config){
    void services.battles.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Battles:',error));
    void services.runDefeats.observe(lobbyId,c.accountId,c.gameState).catch(error=>console.error('Run defeats:',error));
    void services.board.pay(lobbyId,c.accountId).catch(error=>console.error('Board:',error));
+   // A client that does not report its emulator controls (old version or modified): said once per server start.
+   if(!c.adapter.capabilities.includes('emulator.controls')&&!silent.has(`${lobbyId}:${c.accountId}`)){silent.add(`${lobbyId}:${c.accountId}`);
+    domain.audit.record({lobbyId,actorAccountId:c.accountId,targetAccountId:c.accountId,category:'CONTROL',action:'controls.not_reported',status:'REVIEW',
+     message:`Client ${c.clientVersion??'inconnu'} sans remontée des contrôles de l’émulateur (ancienne version ou client modifié)`,metadata:{}});}
+   // Fast forward and time going back, seen from the game's own clock: independent of what the client says about its controls.
+   for(const log of speed.sample(`${lobbyId}:${c.accountId}`,c.gameState.trainer.playTimeSeconds,Date.now()))
+    domain.audit.record({lobbyId,actorAccountId:c.accountId,targetAccountId:c.accountId,category:'CONTROL',action:`speed.${log.action.toLowerCase()}`,status:'REVIEW',message:log.message,metadata:log.metadata});
   }
  };
  // Every Run change (admin or game defeat): live update, retries, and Run events for the passives;
