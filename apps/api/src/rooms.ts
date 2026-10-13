@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import {registerAccounts} from './accounts.js';
-import {accountKey,type Lobby,type Run} from '@pokerace/shared';
+import {accountKey,type GameEvent,type Lobby,type Run} from '@pokerace/shared';
 import {Server} from 'node:http';
 import {createApp,type Config} from './app.js';
 import {Store} from './store.js';
@@ -22,6 +22,9 @@ import {registerPassiveRoutes} from './passives/passive-routes.js';
 import {registerBattleRoutes} from './battles/battle-routes.js';
 import {LobbyEvents} from './realtime/lobby-events.js';
 import type {DomainEvent} from './passives/passive-events.js';
+
+const controlMessage=(c:Extract<GameEvent,{kind:'EMULATOR_CONTROL'}>['data'])=>c.action==='FAST_FORWARD'?`⏩ Accéléré jusqu’à ×${((c.maxSpeedPercent??0)/100).toFixed(1).replace('.',',')} pendant ${c.seconds??0} s`
+ :c.action==='REWIND'?`⏪ Rembobinage pendant ${c.seconds??0} s`:c.action==='STATE_LOADED'?'💾 Savestate chargé':'🔄 Jeu redémarré par le joueur';
 
 const LEGACY='legacy';
 const socketPath=(lobby:Lobby)=>lobby.id===LEGACY?'/socket.io':`/rooms/${lobby.id}/socket.io`;
@@ -88,6 +91,8 @@ export function createPortal(store:Store,config:Config){
     // publish() is false for an eventId already processed: a re-sent defeat never ends the new Run.
     const fresh=await services.passiveEngine.publish({lobbyId:lobby.id,accountId,id:`game:${event.eventId}`,type:event.kind,data:event.data} as DomainEvent);
     if(fresh&&event.kind==='PLAYER_DEFEATED')services.runDefeats.defeated(lobby.id,accountId,event.data.cause);
+    if(fresh&&event.kind==='EMULATOR_CONTROL')domain.audit.record({lobbyId:lobby.id,actorAccountId:accountId,targetAccountId:accountId,category:'CONTROL',
+     action:`control.${event.data.action.toLowerCase()}`,status:'INFO',message:controlMessage(event.data),metadata:event.data});
    }});
   running.set(lobby.id,course);events.attach(lobby.id,course.io.of('/dashboard'));
   // The Pokémon library is global now: former lobby libraries are copied once.

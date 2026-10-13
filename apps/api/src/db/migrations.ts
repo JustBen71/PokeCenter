@@ -515,7 +515,8 @@ export const migrations:readonly Migration[]=[
   CREATE UNIQUE INDEX wheel_resolutions_batch_owner ON wheel_resolutions(batch_id,owner_account_id) WHERE batch_id IS NOT NULL;
  `)},
  // Board teams fought blind: players only see the average level.
- {version:19,name:'board-blind',scopes:['portal'],up:db=>db.exec('ALTER TABLE battle_board_teams ADD COLUMN blind INTEGER NOT NULL DEFAULT 0')}
+ {version:19,name:'board-blind',scopes:['portal'],up:db=>db.exec('ALTER TABLE battle_board_teams ADD COLUMN blind INTEGER NOT NULL DEFAULT 0')},
+ {version:20,name:'audit-controls',scopes:['portal'],up:db=>widenCheck(db,'audit_logs',"'PASSIVE','BATTLE')","'PASSIVE','BATTLE','CONTROL')")}
 ];
 
 // Rebuilds a table nothing references, with one CHECK list widened; data, columns and indexes are kept.

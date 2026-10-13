@@ -131,5 +131,7 @@ public sealed class BridgeClient(ClientConfiguration configuration, Func<string?
         var response = await CallAsync(new JsonObject { ["type"] = "resetGame", ["gameHash"] = gameHash }, cancellation);
         return BridgeProtocol.Text(response, "archive");
     }
+    public async Task<JsonArray?> GetControlsAsync(CancellationToken cancellation) =>
+        (await CallAsync(new JsonObject { ["type"] = "getControls" }, cancellation))["events"] as JsonArray;
     public async ValueTask DisposeAsync() { await DisconnectAsync(); gate.Dispose(); }
 }

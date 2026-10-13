@@ -22,6 +22,9 @@ public sealed class BridgeForm : Form, IExternalToolForm
     private TcpBridgeServer? server;
     // Every 5 minutes, on the emulator thread: a copy of the game (savestate + in-game save), the last 3 kept.
     private readonly System.Windows.Forms.Timer autosave = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
+    // Once a second: the emulator controls used by the player (speed-up, rewind, savestate loads) for the admin logs.
+    private readonly System.Windows.Forms.Timer controls = new System.Windows.Forms.Timer { Interval = 1000 };
+    private IEmuClientApi? watchedClient;
     private readonly Label status = new Label { Dock = DockStyle.Fill, AutoSize = false };
     public BridgeForm()
     {
@@ -46,6 +49,8 @@ public sealed class BridgeForm : Form, IExternalToolForm
             server.Start();
             autosave.Tick += (_, _) => { try { service.Autosave(); } catch (Exception) { Log("Autosave failed; the previous copies are kept."); } };
             autosave.Start();
+            controls.Tick += (_, _) => { try { SampleControls(service.Controls); } catch (Exception) { } };
+            controls.Start();
             status.Text = "Bridge actif sur 127.0.0.1:" + server.Port + "\nProtocole 1 — authentification requise.";
         }
         catch (Exception)
@@ -55,6 +60,21 @@ public sealed class BridgeForm : Form, IExternalToolForm
             Log("Startup failed: check configuration and port availability.");
         }
     }
+    private void SampleControls(ControlTracker tracker)
+    {
+        // BizHawk may hand out a new client API after a core change: follow it for the savestate-loaded event.
+        var client = APIs?.EmuClient;
+        if (client != watchedClient)
+        {
+            if (watchedClient != null) watchedClient.StateLoaded -= OnStateLoaded;
+            if (client != null) client.StateLoaded += OnStateLoaded;
+            watchedClient = client; stateTracker = tracker;
+        }
+        if (client == null || APIs!.Emulation.GetGameInfo() is not IGameInfo game || game.IsNullInstance()) return;
+        tracker.Sample(Emulator.Frame, client.IsRewinding(), DateTime.UtcNow);
+    }
+    private ControlTracker? stateTracker;
+    private void OnStateLoaded(object? sender, StateLoadedEventArgs e) => stateTracker?.StateLoaded();
     // Informative window only: it must not take the keyboard from the game, or BizHawk's hotkeys (save slots…) stop
     // working until the player clicks the game window (seen under Linux/Mono).
     protected override bool ShowWithoutActivation => true;
@@ -74,7 +94,7 @@ public sealed class BridgeForm : Form, IExternalToolForm
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { autosave.Dispose(); server?.Dispose(); }
+        if (disposing) { controls.Dispose(); if (watchedClient != null) watchedClient.StateLoaded -= OnStateLoaded; autosave.Dispose(); server?.Dispose(); }
         base.Dispose(disposing);
     }
     public bool IsActive => IsHandleCreated && !IsDisposed;

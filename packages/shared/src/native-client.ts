@@ -8,7 +8,7 @@ export const readCapabilitySchema=z.enum(['trainer.read','money.read','party.rea
 // Write capabilities are announced by clients whose adapter, profile and local settings allow verified writes.
 export const writeCapabilitySchema=z.enum(['money.write','party.write','pokemon.insert','pokemon.remove','pokemon.replace','battle.trainer.start','party.box_fainted','game.reset','items.write']);
 // Game events (GAME_EVENT). No adapter announces them until its memory sources are validated.
-export const eventCapabilitySchema=z.enum(['events.trainer_victory','events.pokemon_fainted','events.battle_ended','events.player_defeated','steps.read']);
+export const eventCapabilitySchema=z.enum(['events.trainer_victory','events.pokemon_fainted','events.battle_ended','events.player_defeated','steps.read','emulator.controls']);
 const capabilities=z.array(z.union([readCapabilitySchema,writeCapabilitySchema,eventCapabilitySchema])).max(20).refine(v=>new Set(v).size===v.length);
 export const adapterSchema=z.object({id:z.string().max(80).nullable(),status:adapterStatusSchema,profileId:z.string().max(80).nullable(),capabilities}).strict();
 const integer=(max:number)=>z.number().int().min(0).max(max);
@@ -119,7 +119,9 @@ export const gameEventKinds={
  // The player lost in the game: blackout (CB2_WhiteOut), blackout missed between two reads, or a lost commanded battle.
  PLAYER_DEFEATED:{capability:'events.player_defeated',data:z.object({cause:z.enum(['WHITE_OUT','BATTLE_LOST','PARTY_FAINTED'])}).strict()},
  // Absolute counter read from the game; the server computes the deltas (a reset is a new baseline).
- STEPS_CHANGED:{capability:'steps.read',data:z.object({absolute:count(99999999)}).strict()}
+ STEPS_CHANGED:{capability:'steps.read',data:z.object({absolute:count(99999999)}).strict()},
+ // Emulator controls the player used (admin logs): speed-up and rewind episodes, savestate loads, core reboots.
+ EMULATOR_CONTROL:{capability:'emulator.controls',data:z.object({action:z.enum(['FAST_FORWARD','REWIND','STATE_LOADED','REBOOT']),seconds:count(3600).optional(),maxSpeedPercent:count(100000).optional()}).strict()}
 } as const;
 export type GameEventKind=keyof typeof gameEventKinds;
 const gameEventBase={protocolVersion:z.literal(1),eventVersion:z.literal(1),eventId:z.string().uuid(),observedAt:z.string().datetime()};

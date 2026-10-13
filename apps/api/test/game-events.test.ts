@@ -55,5 +55,18 @@ test('GAME_EVENT: capability required, ACK, same eventId after reconnection proc
   assert.equal(portal.services.passiveEngine.raceSteps(lobby.id,ben.id),30000);
   assert.equal((await game.pokemonFainted(2,4))?.ok,true);assert.equal((await game.battleEnded('WIN',1))?.ok,true);
   assert.deepEqual(seen.slice(-2),['fainted:2','battle:WIN']);
+
+  // Emulator controls: one admin log per event (re-sent once = still one), refused without the capability.
+  const ffId=randomUUID();
+  assert.equal((await plainControl(game,ffId))?.ok,false);
+  game.close();await new Promise(r=>setTimeout(r,100));
+  game=await FakeGameClient.connect({base,lobbyId:lobby.id,inviteCode:lobby.inviteCode,playerName:'Ben',money:2260,events:[...events,'emulator.controls']});closers.push(()=>game.close());
+  await until(()=>!!portal.services.currentGame.resolve(lobby.id,ben.id).game.money,'game again');
+  for(let i=0;i<2;i++)assert.equal((await plainControl(game,ffId))?.ok,true);
+  assert.equal((await game.gameEvent('EMULATOR_CONTROL',{action:'STATE_LOADED'}))?.ok,true);
+  const logs=portal.services.domain.audit.list({lobbyId:lobby.id,category:'CONTROL'});
+  assert.deepEqual(logs.map(l=>[l.action,l.message,l.actorAccountId]).sort(),[['control.fast_forward','⏩ Accéléré jusqu’à ×4,2 pendant 12 s',ben.id],['control.state_loaded','💾 Savestate chargé',ben.id]]);
  }finally{for(const c of closers)c();await p.close();}
 });
+
+const plainControl=(game:FakeGameClient,id:string)=>game.gameEvent('EMULATOR_CONTROL',{action:'FAST_FORWARD',seconds:12,maxSpeedPercent:420},id);

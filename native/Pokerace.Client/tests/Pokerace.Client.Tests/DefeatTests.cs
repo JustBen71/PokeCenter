@@ -115,4 +115,16 @@ public sealed class DefeatTests
         Assert.Equal("20261007T000000000Z", (string?)result.Result!["archive"]);
         Assert.Equal(1, bridge.Resets);
     }
+
+    [Fact] public async Task EmulatorControlsBecomeGameEvents()
+    {
+        await using var bridge = Game(20, 20);
+        bridge.Controls = [new System.Text.Json.Nodes.JsonObject { ["action"] = "FAST_FORWARD", ["seconds"] = 12, ["maxSpeedPercent"] = 400 },
+            new System.Text.Json.Nodes.JsonObject { ["action"] = "SOMETHING_ELSE" }];
+        var outbox = new GameEventOutbox(null);
+        var state = await new GameAdapterManager(bridge, Identity, false, new(null), outbox).ObserveAsync(new(true, true, "GBA", 1), default);
+        Assert.Contains(Gen3GameAdapter.ControlsCapability, state.State!.Capabilities);
+        var e = Assert.Single(outbox.Pending(), p => (string?)p["kind"] == "EMULATOR_CONTROL");
+        Assert.Equal("FAST_FORWARD", (string?)e["data"]!["action"]); Assert.Equal(400, (int)e["data"]!["maxSpeedPercent"]!);
+    }
 }

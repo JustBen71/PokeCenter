@@ -15,6 +15,8 @@ public sealed class BridgeService
     public const int ManifestFormat = 1;
     private readonly string lostGamesDirectory, autosavesDirectory;
     private readonly JObject? launch;
+    /// <summary>Emulator controls used by the player (speed-up, rewind, savestate loads), sampled by the host.</summary>
+    public ControlTracker Controls { get; } = new ControlTracker();
     /// <param name="launch">What the launcher knows of this game (clientVersion, romSha256, romRevision), copied into each autosave manifest.</param>
     public BridgeService(IEmulatorHost host, string? lostGamesDirectory = null, string? autosavesDirectory = null, JObject? launch = null)
     {
@@ -139,11 +141,12 @@ public sealed class BridgeService
                     // Archive first: if the savestate or the save copy fails, nothing is erased.
                     RequireSameGame(request);
                     var folder = Archive(lostGamesDirectory, KeptLostGames);
-                    try { host.EraseSaveAndReboot(); }
+                    try { Controls.ExpectReboot(); host.EraseSaveAndReboot(); }
                     catch (Exception) { throw new BridgeException("reset_failed", "Game archived but the reset failed; inspect the emulator."); }
                     result = new { archive = Path.GetFileName(folder), kept = KeptLostGames };
                     break;
                 }
+                case "getControls": result = new { events = Controls.Drain() }; break;
                 default: throw new BridgeException("unknown_command", "Unknown request type.");
             }
             return Protocol.Ok(id, result);

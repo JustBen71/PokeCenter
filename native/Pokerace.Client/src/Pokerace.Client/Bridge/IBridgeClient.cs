@@ -17,6 +17,8 @@ public interface IBridgeClient : IAsyncDisposable
     Task<IReadOnlyList<MemoryDomainInfo>> GetMemoryDomainsAsync(CancellationToken cancellation);
     Task<byte[]> ReadMemoryAsync(string domain, long address, int length, CancellationToken cancellation);
     Task WriteMemoryAsync(string domain, long address, ReadOnlyMemory<byte> data, CancellationToken cancellation);
+    /// <summary>Emulator controls the player used since the last call (speed-up, rewind, savestate loads); null if the bridge cannot tell.</summary>
+    Task<JsonArray?> GetControlsAsync(CancellationToken cancellation) => Task.FromResult<JsonArray?>(null);
 }
 
 public interface ITransactionalBridge

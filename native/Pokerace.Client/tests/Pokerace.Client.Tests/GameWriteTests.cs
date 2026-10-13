@@ -45,7 +45,7 @@ public sealed class GameWriteTests
         await using var bridge = Bridge(0);
         var state = (await new GameAdapterManager(bridge, randomized, true, new BattleEncounterStore(null), new Pokerace.Client.Runtime.GameEventOutbox(null)).ObserveAsync(new(true, true, "GBA", 1), default)).State!;
         Assert.Single(state.Party);
-        Assert.Equal(Gen3GameAdapter.ReadCapabilities.Concat(Gen3BattleEvents.Capabilities), state.Capabilities);
+        Assert.Equal(Gen3GameAdapter.ReadCapabilities.Concat(Gen3BattleEvents.Capabilities).Append(Gen3GameAdapter.ControlsCapability), state.Capabilities);
         Assert.DoesNotContain(state.Capabilities, c => c.EndsWith(".write") || c.Contains("insert") || c.Contains("remove") || c.Contains("replace") || c.Contains("reset") || c.Contains("battle.trainer") || c.Contains("box"));
         var before = (byte[])bridge.Ewram.Clone();
         var router = new CommandRouter(bridge, new ClientConfiguration { AllowPokemonPurchases = true, AllowMemoryWrites = true }, romIdentity: randomized);

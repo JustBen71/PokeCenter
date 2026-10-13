@@ -1,7 +1,7 @@
 import {z} from 'zod';
 import {errorCodeSchema} from './errors.js';
 
-export const auditCategorySchema=z.enum(['ACCOUNT','LOBBY','RUN','GAME_COMMAND','POKEMON','MONEY','BANK','JACKPOT','AUCTION','WHEEL','TICKET','PROTECTION','ADMIN','ERROR','PASSIVE','BATTLE']);
+export const auditCategorySchema=z.enum(['ACCOUNT','LOBBY','RUN','GAME_COMMAND','POKEMON','MONEY','BANK','JACKPOT','AUCTION','WHEEL','TICKET','PROTECTION','ADMIN','ERROR','PASSIVE','BATTLE','CONTROL']);
 export type AuditCategory=z.infer<typeof auditCategorySchema>;
 export const auditStatusSchema=z.enum(['SUCCESS','FAILED','PENDING','REVIEW','INFO']);
 export type AuditStatus=z.infer<typeof auditStatusSchema>;

@@ -17,6 +17,7 @@ public sealed record Gen3EventAddresses(int SaveBlock1GameStats)
 /// </summary>
 public static class Gen3BattleEvents
 {
+    public static readonly string?[] ControlActions = ["FAST_FORWARD", "REWIND", "STATE_LOADED", "REBOOT"];
     public static readonly string[] Capabilities = ["events.trainer_victory", "events.pokemon_fainted", "events.battle_ended", "steps.read"];
     private const uint BattleTypeTrainer = 1 << 3;
     private const int StatSteps = 5, StepsEvery = 100;

@@ -133,6 +133,8 @@ public sealed class GameAdapterTests
         public Action? BeforeTransaction;
         public int Transactions;
         public int Reads; public bool Fail; public string Hash = Identity.Sha1;
+        public System.Text.Json.Nodes.JsonArray? Controls;
+        public Task<System.Text.Json.Nodes.JsonArray?> GetControlsAsync(CancellationToken cancellation) { var c = Controls; Controls = null; return Task.FromResult(c); }
         public IReadOnlyList<MemoryDomainInfo> Domains = [new("EWRAM", 0x40000, true), new("IWRAM", 0x8000, true)];
         public MemoryBridge()
         {

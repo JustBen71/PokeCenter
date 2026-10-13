@@ -1,4 +1,5 @@
 using Pokerace.Client.Bridge;
+using System.Text.Json.Nodes;
 using static Pokerace.Client.Games.Pokemon.Gen3.Gen3PokemonDecoder;
 
 namespace Pokerace.Client.Games.Pokemon.Gen3;
@@ -16,17 +17,31 @@ public sealed class Gen3GameAdapter(IBridgeClient bridge, Gen3MemoryProfile prof
         : ReadCapabilities.Concat(EventCapabilities(profile, outbox)).ToArray();
     // Battle and step events only read memory: announced with or without writes, with an outbox to keep them.
     private static string[] EventCapabilities(Gen3MemoryProfile profile, Runtime.GameEventOutbox? outbox) =>
-        profile.Battle != null && profile.Defeat != null && profile.Events != null && outbox != null ? Gen3BattleEvents.Capabilities : [];
+        (profile.Battle != null && profile.Defeat != null && profile.Events != null && outbox != null ? Gen3BattleEvents.Capabilities : [])
+            .Concat(outbox != null ? [ControlsCapability] : []).ToArray();
+    public const string ControlsCapability = "emulator.controls";
+    private DateTimeOffset controlsAt;
     private readonly Gen3BattleEvents.Detector battleEvents = new();
     private readonly Gen3Defeat.Detector defeats = new();
     private readonly Gen3Memory memory = new(bridge);
-    private readonly System.Text.Json.Nodes.JsonObject data = Gen3ProfileRegistry.Resource("game-data");
+    private readonly JsonObject data = Gen3ProfileRegistry.Resource("game-data");
     private readonly System.Text.Json.Nodes.JsonObject progression = Gen3ProfileRegistry.Resource("progression");
+    // Every few seconds: speed-up, rewind and savestate loads become events for the admin logs. Never blocks the observation.
+    private async Task ForwardControlsAsync(CancellationToken cancellation)
+    {
+        if (!capabilities.Contains(ControlsCapability) || DateTimeOffset.UtcNow < controlsAt) return;
+        controlsAt = DateTimeOffset.UtcNow.AddSeconds(5);
+        JsonArray? events;
+        try { events = await bridge.GetControlsAsync(cancellation); } catch (ClientException) { return; }
+        foreach (var e in events ?? [])
+            if (e is JsonObject item && Gen3BattleEvents.ControlActions.Contains((string?)item["action"])) outbox!.Enqueue("EMULATOR_CONTROL", item);
+    }
     public async Task<GameSnapshot> ReadAsync(CancellationToken cancellation)
     {
         // First, and on its own reads: during a blackout the save blocks move and the rest of the observation may fail.
         if (capabilities.Contains(Gen3Defeat.EventCapability) && await Gen3Defeat.ObserveAsync(memory, profile, defeats, cancellation) is { } cause)
             outbox!.Enqueue("PLAYER_DEFEATED", new() { ["cause"] = cause });
+        await ForwardControlsAsync(cancellation);
         var ptr1 = await memory.ReadAsync(profile.SaveBlock1Pointer, 4, cancellation);
         var ptr2 = await memory.ReadAsync(profile.SaveBlock2Pointer, 4, cancellation);
         var sb1 = U32(ptr1); var sb2 = U32(ptr2);
